@@ -405,10 +405,60 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                   Result
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-2 sm:p-6">
-                <pre className="text-[10px] sm:text-xs bg-muted p-2 sm:p-4 rounded-lg overflow-auto max-h-40 sm:max-h-60">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
+              <CardContent className="p-2 sm:p-6 space-y-3">
+                {/* Live View URL */}
+                {result.liveViewUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-green-600">🔴 Live View (Real-time)</Label>
+                    <a
+                      href={result.liveViewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-blue-600 hover:text-blue-800 underline break-all bg-blue-50 p-2 rounded"
+                    >
+                      {result.liveViewUrl}
+                    </a>
+                  </div>
+                )}
+
+                {/* Recording URL */}
+                {result.recordingUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-purple-600">📹 Session Recording</Label>
+                    <a
+                      href={result.recordingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-blue-600 hover:text-blue-800 underline break-all bg-purple-50 p-2 rounded"
+                    >
+                      {result.recordingUrl}
+                    </a>
+                    <p className="text-[10px] text-slate-500">Note: Recording available ~30 seconds after session completes</p>
+                  </div>
+                )}
+
+                {/* Session URL */}
+                {result.sessionUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold">Session Dashboard</Label>
+                    <a
+                      href={result.sessionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-blue-600 hover:text-blue-800 underline break-all bg-slate-50 p-2 rounded"
+                    >
+                      {result.sessionUrl}
+                    </a>
+                  </div>
+                )}
+
+                {/* Full JSON Response */}
+                <details className="mt-3">
+                  <summary className="text-xs font-bold cursor-pointer hover:text-purple-600">View Full JSON Response</summary>
+                  <pre className="text-[10px] sm:text-xs bg-muted p-2 sm:p-4 rounded-lg overflow-auto max-h-40 sm:max-h-60 mt-2">
+                    {JSON.stringify(result, null, 2)}
+                  </pre>
+                </details>
               </CardContent>
             </Card>
           )}

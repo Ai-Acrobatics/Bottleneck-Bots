@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure } from "../../_core/trpc";
 import { Stagehand } from "@browserbasehq/stagehand";
 import { TRPCError } from "@trpc/server";
-import { getBrowserbaseService } from "../../_core/browserbase";
+import { browserbaseSDK } from "../../_core/browserbaseSDK";
 import { db } from "@/server/db";
 import { browserSessions, extractedData } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -48,17 +48,37 @@ export const aiRouter = router({
             console.log("Initializing Stagehand with Browserbase...");
 
             let sessionId: string | undefined;
+            let liveViewUrl: string | undefined;
+            let debuggerUrl: string | undefined;
 
             try {
-                // Create Browserbase session with optional geo-location
-                const browserbaseService = getBrowserbaseService();
-                const session = input.geolocation
-                    ? await browserbaseService.createSessionWithGeoLocation(input.geolocation)
-                    : await browserbaseService.createSession();
+                // Create Browserbase session using the real SDK
+                const session = await browserbaseSDK.createSession({
+                    projectId: process.env.BROWSERBASE_PROJECT_ID,
+                    browserSettings: {
+                        viewport: { width: 1920, height: 1080 },
+                    },
+                    proxies: true,
+                    recordSession: true,
+                    keepAlive: true,
+                    timeout: 3600,
+                });
 
                 sessionId = session.id;
-                console.log(`Session created: ${session.url}`);
+                console.log(`Browserbase session created: ${sessionId}`);
 
+                // Get live view URLs immediately after session creation
+                try {
+                    const debugInfo = await browserbaseSDK.getSessionDebug(sessionId);
+                    liveViewUrl = debugInfo.debuggerFullscreenUrl;
+                    debuggerUrl = debugInfo.debuggerUrl;
+                    console.log(`Live view available at: ${liveViewUrl}`);
+                } catch (debugError) {
+                    console.error("Failed to get live view URL:", debugError);
+                    // Don't throw - continue with automation even if live view fails
+                }
+
+                // Initialize Stagehand with the existing Browserbase session
                 const stagehand = new Stagehand({
                     env: "BROWSERBASE",
                     verbose: 1,
@@ -66,24 +86,7 @@ export const aiRouter = router({
                     model: input.modelName || "google/gemini-2.0-flash",
                     apiKey: process.env.BROWSERBASE_API_KEY,
                     projectId: process.env.BROWSERBASE_PROJECT_ID,
-                    browserbaseSessionCreateParams: {
-                        projectId: process.env.BROWSERBASE_PROJECT_ID!,
-                        proxies: true,
-                        region: "us-west-2",
-                        timeout: 3600,
-                        keepAlive: true,
-                        browserSettings: {
-                            advancedStealth: false,
-                            blockAds: true,
-                            solveCaptchas: true,
-                            recordSession: true, // Keep recording for session replay
-                            viewport: { width: 1920, height: 1080 },
-                        },
-                        userMetadata: {
-                            userId: "automation-user-chat",
-                            environment: process.env.NODE_ENV || "development",
-                        },
-                    },
+                    browserbaseSessionID: sessionId, // Connect to existing session
                 });
 
                 await stagehand.init();
@@ -108,7 +111,8 @@ export const aiRouter = router({
                         userId: placeholderUserId,
                         sessionId: sessionId,
                         status: "completed",
-                        url: session.url,
+                        url: liveViewUrl || `https://www.browserbase.com/sessions/${sessionId}`,
+                        debuggerUrl: debuggerUrl,
                         projectId: process.env.BROWSERBASE_PROJECT_ID,
                         metadata: {
                             sessionType: "chat",
@@ -117,6 +121,7 @@ export const aiRouter = router({
                             modelName: input.modelName || "google/gemini-2.0-flash",
                             geolocation: input.geolocation || null,
                             environment: process.env.NODE_ENV || "development",
+                            liveViewUrl: liveViewUrl,
                         },
                     });
                     console.log(`Session ${sessionId} persisted to database`);
@@ -129,7 +134,9 @@ export const aiRouter = router({
                     success: true,
                     message: `Successfully executed: ${prompt}`,
                     sessionId: sessionId,
-                    sessionUrl: session.url,
+                    sessionUrl: `https://www.browserbase.com/sessions/${sessionId}`,
+                    liveViewUrl: liveViewUrl,
+                    debuggerUrl: debuggerUrl,
                     prompt: prompt,
                 };
 
@@ -195,16 +202,15 @@ export const aiRouter = router({
                     };
                 }
 
-                // Otherwise, fetch from Browserbase API
+                // Otherwise, fetch from Browserbase API using real SDK
                 console.log(`Fetching recording from Browserbase API for session ${input.sessionId}`);
-                const browserbaseService = getBrowserbaseService();
-                const replay = await browserbaseService.getSessionRecording(input.sessionId);
+                const recording = await browserbaseSDK.getSessionRecording(input.sessionId);
 
                 // Cache the recording URL in database for future requests
-                if (replay.recordingUrl) {
+                if (recording.recordingUrl) {
                     try {
                         await db.update(browserSessions)
-                            .set({ recordingUrl: replay.recordingUrl })
+                            .set({ recordingUrl: recording.recordingUrl })
                             .where(eq(browserSessions.sessionId, input.sessionId));
                         console.log(`Cached recording URL for session ${input.sessionId}`);
                     } catch (dbError) {
@@ -215,9 +221,9 @@ export const aiRouter = router({
 
                 return {
                     sessionId: input.sessionId,
-                    events: replay.events || [],
-                    recordingUrl: replay.recordingUrl,
-                    status: replay.status,
+                    events: [], // rrweb events - Browserbase returns recording URL instead
+                    recordingUrl: recording.recordingUrl,
+                    status: recording.status,
                     cached: false,
                 };
             } catch (error) {
@@ -241,15 +247,15 @@ export const aiRouter = router({
         )
         .query(async ({ input }) => {
             try {
-                const browserbaseService = getBrowserbaseService();
-                const debugInfo = await browserbaseService.getSessionDebugInfo(input.sessionId);
+                // Use real Browserbase SDK to get live view URLs
+                const debugInfo = await browserbaseSDK.getSessionDebug(input.sessionId);
 
                 return {
                     sessionId: input.sessionId,
+                    liveViewUrl: debugInfo.debuggerFullscreenUrl,
                     debuggerFullscreenUrl: debugInfo.debuggerFullscreenUrl,
                     debuggerUrl: debugInfo.debuggerUrl,
                     wsUrl: debugInfo.wsUrl,
-                    status: debugInfo.status,
                 };
             } catch (error) {
                 console.error("Failed to retrieve session live view:", error);
@@ -271,14 +277,12 @@ export const aiRouter = router({
         )
         .query(async ({ input }) => {
             try {
-                // PLACEHOLDER: Implement when browserbase package is installed
-                // const browserbaseService = getBrowserbaseService();
-                // const logs = await browserbaseService.getSessionLogs(input.sessionId);
+                // Use real Browserbase SDK to get session logs
+                const logsData = await browserbaseSDK.getSessionLogs(input.sessionId);
 
                 return {
                     sessionId: input.sessionId,
-                    logs: [],
-                    message: "PLACEHOLDER: Install browserbase package to retrieve logs",
+                    logs: logsData.logs,
                 };
             } catch (error) {
                 console.error("Failed to retrieve session logs:", error);
