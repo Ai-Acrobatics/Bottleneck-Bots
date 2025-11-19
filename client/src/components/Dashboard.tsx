@@ -14,6 +14,12 @@ import { TeamPanel } from './TeamPanel';
 import { AssetManager } from './AssetManager';
 import { TicketQueue } from './TicketQueue';
 import { GlobalOps } from './GlobalOps';
+import { EmailAgentPanel } from './EmailAgentPanel';
+import { VoiceAgentPanel } from './VoiceAgentPanel';
+import { SettingsView } from './SettingsView';
+import { SEOManager } from './SEOManager';
+import { AdManagerPanel } from './AdManagerPanel';
+import { MarketplacePanel } from './MarketplacePanel';
 
 // Mock Data for Notion Integration
 const MOCK_CLIENTS: ClientContext[] = [
@@ -69,32 +75,32 @@ const MOCK_AGENTS: AgentInstance[] = [
 
 // Mock Tickets for the Queue
 const MOCK_TICKETS: SupportTicket[] = [
-  { 
-    id: 't1', 
-    source: 'VOICE', 
-    subject: 'Angry Call re: Workflow Failure', 
-    description: 'Client called (Twilio Rec #9928) stating that the "Birthday Offer" workflow is not triggering sms. She sounded very frustrated.', 
-    priority: 'HIGH', 
-    status: 'OPEN', 
-    timestamp: '2m ago' 
+  {
+    id: 't1',
+    source: 'VOICE',
+    subject: 'Angry Call re: Workflow Failure',
+    description: 'Client called (Twilio Rec #9928) stating that the "Birthday Offer" workflow is not triggering sms. She sounded very frustrated.',
+    priority: 'HIGH',
+    status: 'OPEN',
+    timestamp: '2m ago'
   },
-  { 
-    id: 't2', 
-    source: 'EMAIL', 
-    subject: 'Logo Update Request', 
-    description: 'Please update the header logo on the main landing page to the new PNG attached. - Sent via HelpDesk', 
-    priority: 'LOW', 
-    status: 'OPEN', 
-    timestamp: '15m ago' 
+  {
+    id: 't2',
+    source: 'EMAIL',
+    subject: 'Logo Update Request',
+    description: 'Please update the header logo on the main landing page to the new PNG attached. - Sent via HelpDesk',
+    priority: 'LOW',
+    status: 'OPEN',
+    timestamp: '15m ago'
   },
-  { 
-    id: 't3', 
-    source: 'WHATSAPP', 
-    subject: 'Login Issues', 
-    description: 'User @doctor_smith cannot login to the membership portal. Says password reset email never arrived.', 
-    priority: 'MEDIUM', 
-    status: 'IN_PROGRESS', 
-    timestamp: '1h ago' 
+  {
+    id: 't3',
+    source: 'WHATSAPP',
+    subject: 'Login Issues',
+    description: 'User @doctor_smith cannot login to the membership portal. Says password reset email never arrived.',
+    priority: 'MEDIUM',
+    status: 'IN_PROGRESS',
+    timestamp: '1h ago'
   }
 ];
 
@@ -104,19 +110,19 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initialCredits }) => {
-  const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL'>('GLOBAL');
+  const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE'>('GLOBAL');
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [task, setTask] = useState<AgentTask | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [screenshot, setScreenshot] = useState<string | undefined>(undefined);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
-  const [availableCredits, setAvailableCredits] = useState(initialCredits); 
-  
+  const [availableCredits, setAvailableCredits] = useState(initialCredits);
+
   // Context & Resources State
   const [contextSource, setContextSource] = useState<'NOTION' | 'PDF' | 'G_DRIVE'>('NOTION');
   const [selectedClient, setSelectedClient] = useState<ClientContext | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  
+
   // Drive State
   const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>(MOCK_DRIVE_FILES);
@@ -180,23 +186,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
       const file = e.target.files[0];
       setPdfFile(file);
       addLog('info', 'Analyzing Document', file.name);
-      
+
       // Simulate PDF Parsing
       setTimeout(() => {
-         const mockContext: ClientContext = {
-           id: 'manual_1',
-           source: 'PDF',
-           name: file.name.replace('.pdf', ''),
-           subaccountName: 'Extracted Subaccount',
-           subaccountId: 'manual_001',
-           brandVoice: 'Extracted: Authoritative & Scientific',
-           primaryGoal: 'Extracted: Consultation Bookings',
-           website: 'www.extracted-url.com',
-           seo: { siteTitle: 'Extracted Title', metaDescription: 'Extracted Meta', keywords: ['extracted', 'keywords'], robotsTxt: '' },
-           assets: []
-         };
-         setSelectedClient(mockContext);
-         addLog('success', 'Context Extracted', 'Brand Voice, Goals, and SEO data populated from PDF');
+        const mockContext: ClientContext = {
+          id: 'manual_1',
+          source: 'PDF',
+          name: file.name.replace('.pdf', ''),
+          subaccountName: 'Extracted Subaccount',
+          subaccountId: 'manual_001',
+          brandVoice: 'Extracted: Authoritative & Scientific',
+          primaryGoal: 'Extracted: Consultation Bookings',
+          website: 'www.extracted-url.com',
+          seo: { siteTitle: 'Extracted Title', metaDescription: 'Extracted Meta', keywords: ['extracted', 'keywords'], robotsTxt: '' },
+          assets: []
+        };
+        setSelectedClient(mockContext);
+        addLog('success', 'Context Extracted', 'Brand Voice, Goals, and SEO data populated from PDF');
       }, 1500);
     }
   };
@@ -214,50 +220,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
   };
 
   const handleUseDriveContext = () => {
-     const selectedFiles = driveFiles.filter(f => f.selected);
-     if (selectedFiles.length === 0) {
-        addLog('warning', 'Selection Empty', 'Please select at least one file from Drive.');
-        return;
-     }
+    const selectedFiles = driveFiles.filter(f => f.selected);
+    if (selectedFiles.length === 0) {
+      addLog('warning', 'Selection Empty', 'Please select at least one file from Drive.');
+      return;
+    }
 
-     addLog('info', 'Processing Drive Context', `Analyzing ${selectedFiles.length} documents...`);
-     
-     setTimeout(() => {
-        if (selectedClient) {
-            // Merge into existing client
-            const updatedClient: ClientContext = {
-                ...selectedClient,
-                source: 'G_DRIVE', // Mark that Drive is now a source
-                driveFiles: selectedFiles,
-            };
-            setSelectedClient(updatedClient);
-            addLog('success', 'Context Enriched', `Attached ${selectedFiles.length} Drive files to client: ${selectedClient.name}`);
-        } else {
-            // Create new mock client if none selected
-            const mockContext: ClientContext = {
-               id: 'gdrive_1',
-               source: 'G_DRIVE',
-               name: 'TechStart Agency',
-               subaccountName: 'TechStart - Main',
-               subaccountId: 'gd_001',
-               brandVoice: 'Innovative, Bold, Futuristic',
-               primaryGoal: 'Automate Client Onboarding',
-               website: 'techstart.demo',
-               driveFiles: selectedFiles,
-               seo: { siteTitle: 'TechStart', metaDescription: 'AI Automation', keywords: ['ai', 'automation'], robotsTxt: '' },
-               assets: []
-            };
-            setSelectedClient(mockContext);
-            addLog('success', 'Context Loaded', 'Created new client context from Drive files.');
-        }
-     }, 1500);
+    addLog('info', 'Processing Drive Context', `Analyzing ${selectedFiles.length} documents...`);
+
+    setTimeout(() => {
+      if (selectedClient) {
+        // Merge into existing client
+        const updatedClient: ClientContext = {
+          ...selectedClient,
+          source: 'G_DRIVE', // Mark that Drive is now a source
+          driveFiles: selectedFiles,
+        };
+        setSelectedClient(updatedClient);
+        addLog('success', 'Context Enriched', `Attached ${selectedFiles.length} Drive files to client: ${selectedClient.name}`);
+      } else {
+        // Create new mock client if none selected
+        const mockContext: ClientContext = {
+          id: 'gdrive_1',
+          source: 'G_DRIVE',
+          name: 'TechStart Agency',
+          subaccountName: 'TechStart - Main',
+          subaccountId: 'gd_001',
+          brandVoice: 'Innovative, Bold, Futuristic',
+          primaryGoal: 'Automate Client Onboarding',
+          website: 'techstart.demo',
+          driveFiles: selectedFiles,
+          seo: { siteTitle: 'TechStart', metaDescription: 'AI Automation', keywords: ['ai', 'automation'], robotsTxt: '' },
+          assets: []
+        };
+        setSelectedClient(mockContext);
+        addLog('success', 'Context Loaded', 'Created new client context from Drive files.');
+      }
+    }, 1500);
   };
 
   const handleResolveTicket = (ticket: SupportTicket, command: string) => {
     // 1. Update ticket status
     setTickets(prev => prev.map(t => t.id === ticket.id ? { ...t, status: 'IN_PROGRESS' } : t));
-    addLog('info', 'Ticket Triage', `Starting resolution for Ticket #${ticket.id.slice(0,4)}`);
-    
+    addLog('info', 'Ticket Triage', `Starting resolution for Ticket #${ticket.id.slice(0, 4)}`);
+
     // 2. Switch to Logs view to see progress
     setRightPanelTab('logs');
 
@@ -268,7 +274,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
   const handleCommand = async (input: string) => {
     // Permission Guard
     if (currentUser.role === 'VA') {
-       addLog('warning', 'Permissions Check', 'Running as VA: Some actions may be restricted by Admin policy.');
+      addLog('warning', 'Permissions Check', 'Running as VA: Some actions may be restricted by Admin policy.');
     }
 
     if (!selectedClient) {
@@ -286,10 +292,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
     setStatus(AgentStatus.PLANNING);
     setLogs([]);
     setScreenshot(undefined);
-    
+
     try {
       addLog('info', 'Agent is thinking...', 'Generating execution plan based on context and request.');
-      
+
       // Mock plan generation - will be replaced with tRPC call
       const plan: AgentTask = {
         id: crypto.randomUUID(),
@@ -302,18 +308,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
           { id: '2', action: 'Execute task', target: '.submit', status: 'pending' }
         ]
       };
-      
+
       setTask(plan);
       addLog('success', 'Plan Generated', `${plan.steps.length} steps identified for subaccount: ${plan.subaccount}`);
-      
+
       setStatus(AgentStatus.EXECUTING);
-      
+
       // Execute Loop
       let totalSessionCost = 0;
 
       for (const step of plan.steps) {
         setActiveStepId(step.id);
-        
+
         // Stop if credits run out mid-execution
         if (availableCredits - totalSessionCost <= 0) {
           addLog('error', 'Balance Depleted', 'Halting execution due to insufficient funds.');
@@ -322,38 +328,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
         }
 
         const result = await executeStep(step);
-        
+
         // Billing Logic: Charge per minute of execution
         // Standard Rate: $0.20 per minute (approx $0.0033 per second)
-        const costPerMs = 0.20 / 60000; 
+        const costPerMs = 0.20 / 60000;
         const stepCost = result.duration * costPerMs;
-        
+
         // Update Credits
         setAvailableCredits(prev => Math.max(0, prev - stepCost));
         totalSessionCost += stepCost;
 
         // Merge logs
         result.logs.forEach(l => addLog(l.level, l.message, l.detail));
-        
+
         if (result.screenshot) {
           setScreenshot(result.screenshot);
         }
 
         if (!result.success) {
-           setStatus(AgentStatus.ERROR);
-           addLog('error', 'Step Failed', step.action);
-           const fixSuggestion = 'Retry with alternative selector or increase timeout';
-           addLog('warning', 'AI Suggestion', fixSuggestion);
-           
-           await sendSlackAlert(slackConfig.webhookUrl, `Mission Failed at step: ${step.action}`, 'error');
-           return;
+          setStatus(AgentStatus.ERROR);
+          addLog('error', 'Step Failed', step.action);
+          const fixSuggestion = 'Retry with alternative selector or increase timeout';
+          addLog('warning', 'AI Suggestion', fixSuggestion);
+
+          await sendSlackAlert(slackConfig.webhookUrl, `Mission Failed at step: ${step.action}`, 'error');
+          return;
         }
       }
 
       setStatus(AgentStatus.COMPLETED);
       addLog('success', 'Mission Complete', `All steps executed successfully. Total Cost: $${totalSessionCost.toFixed(3)}`);
       setScreenshot('https://placehold.co/800x600/10b981/ffffff?text=Mission+Complete');
-      
+
       // Send Success Alert
       await sendSlackAlert(slackConfig.webhookUrl, `Mission "${input}" completed successfully for ${plan.subaccount}.`, 'success');
 
@@ -366,7 +372,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
   return (
     <div className="min-h-screen bg-[#f8fafc] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      
+
       {/* Header */}
       <header className="border-b border-white/60 bg-white/40 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-[2000px] mx-auto px-4 h-16 flex items-center justify-between">
@@ -375,11 +381,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
               AI
             </div>
             <div>
-               <h1 className="font-bold text-slate-800 leading-tight">GHL Agent <span className="text-indigo-600">Command</span></h1>
-               <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                  <span className={`w-2 h-2 rounded-full ${status === AgentStatus.EXECUTING ? 'bg-amber-400 animate-pulse' : status === AgentStatus.COMPLETED ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                  Status: {status}
-               </div>
+              <h1 className="font-bold text-slate-800 leading-tight">GHL Agent <span className="text-indigo-600">Command</span></h1>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                <span className={`w-2 h-2 rounded-full ${status === AgentStatus.EXECUTING ? 'bg-amber-400 animate-pulse' : status === AgentStatus.COMPLETED ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                Status: {status}
+              </div>
             </div>
           </div>
 
@@ -389,66 +395,107 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
           <div className="flex items-center gap-4">
             {/* Credits Display */}
-            <button 
+            <button
               onClick={() => handleOpenSettings('BILLING')}
               className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/50 border border-slate-200 rounded-lg hover:bg-white hover:border-indigo-300 transition-all group"
             >
-               <span className="text-xs font-bold text-slate-500 uppercase group-hover:text-indigo-600">Credits</span>
-               <span className="text-sm font-mono font-bold text-indigo-600">${availableCredits.toFixed(2)}</span>
+              <span className="text-xs font-bold text-slate-500 uppercase group-hover:text-indigo-600">Credits</span>
+              <span className="text-sm font-mono font-bold text-indigo-600">{availableCredits.toFixed(2)}</span>
             </button>
 
             {/* User Profile */}
             <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-               <div className="text-right hidden md:block">
-                 <p className="text-xs font-bold text-slate-700">{currentUser.name}</p>
-                 <p className="text-[10px] text-slate-500 uppercase tracking-wide">{currentUser.role} Account</p>
-               </div>
-               <button 
-                  onClick={() => handleOpenSettings('GENERAL')}
-                  className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-xs font-bold hover:shadow-lg transition-shadow"
-               >
-                  {currentUser.avatarInitials}
-               </button>
+              <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-slate-700">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{currentUser.role} Account</p>
+              </div>
+              <button
+                onClick={() => handleOpenSettings('GENERAL')}
+                className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center text-xs font-bold hover:shadow-lg transition-shadow"
+              >
+                {currentUser.avatarInitials}
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       <div className="flex max-w-[2000px] mx-auto h-[calc(100vh-64px)]">
-        
+
         {/* Navigation Rail */}
         <div className="w-16 flex flex-col items-center py-4 gap-4 border-r border-white/50 bg-white/30">
-           <button 
-             onClick={() => setViewMode('GLOBAL')}
-             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'GLOBAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
-             title="Global Operations"
-           >
-             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-           </button>
-           
-           <button 
-             onClick={() => setViewMode('TERMINAL')}
-             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'TERMINAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
-             title="Live Terminal"
-           >
-             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-           </button>
+          <button
+            onClick={() => setViewMode('GLOBAL')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'GLOBAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
+            title="Global Operations"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </button>
 
-           <div className="flex-1"></div>
-           
-           <button 
-            onClick={() => handleOpenSettings('GENERAL')}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-slate-600 transition-all"
-           >
-             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-           </button>
+          <button
+            onClick={() => setViewMode('TERMINAL')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'TERMINAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
+            title="Live Terminal"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </button>
+
+          <button
+            onClick={() => setViewMode('EMAIL_AGENT')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'EMAIL_AGENT' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
+            title="AI Email Agent"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+          </button>
+
+          <button
+            onClick={() => setViewMode('VOICE_AGENT')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'VOICE_AGENT' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
+            title="AI Voice Agent"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+          </button>
+
+          <button
+            onClick={() => setViewMode('SEO')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'SEO' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-slate-600'}`}
+            title="SEO & Reports"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          </button>
+
+          <button
+            onClick={() => setViewMode('ADS')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'ADS' ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-slate-600'}`}
+            title="AI Ad Manager"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+          </button>
+
+          <button
+            onClick={() => setViewMode('MARKETPLACE')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'MARKETPLACE' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-slate-600'}`}
+            title="Marketplace"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+          </button>
+
+          <div className="flex-1"></div>
+
+          <button
+            onClick={() => setViewMode('SETTINGS')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'SETTINGS' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-slate-600'}`}
+            title="Settings"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </button>
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 overflow-hidden">
-          
+        <main className="flex-1 p-4 overflow-y-auto md:overflow-hidden">
+
           {viewMode === 'GLOBAL' && (
-            <GlobalOps 
+            <GlobalOps
               clients={MOCK_CLIENTS}
               agents={MOCK_AGENTS}
               activities={activities}
@@ -459,27 +506,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
             />
           )}
 
+          {viewMode === 'EMAIL_AGENT' && (
+            <EmailAgentPanel />
+          )}
+
+          {viewMode === 'VOICE_AGENT' && (
+            <VoiceAgentPanel />
+          )}
+
+          {viewMode === 'SETTINGS' && (
+            <SettingsView userRole={currentUser.role} />
+          )}
+
+          {viewMode === 'SEO' && (
+            <SEOManager />
+          )}
+
+          {viewMode === 'ADS' && (
+            <AdManagerPanel />
+          )}
+
+          {viewMode === 'MARKETPLACE' && (
+            <MarketplacePanel />
+          )}
+
           {viewMode === 'TERMINAL' && (
-            <div className="h-full grid grid-cols-12 gap-4">
+            <div className="h-full grid grid-cols-1 md:grid-cols-12 gap-4 overflow-y-auto md:overflow-hidden">
               {/* Left Sidebar: Context & Config */}
-              <div className="col-span-3 flex flex-col gap-4 min-h-0">
+              <div className="col-span-1 md:col-span-3 flex flex-col gap-4 min-h-[400px] md:min-h-0 order-2 md:order-1">
                 <GlassPane title="Mission Context" className="shrink-0">
                   <div className="p-4 space-y-4">
                     {/* Source Selector */}
                     <div className="flex p-1 bg-slate-100 rounded-lg">
-                      <button 
+                      <button
                         onClick={() => setContextSource('NOTION')}
                         className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${contextSource === 'NOTION' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
                         Notion
                       </button>
-                      <button 
+                      <button
                         onClick={() => setContextSource('G_DRIVE')}
                         className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${contextSource === 'G_DRIVE' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
                         Drive
                       </button>
-                      <button 
+                      <button
                         onClick={() => setContextSource('PDF')}
                         className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${contextSource === 'PDF' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                       >
@@ -495,11 +566,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
                             <button
                               key={client.id}
                               onClick={() => setSelectedClient(client)}
-                              className={`w-full text-left p-2 rounded-lg border transition-all text-xs ${
-                                selectedClient?.id === client.id 
-                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium' 
-                                  : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200'
-                              }`}
+                              className={`w-full text-left p-2 rounded-lg border transition-all text-xs ${selectedClient?.id === client.id
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium'
+                                : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200'
+                                }`}
                             >
                               {client.name}
                             </button>
@@ -520,7 +590,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
                                 <path fill="#EA4335" d="M12.255 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C18.205 1.19 15.495 0 12.255 0c-4.69 0-8.74 2.7-10.71 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z" />
                               </svg>
                             </div>
-                            <button 
+                            <button
                               onClick={handleConnectDrive}
                               className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-slate-50 transition-colors"
                             >
@@ -529,33 +599,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
                           </div>
                         ) : (
                           <>
-                             <div className="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-[10px] font-medium flex justify-between items-center">
-                               <span>Connected: admin@zenithops.com</span>
-                               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                             </div>
-                             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                                {driveFiles.map(file => (
-                                  <div key={file.id} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                                    <input 
-                                      type="checkbox" 
-                                      checked={file.selected}
-                                      onChange={() => handleDriveFileToggle(file.id)}
-                                      className="rounded text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <span className="text-lg">{file.icon}</span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-slate-700 truncate">{file.name}</p>
-                                      <p className="text-[9px] text-slate-400">Google Doc</p>
-                                    </div>
+                            <div className="bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-[10px] font-medium flex justify-between items-center">
+                              <span>Connected: admin@zenithops.com</span>
+                              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                              {driveFiles.map(file => (
+                                <div key={file.id} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={file.selected}
+                                    onChange={() => handleDriveFileToggle(file.id)}
+                                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                  <span className="text-lg">{file.icon}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-slate-700 truncate">{file.name}</p>
+                                    <p className="text-[9px] text-slate-400">Google Doc</p>
                                   </div>
-                                ))}
-                             </div>
-                             <button 
-                               onClick={handleUseDriveContext}
-                               className="bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-500/20"
-                             >
-                               Import Context & Analyze
-                             </button>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              onClick={handleUseDriveContext}
+                              className="bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-500/20"
+                            >
+                              Import Context & Analyze
+                            </button>
                           </>
                         )}
                       </div>
@@ -563,8 +633,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
                     {contextSource === 'PDF' && (
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-white/50 transition-colors cursor-pointer relative">
-                        <input 
-                          type="file" 
+                        <input
+                          type="file"
                           accept=".pdf"
                           onChange={handlePdfUpload}
                           className="absolute inset-0 opacity-0 cursor-pointer"
@@ -582,143 +652,151 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
                 {/* Context Data Visualization */}
                 <GlassPane className="flex-1 min-h-0 overflow-hidden bg-gradient-to-b from-white/40 to-white/10">
                   <div className="p-4 space-y-4 overflow-y-auto h-full">
-                      {selectedClient ? (
-                        <>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Subaccount Target</p>
-                            <div className="bg-white/60 p-2 rounded border border-white/50 text-xs font-mono text-slate-700 flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                              {selectedClient.subaccountName}
-                            </div>
+                    {selectedClient ? (
+                      <>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Subaccount Target</p>
+                          <div className="bg-white/60 p-2 rounded border border-white/50 text-xs font-mono text-slate-700 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            {selectedClient.subaccountName}
                           </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Brand Voice</p>
-                            <p className="text-xs text-slate-600 italic bg-indigo-50/50 p-2 rounded border-l-2 border-indigo-400">
-                              "{selectedClient.brandVoice}"
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Primary Objective</p>
-                            <p className="text-xs text-slate-700 font-medium">{selectedClient.primaryGoal}</p>
-                          </div>
-                          
-                          {selectedClient.driveFiles && selectedClient.driveFiles.length > 0 && (
-                            <div>
-                               <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Active Documents</p>
-                               <div className="space-y-1">
-                                  {selectedClient.driveFiles.map(f => (
-                                     <div key={f.id} className="text-[10px] text-slate-600 flex items-center gap-1">
-                                        <span>{f.icon}</span> {f.name}
-                                     </div>
-                                  ))}
-                               </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
-                          Select a client to view context data
                         </div>
-                      )}
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Brand Voice</p>
+                          <textarea
+                            className="w-full text-xs text-slate-600 bg-indigo-50/50 p-2 rounded border border-indigo-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-y min-h-[80px]"
+                            value={selectedClient.brandVoice}
+                            onChange={(e) => setSelectedClient({ ...selectedClient, brandVoice: e.target.value })}
+                            placeholder="Describe the brand's tone, style, and personality..."
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Primary Objective</p>
+                          <textarea
+                            className="w-full text-xs text-slate-700 bg-white p-2 rounded border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-y min-h-[60px]"
+                            value={selectedClient.primaryGoal}
+                            onChange={(e) => setSelectedClient({ ...selectedClient, primaryGoal: e.target.value })}
+                            placeholder="What is the main goal for this agent?"
+                          />
+                        </div>
+
+                        {selectedClient.driveFiles && selectedClient.driveFiles.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Active Documents</p>
+                            <div className="space-y-1">
+                              {selectedClient.driveFiles.map(f => (
+                                <div key={f.id} className="text-[10px] text-slate-600 flex items-center gap-1">
+                                  <span>{f.icon}</span> {f.name}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                        Select a client to view context data
+                      </div>
+                    )}
                   </div>
                 </GlassPane>
               </div>
 
               {/* Center: Visual Command Center */}
-              <div className="col-span-6 flex flex-col min-h-0 gap-4">
+              <div className="col-span-1 md:col-span-6 flex flex-col min-h-[600px] md:min-h-0 gap-4 order-1 md:order-2">
                 <div className="flex-1 min-h-0">
-                  <BrowserPreview 
+                  <BrowserPreview
                     currentStep={task?.steps.find(s => s.id === activeStepId) || null}
                     screenshotUrl={screenshot}
                     isProcessing={status === AgentStatus.EXECUTING || status === AgentStatus.PLANNING}
                   />
                 </div>
-                
-                <CommandBar 
-                  onSend={handleCommand} 
-                  disabled={status === AgentStatus.EXECUTING || status === AgentStatus.PLANNING} 
+
+                <CommandBar
+                  onSend={handleCommand}
+                  disabled={status === AgentStatus.EXECUTING || status === AgentStatus.PLANNING}
                 />
               </div>
 
               {/* Right Sidebar: Logs, Resources & Team */}
-              <div className="col-span-3 flex flex-col gap-0 min-h-0 glass-panel rounded-2xl overflow-hidden">
+              <div className="col-span-1 md:col-span-3 flex flex-col gap-0 min-h-[500px] md:min-h-0 glass-panel rounded-2xl overflow-hidden order-3">
                 {/* Tabs */}
                 <div className="flex border-b border-white/50 bg-white/30">
-                    <button 
-                      onClick={() => setRightPanelTab('tickets')}
-                      className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'tickets' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
-                    >
-                      Tickets
-                    </button>
-                    <button 
-                      onClick={() => setRightPanelTab('logs')}
-                      className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'logs' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
-                    >
-                      Terminal
-                    </button>
-                    <button 
-                      onClick={() => setRightPanelTab('resources')}
-                      className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'resources' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
-                    >
-                      Assets
-                    </button>
-                    <button 
-                      onClick={() => setRightPanelTab('team')}
-                      className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'team' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
-                    >
-                      Team
-                    </button>
+                  <button
+                    onClick={() => setRightPanelTab('tickets')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'tickets' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
+                  >
+                    Tickets
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('logs')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'logs' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
+                  >
+                    Terminal
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('resources')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'resources' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
+                  >
+                    Assets
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('team')}
+                    className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${rightPanelTab === 'team' ? 'bg-white/50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-white/20'}`}
+                  >
+                    Team
+                  </button>
                 </div>
 
                 <div className="flex-1 min-h-0 relative bg-white/20">
-                    {rightPanelTab === 'logs' && (
-                      <div className="absolute inset-0">
-                        <TerminalLog logs={logs} />
-                      </div>
-                    )}
+                  {rightPanelTab === 'logs' && (
+                    <div className="absolute inset-0">
+                      <TerminalLog logs={logs} />
+                    </div>
+                  )}
 
-                    {rightPanelTab === 'tickets' && (
-                      <div className="absolute inset-0 p-2">
-                        <TicketQueue 
-                          tickets={tickets}
-                          onResolve={handleResolveTicket}
-                        />
-                      </div>
-                    )}
+                  {rightPanelTab === 'tickets' && (
+                    <div className="absolute inset-0 p-2">
+                      <TicketQueue
+                        tickets={tickets}
+                        onResolve={handleResolveTicket}
+                      />
+                    </div>
+                  )}
 
-                    {rightPanelTab === 'resources' && selectedClient && (
-                      <div className="absolute inset-0 p-2">
-                        <AssetManager 
-                          assets={selectedClient.assets || []}
-                          seoConfig={selectedClient.seo || { siteTitle: '', metaDescription: '', keywords: [], robotsTxt: '' }}
-                          onAssetsUpdate={(newAssets) => setSelectedClient({...selectedClient, assets: newAssets})}
-                          onSeoUpdate={(newSeo) => setSelectedClient({...selectedClient, seo: newSeo})}
-                        />
-                      </div>
-                    )}
+                  {rightPanelTab === 'resources' && selectedClient && (
+                    <div className="absolute inset-0 p-2">
+                      <AssetManager
+                        assets={selectedClient.assets || []}
+                        seoConfig={selectedClient.seo || { siteTitle: '', metaDescription: '', keywords: [], robotsTxt: '' }}
+                        onAssetsUpdate={(newAssets) => setSelectedClient({ ...selectedClient, assets: newAssets })}
+                        onSeoUpdate={(newSeo) => setSelectedClient({ ...selectedClient, seo: newSeo })}
+                      />
+                    </div>
+                  )}
 
-                    {rightPanelTab === 'team' && (
-                      <div className="absolute inset-0 p-2">
-                        <TeamPanel 
-                          users={MOCK_USERS}
-                          activities={activities}
-                          currentUser={currentUser}
-                          onSwitchUser={(userId) => {
-                            const user = MOCK_USERS.find(u => u.id === userId);
-                            if (user) {
-                              setCurrentUser(user);
-                              addLog('system', 'User Switched', `Now operating as ${user.name} (${user.role})`);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
+                  {rightPanelTab === 'team' && (
+                    <div className="absolute inset-0 p-2">
+                      <TeamPanel
+                        users={MOCK_USERS}
+                        activities={activities}
+                        currentUser={currentUser}
+                        onSwitchUser={(userId) => {
+                          const user = MOCK_USERS.find(u => u.id === userId);
+                          if (user) {
+                            setCurrentUser(user);
+                            addLog('system', 'User Switched', `Now operating as ${user.name} (${user.role})`);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
 
-                    {!selectedClient && rightPanelTab === 'resources' && (
-                      <div className="h-full flex items-center justify-center text-slate-400 text-xs italic p-4 text-center">
-                          Select a client to manage their assets and SEO settings.
-                      </div>
-                    )}
+                  {!selectedClient && rightPanelTab === 'resources' && (
+                    <div className="h-full flex items-center justify-center text-slate-400 text-xs italic p-4 text-center">
+                      Select a client to manage their assets and SEO settings.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -726,9 +804,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
         </main>
       </div>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
         config={slackConfig}
         onSaveConfig={handleSaveSettings}
         userRole={currentUser.role}

@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type check
+        run: pnpm run check
+
+      - name: Run tests
+        run: pnpm run test
+
+      # TODO (Hitesh): Add linting step
+      # - name: Lint
+      #   run: pnpm run lint

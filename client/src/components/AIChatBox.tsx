@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Loader2, Send, User, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
+import { trpc } from "@/lib/trpc";
 
 /**
  * Message type matching server-side LLM Message interface
@@ -19,13 +20,13 @@ export type AIChatBoxProps = {
    * Messages array to display in the chat.
    * Should match the format used by invokeLLM on the server.
    */
-  messages: Message[];
+  messages?: Message[];
 
   /**
    * Callback when user sends a message.
    * Typically you'll call a tRPC mutation here to invoke the LLM.
    */
-  onSendMessage: (content: string) => void;
+  onSendMessage?: (content: string) => void;
 
   /**
    * Whether the AI is currently generating a response
@@ -72,35 +73,8 @@ export type AIChatBoxProps = {
  * @example
  * ```tsx
  * const ChatPage = () => {
- *   const [messages, setMessages] = useState<Message[]>([
- *     { role: "system", content: "You are a helpful assistant." }
- *   ]);
- *
- *   const chatMutation = trpc.ai.chat.useMutation({
- *     onSuccess: (response) => {
- *       // Assuming your tRPC endpoint returns the AI response as a string
- *       setMessages(prev => [...prev, {
- *         role: "assistant",
- *         content: response
- *       }]);
- *     },
- *     onError: (error) => {
- *       console.error("Chat error:", error);
- *       // Optionally show error message to user
- *     }
- *   });
- *
- *   const handleSend = (content: string) => {
- *     const newMessages = [...messages, { role: "user", content }];
- *     setMessages(newMessages);
- *     chatMutation.mutate({ messages: newMessages });
- *   };
- *
  *   return (
  *     <AIChatBox
- *       messages={messages}
- *       onSendMessage={handleSend}
- *       isLoading={chatMutation.isPending}
  *       suggestedPrompts={[
  *         "Explain quantum computing",
  *         "Write a hello world in Python"
@@ -111,9 +85,9 @@ export type AIChatBoxProps = {
  * ```
  */
 export function AIChatBox({
-  messages,
+  messages: initialMessages = [],
   onSendMessage,
-  isLoading = false,
+  isLoading: externalIsLoading,
   placeholder = "Type your message...",
   className,
   height = "600px",
@@ -121,6 +95,27 @@ export function AIChatBox({
   suggestedPrompts,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
+  const [internalMessages, setInternalMessages] = useState<Message[]>(initialMessages);
+
+  // Use tRPC mutation
+  const chatMutation = trpc.ai.chat.useMutation({
+    onSuccess: (response) => {
+      setInternalMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response },
+      ]);
+    },
+    onError: (error) => {
+      setInternalMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Error: ${error.message}` },
+      ]);
+    }
+  });
+
+  const isLoading = externalIsLoading || chatMutation.isPending;
+  const messages = internalMessages;
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
@@ -170,7 +165,17 @@ export function AIChatBox({
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
 
-    onSendMessage(trimmedInput);
+    if (onSendMessage) {
+      onSendMessage(trimmedInput);
+    } else {
+      // Default behavior: update internal state and call mutation
+      const newMessages = [
+        ...internalMessages,
+        { role: "user", content: trimmedInput } as Message,
+      ];
+      setInternalMessages(newMessages);
+      chatMutation.mutate({ messages: newMessages });
+    }
     setInput("");
 
     // Scroll immediately after sending
@@ -211,7 +216,18 @@ export function AIChatBox({
                   {suggestedPrompts.map((prompt, index) => (
                     <button
                       key={index}
-                      onClick={() => onSendMessage(prompt)}
+                      onClick={() => {
+                        if (onSendMessage) {
+                          onSendMessage(prompt);
+                        } else {
+                          const newMessages = [
+                            ...internalMessages,
+                            { role: "user", content: prompt } as Message,
+                          ];
+                          setInternalMessages(newMessages);
+                          chatMutation.mutate({ messages: newMessages });
+                        }
+                      }}
                       disabled={isLoading}
                       className="rounded-lg border border-border bg-card px-4 py-2 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                     >

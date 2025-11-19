@@ -1,11 +1,18 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { aiRouter } from "./api/routers/ai";
+import { emailRouter } from "./api/routers/email";
+import { voiceRouter } from "./api/routers/voice";
+import { seoRouter } from "./api/routers/seo";
+import { adsRouter } from "./api/routers/ads";
+import { marketplaceRouter } from "./api/routers/marketplace";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  ai: aiRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -17,12 +24,12 @@ export const appRouter = router({
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // Feature routers
+  email: emailRouter,
+  voice: voiceRouter,
+  seo: seoRouter,
+  ads: adsRouter,
+  marketplace: marketplaceRouter,
 });
 
 export type AppRouter = typeof appRouter;

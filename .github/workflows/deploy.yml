@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build application
+        run: pnpm run build
+        env:
+          # TODO (Hitesh): Add all required environment variables as GitHub Secrets
+          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
+          VITE_APP_TITLE: ${{ secrets.VITE_APP_TITLE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      # TODO (Hitesh): Choose deployment target and uncomment appropriate section
+
+      # Option 1: Deploy to Vercel
+      # - name: Deploy to Vercel
+      #   uses: amondnet/vercel-action@v25
+      #   with:
+      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+      #     vercel-args: '--prod'
+
+      # Option 2: Build and push Docker image
+      # - name: Build Docker image
+      #   run: docker build -t ghlagencyai:${{ github.sha }} .
+      #
+      # - name: Push to Container Registry
+      #   run: |
+      #     echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+      #     docker push ghlagencyai:${{ github.sha }}
+      #
+      # - name: Deploy to production
+      #   run: |
+      #     # Add deployment commands here (e.g., AWS ECS, Railway, etc.)
+
+      - name: Deployment placeholder
+        run: echo "Deployment configuration needed - see TODO comments above"
