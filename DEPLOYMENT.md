@@ -70,6 +70,8 @@ npx pnpm run start
    - Output Directory: `dist/public`
    - Install Command: `pnpm install`
 
+   > **Note:** This project uses a custom serverless entry point at `api/index.ts` for Vercel. The `vercel.json` configuration handles the routing automatically.
+
 4. **Add Environment Variables**
    In the Vercel project settings, add all environment variables from your `.env` file:
    - Go to "Settings" → "Environment Variables"
