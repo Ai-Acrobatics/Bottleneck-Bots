@@ -20,6 +20,7 @@ import { SettingsView } from './SettingsView';
 import { SEOManager } from './SEOManager';
 import { AdManagerPanel } from './AdManagerPanel';
 import { MarketplacePanel } from './MarketplacePanel';
+import { AIBrowserPanel } from './AIBrowserPanel';
 
 // Mock Data for Notion Integration
 const MOCK_CLIENTS: ClientContext[] = [
@@ -110,7 +111,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initialCredits }) => {
-  const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE'>('GLOBAL');
+  const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER'>('GLOBAL');
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [task, setTask] = useState<AgentTask | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -480,6 +481,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
           </button>
 
+          <button
+            onClick={() => setViewMode('AI_BROWSER')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'AI_BROWSER' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-400 hover:bg-white/60 hover:text-indigo-500'}`}
+            title="AI Browser"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+          </button>
+
           <div className="flex-1"></div>
 
           <button
@@ -528,6 +537,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
           {viewMode === 'MARKETPLACE' && (
             <MarketplacePanel />
+          )}
+
+          {viewMode === 'AI_BROWSER' && (
+            <AIBrowserPanel onLog={(msg) => addLog('info', 'AI Browser', msg)} />
           )}
 
           {viewMode === 'TERMINAL' && (
@@ -703,8 +716,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
               </div>
 
               {/* Center: Visual Command Center */}
-              <div className="col-span-1 md:col-span-6 flex flex-col min-h-[600px] md:min-h-0 gap-4 order-1 md:order-2">
-                <div className="flex-1 min-h-0">
+              <div className="col-span-1 md:col-span-6 flex flex-col-reverse md:flex-col min-h-[600px] md:min-h-0 gap-4 order-1 md:order-2">
+                <div className="h-64 md:h-auto md:flex-1 min-h-0 shrink-0">
                   <BrowserPreview
                     currentStep={task?.steps.find(s => s.id === activeStepId) || null}
                     screenshotUrl={screenshot}

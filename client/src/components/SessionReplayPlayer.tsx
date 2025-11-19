@@ -1,0 +1,251 @@
+/**
+ * Session Replay Player Component
+ * Displays Browserbase session recordings using rrweb-player
+ *
+ * PLACEHOLDER: Install rrweb-player package
+ * Run: pnpm add rrweb-player rrweb
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Spinner } from './ui/spinner';
+import { Alert, AlertDescription } from './ui/alert';
+import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+
+// PLACEHOLDER: Import when rrweb-player is installed
+// import rrwebPlayer from 'rrweb-player';
+// import 'rrweb-player/dist/style.css';
+
+interface SessionReplayPlayerProps {
+  sessionId: string;
+  events?: any[]; // rrweb events
+  width?: number;
+  height?: number;
+  autoPlay?: boolean;
+  skipInactive?: boolean;
+  showController?: boolean;
+}
+
+export function SessionReplayPlayer({
+  sessionId,
+  events = [],
+  width = 1024,
+  height = 576,
+  autoPlay = false,
+  skipInactive = true,
+  showController = true,
+}: SessionReplayPlayerProps) {
+  const playerRef = useRef<HTMLDivElement>(null);
+  const [player, setPlayer] = useState<any>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!playerRef.current || events.length === 0) {
+      return;
+    }
+
+    try {
+      // PLACEHOLDER: Initialize rrweb player when package is installed
+      /*
+      const rrwebPlayerInstance = new rrwebPlayer({
+        target: playerRef.current,
+        props: {
+          events,
+          width,
+          height,
+          skipInactive,
+          showController,
+          autoPlay,
+        },
+      });
+
+      // Add event listeners
+      rrwebPlayerInstance.addEventListener('play', () => {
+        console.log('Playback started');
+        setIsPlaying(true);
+      });
+
+      rrwebPlayerInstance.addEventListener('pause', () => {
+        console.log('Playback paused');
+        setIsPlaying(false);
+      });
+
+      rrwebPlayerInstance.addEventListener('finish', () => {
+        console.log('Playback finished');
+        setIsPlaying(false);
+      });
+
+      setPlayer(rrwebPlayerInstance);
+
+      return () => {
+        rrwebPlayerInstance.destroy();
+      };
+      */
+
+      // Mock for now
+      console.log('SessionReplayPlayer mounted with', events.length, 'events');
+    } catch (err) {
+      console.error('Failed to initialize rrweb player:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load replay');
+    }
+  }, [events, width, height, skipInactive, showController, autoPlay]);
+
+  const handlePlay = () => {
+    if (player) {
+      // PLACEHOLDER: Implement when rrweb-player is installed
+      // player.play();
+      console.log('Play clicked');
+    }
+  };
+
+  const handlePause = () => {
+    if (player) {
+      // PLACEHOLDER: Implement when rrweb-player is installed
+      // player.pause();
+      console.log('Pause clicked');
+    }
+  };
+
+  const handleJumpTo = (time: number) => {
+    if (player) {
+      // PLACEHOLDER: Implement when rrweb-player is installed
+      // player.goto(time);
+      console.log('Jump to', time);
+    }
+  };
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading Session Replay</CardTitle>
+          <CardDescription>Session ID: {sessionId}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Spinner className="mb-4" />
+            <p className="text-sm text-muted-foreground">
+              Waiting for session recording... Replays typically become available ~30 seconds after session closure.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Session Replay</CardTitle>
+        <CardDescription>
+          Session ID: {sessionId} | {events.length} events recorded
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* PLACEHOLDER: rrweb player container */}
+        <div
+          ref={playerRef}
+          className="border rounded-lg overflow-hidden bg-gray-50"
+          style={{ width: `${width}px`, height: `${height}px` }}
+        >
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                PLACEHOLDER: Install rrweb-player to display session replay
+              </p>
+              <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                pnpm add rrweb-player rrweb
+              </code>
+            </div>
+          </div>
+        </div>
+
+        {/* Custom playback controls */}
+        {!showController && (
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleJumpTo(0)}
+            >
+              <SkipBack className="h-4 w-4" />
+            </Button>
+
+            {isPlaying ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePause}
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePlay}
+              >
+                <Play className="h-4 w-4" />
+              </Button>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleJumpTo(5000)}
+            >
+              <SkipForward className="h-4 w-4" />
+            </Button>
+
+            <span className="text-xs text-muted-foreground ml-auto">
+              {currentTime}ms
+            </span>
+          </div>
+        )}
+
+        <Alert className="mt-4">
+          <AlertDescription className="text-xs">
+            <strong>Note:</strong> Session replays are designed for single-tab workflows only.
+            Multi-tab recordings may be unreliable. Some sites (Opentable, Salesforce) disable recordings.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Alternative iframe-based player for simpler integration
+ */
+export function SessionReplayIframe({
+  sessionId
+}: {
+  sessionId: string
+}) {
+  return (
+    <div className="w-full">
+      <iframe
+        src={`/replay/${sessionId}`}
+        width="100%"
+        height="600px"
+        className="border rounded-lg"
+        allow="fullscreen"
+        title={`Session Replay ${sessionId}`}
+      />
+      <p className="text-xs text-muted-foreground mt-2">
+        PLACEHOLDER: Create /replay/:sessionId route that initializes rrweb player
+      </p>
+    </div>
+  );
+}

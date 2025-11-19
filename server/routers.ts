@@ -7,6 +7,10 @@ import { voiceRouter } from "./api/routers/voice";
 import { seoRouter } from "./api/routers/seo";
 import { adsRouter } from "./api/routers/ads";
 import { marketplaceRouter } from "./api/routers/marketplace";
+import { tasksRouter } from "./api/routers/tasks";
+import { templatesRouter } from "./api/routers/templates";
+import { workflowRouter } from "./api/routers/workflows";
+import { quizRouter } from "./api/routers/quiz";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -30,6 +34,10 @@ export const appRouter = router({
   seo: seoRouter,
   ads: adsRouter,
   marketplace: marketplaceRouter,
+  tasks: tasksRouter,
+  templates: templatesRouter,
+  workflows: workflowRouter,
+  quiz: quizRouter,
 });
 
 export type AppRouter = typeof appRouter;

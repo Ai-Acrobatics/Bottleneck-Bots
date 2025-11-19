@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -82,3 +82,226 @@ export type Job = typeof jobs.$inferSelect;
 export type InsertJob = typeof jobs.$inferInsert;
 export type Integration = typeof integrations.$inferSelect;
 export type InsertIntegration = typeof integrations.$inferInsert;
+
+export const scheduledTasks = pgTable("scheduled_tasks", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  schedule: text("schedule").notNull(), // Cron expression or human readable
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, paused
+  lastRun: timestamp("lastRun"),
+  nextRun: timestamp("nextRun"),
+  config: text("config"), // JSON string
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export const automationTemplates = pgTable("automation_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  steps: text("steps").notNull(), // JSON string of Stagehand steps
+  category: varchar("category", { length: 50 }).default("General"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type ScheduledTask = typeof scheduledTasks.$inferSelect;
+export type InsertScheduledTask = typeof scheduledTasks.$inferInsert;
+
+export type AutomationTemplate = typeof automationTemplates.$inferSelect;
+export type InsertAutomationTemplate = typeof automationTemplates.$inferInsert;
+
+// ========================================
+// AI BROWSER INTEGRATION TABLES
+// ========================================
+
+/**
+ * Browserbase session metadata
+ * Tracks browser sessions created via Browserbase API
+ */
+export const browserSessions = pgTable("browser_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id).notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull().unique(), // Browserbase session ID
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, completed, failed, expired
+  url: text("url"), // Current or last visited URL
+  projectId: varchar("projectId", { length: 128 }), // Browserbase project ID
+  debugUrl: text("debugUrl"), // Live debug URL
+  recordingUrl: text("recordingUrl"), // Session recording URL
+  metadata: jsonb("metadata"), // Additional session data
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+});
+
+export type BrowserSession = typeof browserSessions.$inferSelect;
+export type InsertBrowserSession = typeof browserSessions.$inferInsert;
+
+/**
+ * Automation workflow definitions
+ * Stores reusable automation workflows created by users
+ */
+export const automationWorkflows = pgTable("automation_workflows", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  steps: jsonb("steps").notNull(), // Array of Stagehand automation steps
+  category: varchar("category", { length: 50 }).default("custom"),
+  isTemplate: boolean("isTemplate").default(false).notNull(), // Public template or private workflow
+  tags: jsonb("tags"), // Array of tags for categorization
+  version: integer("version").default(1).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  executionCount: integer("executionCount").default(0).notNull(),
+  lastExecutedAt: timestamp("lastExecutedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type AutomationWorkflow = typeof automationWorkflows.$inferSelect;
+export type InsertAutomationWorkflow = typeof automationWorkflows.$inferInsert;
+
+/**
+ * Workflow execution tracking
+ * Records each workflow run with status and results
+ */
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: serial("id").primaryKey(),
+  workflowId: integer("workflowId").references(() => automationWorkflows.id).notNull(),
+  sessionId: integer("sessionId").references(() => browserSessions.id),
+  userId: integer("userId").references(() => users.id).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, running, completed, failed, cancelled
+  input: jsonb("input"), // Input parameters for this execution
+  output: jsonb("output"), // Results/output from execution
+  error: text("error"), // Error message if failed
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  duration: integer("duration"), // Execution time in milliseconds
+  stepResults: jsonb("stepResults"), // Results from each step
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+export type InsertWorkflowExecution = typeof workflowExecutions.$inferInsert;
+
+/**
+ * Extracted web data
+ * Stores data extracted from web pages during automation
+ */
+export const extractedData = pgTable("extracted_data", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("sessionId").references(() => browserSessions.id),
+  executionId: integer("executionId").references(() => workflowExecutions.id),
+  userId: integer("userId").references(() => users.id).notNull(),
+  url: text("url").notNull(), // Source URL
+  dataType: varchar("dataType", { length: 50 }).notNull(), // text, image, table, form, link, custom
+  selector: text("selector"), // CSS selector or XPath used
+  data: jsonb("data").notNull(), // Extracted data payload
+  metadata: jsonb("metadata"), // Additional context (screenshot, page title, etc.)
+  tags: jsonb("tags"), // User-defined tags for organization
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ExtractedData = typeof extractedData.$inferSelect;
+export type InsertExtractedData = typeof extractedData.$inferInsert;
+
+/**
+ * User preferences for AI browser
+ * Stores user-specific defaults and settings
+ */
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id).notNull().unique(),
+  defaultBrowserConfig: jsonb("defaultBrowserConfig"), // Default Browserbase config
+  defaultWorkflowSettings: jsonb("defaultWorkflowSettings"), // Default automation settings
+  notifications: jsonb("notifications"), // Notification preferences
+  apiKeys: jsonb("apiKeys"), // Encrypted API keys for integrations
+  theme: varchar("theme", { length: 20 }).default("light"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type UserPreference = typeof userPreferences.$inferSelect;
+export type InsertUserPreference = typeof userPreferences.$inferInsert;
+
+// ========================================
+// QUIZ SYSTEM TABLES
+// ========================================
+
+/**
+ * Quiz documents
+ * Top-level quiz/assessment definitions
+ */
+export const quizzes = pgTable("quizzes", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id), // Creator/owner of quiz
+  title: text("title").notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).default("general"),
+  difficulty: varchar("difficulty", { length: 20 }).default("medium"), // easy, medium, hard
+  timeLimit: integer("timeLimit"), // Time limit in minutes (null = no limit)
+  passingScore: integer("passingScore").default(70), // Percentage required to pass
+  isPublished: boolean("isPublished").default(false).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  tags: jsonb("tags"), // Array of tags
+  metadata: jsonb("metadata"), // Additional quiz settings (randomize, show answers, etc.)
+  attemptsAllowed: integer("attemptsAllowed"), // Max attempts per user (null = unlimited)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  publishedAt: timestamp("publishedAt"),
+});
+
+export type Quiz = typeof quizzes.$inferSelect;
+export type InsertQuiz = typeof quizzes.$inferInsert;
+
+/**
+ * Quiz questions
+ * Individual questions belonging to quizzes
+ */
+export const quizQuestions = pgTable("quiz_questions", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quizId").references(() => quizzes.id).notNull(),
+  questionText: text("questionText").notNull(),
+  questionType: varchar("questionType", { length: 30 }).notNull(), // multiple_choice, true_false, short_answer, essay
+  options: jsonb("options"), // Array of answer options for multiple choice
+  correctAnswer: jsonb("correctAnswer"), // Correct answer(s) - can be string, array, or object
+  points: integer("points").default(1).notNull(),
+  order: integer("order").notNull(), // Question order in quiz
+  explanation: text("explanation"), // Explanation shown after answer
+  hint: text("hint"), // Optional hint for question
+  metadata: jsonb("metadata"), // Additional question settings
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type QuizQuestion = typeof quizQuestions.$inferSelect;
+export type InsertQuizQuestion = typeof quizQuestions.$inferInsert;
+
+/**
+ * Quiz attempts
+ * Tracks user quiz submissions and results
+ */
+export const quizAttempts = pgTable("quiz_attempts", {
+  id: serial("id").primaryKey(),
+  quizId: integer("quizId").references(() => quizzes.id).notNull(),
+  userId: integer("userId").references(() => users.id).notNull(),
+  status: varchar("status", { length: 20 }).default("in_progress").notNull(), // in_progress, submitted, graded
+  answers: jsonb("answers").notNull(), // Array of user answers with questionId mapping
+  score: integer("score"), // Total score achieved
+  percentage: integer("percentage"), // Score as percentage
+  passed: boolean("passed"), // Whether user passed based on passingScore
+  timeSpent: integer("timeSpent"), // Time spent in minutes
+  attemptNumber: integer("attemptNumber").notNull(), // Which attempt this is for the user
+  feedback: text("feedback"), // Optional instructor feedback
+  gradedBy: integer("gradedBy").references(() => users.id), // User who graded (if manual grading)
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  submittedAt: timestamp("submittedAt"),
+  gradedAt: timestamp("gradedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type QuizAttempt = typeof quizAttempts.$inferSelect;
+export type InsertQuizAttempt = typeof quizAttempts.$inferInsert;
