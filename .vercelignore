@@ -1,0 +1,3 @@
+# Don't ignore dist folder - it's needed for production
+!dist
+

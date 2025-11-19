@@ -3,19 +3,19 @@
 
 import createApp from '../dist/index.js';
 
-// Create and export the Express app as a serverless function
-// Vercel will handle the async initialization
-let appPromise = null;
-
-async function getApp() {
-  if (!appPromise) {
-    appPromise = createApp();
-  }
-  return await appPromise;
-}
+// Cache the Express app instance
+let app = null;
 
 export default async function handler(req, res) {
-  const app = await getApp();
+  // Set VERCEL environment variable for the app
+  process.env.VERCEL = "1";
+  process.env.NODE_ENV = "production";
+  
+  if (!app) {
+    app = await createApp();
+  }
+  
+  // Express apps are functions that take (req, res, next)
   return app(req, res);
 }
 
