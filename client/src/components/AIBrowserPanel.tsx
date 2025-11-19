@@ -127,35 +127,36 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
   };
 
   return (
-    <div className="h-full space-y-4">
+    <div className="h-full space-y-2 sm:space-y-4 p-2 sm:p-0">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
             AI Browser Automation
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Execute browser actions, observe pages, extract data, and view session replays
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2 sm:p-6">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="execute">
-                <Zap className="h-4 w-4 mr-1" />
-                Execute
+            {/* Mobile: 2x2 Grid, Desktop: 1x4 Grid */}
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 h-auto">
+              <TabsTrigger value="execute" className="text-xs sm:text-sm p-2 sm:p-3">
+                <Zap className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Execute</span>
               </TabsTrigger>
-              <TabsTrigger value="observe">
-                <Eye className="h-4 w-4 mr-1" />
-                Observe
+              <TabsTrigger value="observe" className="text-xs sm:text-sm p-2 sm:p-3">
+                <Eye className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Observe</span>
               </TabsTrigger>
-              <TabsTrigger value="extract">
-                <Database className="h-4 w-4 mr-1" />
-                Extract
+              <TabsTrigger value="extract" className="text-xs sm:text-sm p-2 sm:p-3">
+                <Database className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Extract</span>
               </TabsTrigger>
-              <TabsTrigger value="sessions">
-                <Play className="h-4 w-4 mr-1" />
-                Sessions
+              <TabsTrigger value="sessions" className="text-xs sm:text-sm p-2 sm:p-3">
+                <Play className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Sessions</span>
               </TabsTrigger>
             </TabsList>
 
@@ -182,32 +183,35 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2">
                   <div className="space-y-2">
-                    <Label htmlFor="geo-city">City (Optional)</Label>
+                    <Label htmlFor="geo-city" className="text-xs sm:text-sm">City (Optional)</Label>
                     <Input
                       id="geo-city"
                       value={geoCity}
                       onChange={(e) => setGeoCity(e.target.value)}
                       placeholder="NEW_YORK"
+                      className="text-xs sm:text-sm h-8 sm:h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="geo-state">State</Label>
+                    <Label htmlFor="geo-state" className="text-xs sm:text-sm">State</Label>
                     <Input
                       id="geo-state"
                       value={geoState}
                       onChange={(e) => setGeoState(e.target.value)}
                       placeholder="NY"
+                      className="text-xs sm:text-sm h-8 sm:h-10"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="geo-country">Country</Label>
+                    <Label htmlFor="geo-country" className="text-xs sm:text-sm">Country</Label>
                     <Input
                       id="geo-country"
                       value={geoCountry}
                       onChange={(e) => setGeoCountry(e.target.value)}
                       placeholder="US"
+                      className="text-xs sm:text-sm h-8 sm:h-10"
                     />
                   </div>
                 </div>
@@ -379,12 +383,14 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                 )}
 
                 {replayQuery.replay && (
-                  <SessionReplayPlayer
-                    sessionId={replayQuery.replay.sessionId}
-                    events={replayQuery.replay.events}
-                    width={800}
-                    height={450}
-                  />
+                  <div className="w-full overflow-hidden">
+                    <SessionReplayPlayer
+                      sessionId={replayQuery.replay.sessionId}
+                      events={replayQuery.replay.events}
+                      width={window.innerWidth < 640 ? window.innerWidth - 64 : 800}
+                      height={window.innerWidth < 640 ? 300 : 450}
+                    />
+                  </div>
                 )}
               </div>
             </TabsContent>
@@ -392,15 +398,15 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
 
           {/* Result Display */}
           {result && (
-            <Card className="mt-4">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Code className="h-4 w-4" />
+            <Card className="mt-2 sm:mt-4">
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-xs sm:text-sm flex items-center gap-2">
+                  <Code className="h-3 w-3 sm:h-4 sm:w-4" />
                   Result
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted p-4 rounded-lg overflow-auto max-h-60">
+              <CardContent className="p-2 sm:p-6">
+                <pre className="text-[10px] sm:text-xs bg-muted p-2 sm:p-4 rounded-lg overflow-auto max-h-40 sm:max-h-60">
                   {JSON.stringify(result, null, 2)}
                 </pre>
               </CardContent>
