@@ -1,38 +1,56 @@
+import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { Dashboard } from './components/Dashboard';
+import { LandingPage } from './components/LandingPage';
+import { LoginScreen } from './components/LoginScreen';
+import { OnboardingFlow } from './components/OnboardingFlow';
 
-function Router() {
-  // make sure to consider if you need authentication for certain routes
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
+type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD';
+type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 
 function App() {
+  // NOTE: Defaulting to DASHBOARD for immediate access as requested ("Fast Start")
+  const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
+  const [userTier, setUserTier] = useState<UserTier>('WHITELABEL'); // Default to max tier for testing
+  const [credits, setCredits] = useState(5000);
+
+  const handleLogin = (tier: UserTier) => {
+    setUserTier(tier);
+    // Set credits based on tier
+    if (tier === 'STARTER') setCredits(500);
+    if (tier === 'GROWTH') setCredits(1500);
+    if (tier === 'WHITELABEL') setCredits(5000);
+    
+    // Route to dashboard normally
+    setCurrentView('DASHBOARD');
+  };
+
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          {currentView === 'LANDING' && (
+            <LandingPage onLogin={() => setCurrentView('LOGIN')} />
+          )}
+
+          {currentView === 'LOGIN' && (
+            <LoginScreen 
+              onAuthenticated={handleLogin} 
+              onBack={() => setCurrentView('LANDING')} 
+            />
+          )}
+
+          {currentView === 'ONBOARDING' && (
+            <OnboardingFlow onComplete={() => setCurrentView('DASHBOARD')} />
+          )}
+
+          {currentView === 'DASHBOARD' && (
+            <Dashboard userTier={userTier} credits={credits} />
+          )}
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
