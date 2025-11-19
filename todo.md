@@ -197,4 +197,7 @@
 - [x] Fix @google/genai import error in geminiService.ts
 - [x] Ensure build output directory is correct
 - [x] Test local build to verify no errors
-- [ ] Redeploy to Vercel
+- [ ] Login to Vercel through browser
+- [ ] Connect GitHub repository (Julianb233/ghl-agency-ai) to Vercel
+- [ ] Configure environment variables in Vercel dashboard
+- [ ] Trigger deployment and verify success
