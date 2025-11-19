@@ -384,6 +384,29 @@ export const aiRouter = router({
 
                 await stagehand.close();
 
+                // Persist session to database
+                try {
+                    const placeholderUserId = 1;
+
+                    await db.insert(browserSessions).values({
+                        userId: placeholderUserId,
+                        sessionId: sessionId,
+                        status: "completed",
+                        url: input.url,
+                        projectId: process.env.BROWSERBASE_PROJECT_ID,
+                        metadata: {
+                            sessionType: "observe",
+                            instruction: input.instruction,
+                            actionsFound: actions?.length || 0,
+                            modelName: input.modelName || "google/gemini-2.0-flash",
+                            geolocation: input.geolocation || null,
+                        },
+                    });
+                    console.log(`Observe session ${sessionId} persisted to database`);
+                } catch (dbError) {
+                    console.error("Failed to persist observe session:", dbError);
+                }
+
                 return {
                     success: true,
                     actions: actions,
@@ -394,6 +417,25 @@ export const aiRouter = router({
 
             } catch (error) {
                 console.error("Failed to observe page:", error);
+
+                // Log failed session
+                if (sessionId) {
+                    try {
+                        await db.insert(browserSessions).values({
+                            userId: 1,
+                            sessionId: sessionId,
+                            status: "failed",
+                            url: input.url,
+                            metadata: {
+                                sessionType: "observe",
+                                error: error instanceof Error ? error.message : "Unknown error",
+                            },
+                        });
+                    } catch (dbError) {
+                        console.error("Failed to log failed observe session:", dbError);
+                    }
+                }
+
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `Failed to observe page: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -473,6 +515,30 @@ export const aiRouter = router({
 
                 await stagehand.close();
 
+                // Persist session to database
+                try {
+                    const placeholderUserId = 1;
+
+                    await db.insert(browserSessions).values({
+                        userId: placeholderUserId,
+                        sessionId: sessionId,
+                        status: "completed",
+                        url: input.url,
+                        projectId: process.env.BROWSERBASE_PROJECT_ID,
+                        metadata: {
+                            sessionType: "executeActions",
+                            instruction: input.instruction,
+                            actionsExecuted: executedActions.length,
+                            actions: executedActions,
+                            modelName: input.modelName || "google/gemini-2.0-flash",
+                            geolocation: input.geolocation || null,
+                        },
+                    });
+                    console.log(`ExecuteActions session ${sessionId} persisted to database`);
+                } catch (dbError) {
+                    console.error("Failed to persist executeActions session:", dbError);
+                }
+
                 return {
                     success: true,
                     executedActions,
@@ -483,6 +549,25 @@ export const aiRouter = router({
 
             } catch (error) {
                 console.error("Failed to execute actions:", error);
+
+                // Log failed session
+                if (sessionId) {
+                    try {
+                        await db.insert(browserSessions).values({
+                            userId: 1,
+                            sessionId: sessionId,
+                            status: "failed",
+                            url: input.url,
+                            metadata: {
+                                sessionType: "executeActions",
+                                error: error instanceof Error ? error.message : "Unknown error",
+                            },
+                        });
+                    } catch (dbError) {
+                        console.error("Failed to log failed executeActions session:", dbError);
+                    }
+                }
+
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `Failed to execute actions: ${error instanceof Error ? error.message : "Unknown error"}`,
