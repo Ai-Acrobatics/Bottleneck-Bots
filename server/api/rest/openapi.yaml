@@ -1,0 +1,958 @@
+openapi: 3.0.3
+info:
+  title: GHL Agency AI API
+  description: |
+    Production-ready REST API for browser automation and workflow management.
+
+    ## Authentication
+    All API requests require an API key passed in the `Authorization` header:
+    ```
+    Authorization: Bearer ghl_your_api_key_here
+    ```
+
+    ## Rate Limiting
+    - **Default**: 100 requests per minute
+    - **Authenticated**: Based on your API key plan
+
+    Rate limit information is included in response headers:
+    - `X-RateLimit-Limit`: Request limit per window
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+    - `X-RateLimit-Reset`: Time when the rate limit resets
+
+    ## Error Handling
+    All errors follow a consistent format:
+    ```json
+    {
+      "error": "Error Type",
+      "message": "Human-readable error message",
+      "code": "ERROR_CODE",
+      "timestamp": "2025-01-19T12:00:00Z",
+      "path": "/api/v1/tasks"
+    }
+    ```
+
+    ## Pagination
+    List endpoints support cursor-based pagination:
+    - `page`: Page number (default: 1)
+    - `limit`: Items per page (max: 100, default: 20)
+
+    Pagination metadata is included in responses:
+    ```json
+    {
+      "data": [...],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 150,
+        "pages": 8
+      }
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@ghl-agency.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.ghl-agency.ai/api/v1
+    description: Production server
+  - url: http://localhost:3001/api/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Tasks
+    description: Manage scheduled browser automation tasks
+  - name: Executions
+    description: View task execution history and results
+  - name: Templates
+    description: Browse and use workflow templates
+  - name: Health
+    description: API health and status
+
+paths:
+  # ========================================
+  # HEALTH & INFO
+  # ========================================
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Check API health and availability
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  version:
+                    type: string
+                    example: 1.0.0
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /:
+    get:
+      tags: [Health]
+      summary: API information
+      description: Get API version and endpoint information
+      operationId: getApiInfo
+      security: []
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfo'
+
+  # ========================================
+  # TASKS
+  # ========================================
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      description: Get all scheduled tasks for the authenticated user
+      operationId: listTasks
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, paused, failed, completed, archived]
+          description: Filter by task status
+        - in: query
+          name: automationType
+          schema:
+            type: string
+            enum: [chat, observe, extract, workflow, custom]
+          description: Filter by automation type
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+    post:
+      tags: [Tasks]
+      summary: Create task
+      description: Create a new scheduled task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Get task
+      description: Get details of a specific task
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags: [Tasks]
+      summary: Update task
+      description: Update an existing task
+      operationId: updateTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      tags: [Tasks]
+      summary: Delete task
+      description: Archive a task (soft delete)
+      operationId: deleteTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /tasks/{id}/execute:
+    post:
+      tags: [Tasks]
+      summary: Execute task
+      description: Trigger immediate execution of a task
+      operationId: executeTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '202':
+          description: Task execution queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /tasks/{id}/executions:
+    get:
+      tags: [Tasks]
+      summary: List task executions
+      description: Get execution history for a specific task
+      operationId: listTaskExecutions
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, running, success, failed, timeout, cancelled]
+          description: Filter by execution status
+      responses:
+        '200':
+          description: List of executions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionListResponse'
+
+  # ========================================
+  # EXECUTIONS
+  # ========================================
+
+  /executions:
+    get:
+      tags: [Executions]
+      summary: List executions
+      description: Get all executions for the authenticated user
+      operationId: listExecutions
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, running, success, failed, timeout, cancelled]
+        - in: query
+          name: taskId
+          schema:
+            type: integer
+          description: Filter by task ID
+      responses:
+        '200':
+          description: List of executions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionListResponse'
+
+  /executions/{id}:
+    get:
+      tags: [Executions]
+      summary: Get execution
+      description: Get detailed information about a specific execution
+      operationId: getExecution
+      parameters:
+        - $ref: '#/components/parameters/ExecutionId'
+      responses:
+        '200':
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /executions/{id}/logs:
+    get:
+      tags: [Executions]
+      summary: Get execution logs
+      description: Get logs for a specific execution
+      operationId: getExecutionLogs
+      parameters:
+        - $ref: '#/components/parameters/ExecutionId'
+      responses:
+        '200':
+          description: Execution logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionLogsResponse'
+
+  /executions/{id}/output:
+    get:
+      tags: [Executions]
+      summary: Get execution output
+      description: Get output/results from an execution
+      operationId: getExecutionOutput
+      parameters:
+        - $ref: '#/components/parameters/ExecutionId'
+      responses:
+        '200':
+          description: Execution output
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionOutputResponse'
+
+  # ========================================
+  # TEMPLATES
+  # ========================================
+
+  /templates:
+    get:
+      tags: [Templates]
+      summary: List templates
+      description: Get all available workflow templates
+      operationId: listTemplates
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter by category
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search templates by name or description
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateListResponse'
+
+  /templates/{id}:
+    get:
+      tags: [Templates]
+      summary: Get template
+      description: Get details of a specific template
+      operationId: getTemplate
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /templates/{id}/use:
+    post:
+      tags: [Templates]
+      summary: Use template
+      description: Create a new task from a template
+      operationId: useTemplate
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UseTemplateRequest'
+      responses:
+        '201':
+          description: Task created from template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+
+  /templates/meta/categories:
+    get:
+      tags: [Templates]
+      summary: Get template categories
+      description: Get list of available template categories
+      operationId: getTemplateCategories
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+
+# ========================================
+# COMPONENTS
+# ========================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: 'API key authentication. Format: Bearer ghl_your_api_key_here'
+
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    LimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+    TaskId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: Task ID
+
+    ExecutionId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: Execution ID
+
+    TemplateId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+      description: Template ID
+
+  schemas:
+    # API Info
+    ApiInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: GHL Agency AI API
+        version:
+          type: string
+          example: 1.0.0
+        description:
+          type: string
+        documentation:
+          type: string
+          example: /api/docs
+        endpoints:
+          type: object
+        authentication:
+          type: object
+        rateLimit:
+          type: object
+
+    # Pagination
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    # Task Schemas
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        automationType:
+          type: string
+          enum: [chat, observe, extract, workflow, custom]
+        automationConfig:
+          type: object
+        scheduleType:
+          type: string
+          enum: [daily, weekly, monthly, cron, once]
+        cronExpression:
+          type: string
+        timezone:
+          type: string
+        status:
+          type: string
+          enum: [active, paused, failed, completed, archived]
+        nextRun:
+          type: string
+          format: date-time
+        lastRun:
+          type: string
+          format: date-time
+        lastRunStatus:
+          type: string
+        executionCount:
+          type: integer
+        successCount:
+          type: integer
+        failureCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - name
+        - automationType
+        - automationConfig
+        - scheduleType
+        - cronExpression
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        automationType:
+          type: string
+          enum: [chat, observe, extract, workflow, custom]
+        automationConfig:
+          type: object
+          required:
+            - url
+          properties:
+            url:
+              type: string
+              format: uri
+            instruction:
+              type: string
+            actions:
+              type: array
+              items:
+                type: object
+            browserConfig:
+              type: object
+        scheduleType:
+          type: string
+          enum: [daily, weekly, monthly, cron, once]
+        cronExpression:
+          type: string
+        timezone:
+          type: string
+          default: UTC
+        retryOnFailure:
+          type: boolean
+          default: true
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+          default: 3
+        notifyOnSuccess:
+          type: boolean
+          default: false
+        notifyOnFailure:
+          type: boolean
+          default: true
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        automationType:
+          type: string
+        automationConfig:
+          type: object
+        scheduleType:
+          type: string
+        cronExpression:
+          type: string
+
+    TaskResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Task'
+        message:
+          type: string
+
+    TaskListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # Execution Schemas
+    Execution:
+      type: object
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        sessionId:
+          type: integer
+        status:
+          type: string
+          enum: [queued, running, success, failed, timeout, cancelled]
+        triggerType:
+          type: string
+          enum: [scheduled, manual, retry]
+        attemptNumber:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+          description: Duration in milliseconds
+        output:
+          type: object
+        error:
+          type: string
+        logs:
+          type: array
+          items:
+            type: object
+        screenshots:
+          type: array
+          items:
+            type: string
+        recordingUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ExecutionResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Execution'
+        message:
+          type: string
+
+    ExecutionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Execution'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ExecutionLogsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            executionId:
+              type: integer
+            taskId:
+              type: integer
+            logs:
+              type: array
+              items:
+                type: object
+            screenshots:
+              type: array
+              items:
+                type: string
+            recordingUrl:
+              type: string
+
+    ExecutionOutputResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            executionId:
+              type: integer
+            taskId:
+              type: integer
+            status:
+              type: string
+            output:
+              type: object
+            error:
+              type: string
+            startedAt:
+              type: string
+              format: date-time
+            completedAt:
+              type: string
+              format: date-time
+            duration:
+              type: integer
+
+    # Template Schemas
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+        category:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TemplateResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Template'
+
+    TemplateListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    UseTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scheduleType:
+          type: string
+          enum: [daily, weekly, monthly, cron, once]
+        cronExpression:
+          type: string
+        timezone:
+          type: string
+          default: UTC
+        customInputs:
+          type: object
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        count:
+          type: integer
+
+    CategoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+
+    # Common Responses
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+        requestId:
+          type: string
+
+  responses:
+    BadRequestError:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Bad Request
+            message: Invalid request parameters
+            code: BAD_REQUEST
+            timestamp: '2025-01-19T12:00:00Z'
+            path: /api/v1/tasks
+
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Unauthorized
+            message: Invalid API key
+            code: INVALID_API_KEY
+            timestamp: '2025-01-19T12:00:00Z'
+            path: /api/v1/tasks
+
+    NotFoundError:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Not Found
+            message: Resource not found
+            code: NOT_FOUND
+            timestamp: '2025-01-19T12:00:00Z'
+            path: /api/v1/tasks/123
+
+    ValidationError:
+      description: Validation Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Unprocessable Entity
+            message: Validation failed
+            code: UNPROCESSABLE_ENTITY
+            details:
+              - field: name
+                message: Name is required
+              - field: cronExpression
+                message: Invalid cron expression
+            timestamp: '2025-01-19T12:00:00Z'
+            path: /api/v1/tasks
+
+    RateLimitError:
+      description: Rate Limit Exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Too Many Requests
+            message: Rate limit exceeded
+            code: RATE_LIMIT_EXCEEDED
+            timestamp: '2025-01-19T12:00:00Z'
+            path: /api/v1/tasks

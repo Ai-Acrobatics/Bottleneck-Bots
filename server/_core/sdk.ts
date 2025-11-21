@@ -270,8 +270,12 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
     if (!user) {
+      user = await db.getUserByGoogleId(sessionUserId);
+    }
+
+    // If user not in DB, sync from OAuth server automatically (only for Manus users)
+    if (!user && !sessionUserId.startsWith("google_")) { // Assuming google IDs might be distinguished or we just skip this for google
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({
@@ -284,7 +288,7 @@ class SDKServer {
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
+        // Don't throw here, just let it fail below if user is still null
       }
     }
 
@@ -294,6 +298,7 @@ class SDKServer {
 
     await db.upsertUser({
       openId: user.openId,
+      googleId: user.googleId,
       lastSignedIn: signedInAt,
     });
 

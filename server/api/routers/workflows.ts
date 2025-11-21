@@ -6,15 +6,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { Stagehand } from "@browserbasehq/stagehand";
 import { getBrowserbaseService } from "../../_core/browserbase";
 
-// PLACEHOLDER: Import workflow-related schema tables once they're defined in drizzle/schema.ts
-// For now, using placeholder table names that should match your database schema
-//
-// Expected tables in schema.ts:
-// - workflows: id, userId, name, description, trigger, status, createdAt, updatedAt
-// - workflowSteps: id, workflowId, order, type, config, createdAt
-// - workflowExecutions: id, workflowId, sessionId, status, startedAt, completedAt, result, error
-//
-// import { workflows, workflowSteps, workflowExecutions } from "../../../drizzle/schema";
+import { automationWorkflows, workflowExecutions, browserSessions } from "../../../drizzle/schema";
 
 // PLACEHOLDER: Define Zod schemas for validation
 const workflowStepSchema = z.object({
@@ -72,12 +64,10 @@ export const workflowsRouter = router({
      * Create a new workflow
      * Creates workflow and associated steps in a transaction
      */
-    create: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    create: protectedProcedure
         .input(createWorkflowSchema)
         .mutation(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -88,59 +78,18 @@ export const workflowsRouter = router({
             }
 
             try {
-                // PLACEHOLDER: Implement workflow creation once schema is defined
-                // This is the expected implementation:
-                /*
                 const [workflow] = await db
-                    .insert(workflows)
+                    .insert(automationWorkflows)
                     .values({
                         userId,
                         name: input.name,
                         description: input.description,
-                        trigger: input.trigger,
-                        status: "active",
+                        steps: input.steps,
+                        isActive: true,
                     })
                     .returning();
 
-                // Create workflow steps
-                const stepValues = input.steps.map(step => ({
-                    workflowId: workflow.id,
-                    order: step.order,
-                    type: step.type,
-                    config: JSON.stringify(step.config),
-                }));
-
-                const steps = await db
-                    .insert(workflowSteps)
-                    .values(stepValues)
-                    .returning();
-
-                return {
-                    ...workflow,
-                    steps,
-                };
-                */
-
-                // PLACEHOLDER: Return mock response until schema is implemented
-                return {
-                    id: Date.now(), // Mock ID
-                    userId,
-                    name: input.name,
-                    description: input.description,
-                    trigger: input.trigger,
-                    status: "active" as const,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    steps: input.steps.map((step, idx) => ({
-                        id: Date.now() + idx,
-                        workflowId: Date.now(),
-                        order: step.order,
-                        type: step.type,
-                        config: step.config,
-                        createdAt: new Date(),
-                    })),
-                    _placeholder: "PLACEHOLDER: Add workflows, workflowSteps tables to drizzle/schema.ts",
-                };
+                return workflow;
             } catch (error) {
                 console.error("Failed to create workflow:", error);
                 throw new TRPCError({
@@ -154,7 +103,7 @@ export const workflowsRouter = router({
      * List all workflows for the authenticated user
      * Returns workflows with step count
      */
-    list: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    list: protectedProcedure
         .input(
             z.object({
                 status: z.enum(["active", "paused", "archived"]).optional(),
@@ -163,9 +112,7 @@ export const workflowsRouter = router({
             }).optional()
         )
         .query(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -178,54 +125,25 @@ export const workflowsRouter = router({
             const params = input || { limit: 50, offset: 0 };
 
             try {
-                // PLACEHOLDER: Implement workflow listing once schema is defined
-                /*
-                const conditions = [eq(workflows.userId, userId)];
-                if (params.status) {
-                    conditions.push(eq(workflows.status, params.status));
+                const conditions = [eq(automationWorkflows.userId, userId)];
+                if (params.status === "active") {
+                    conditions.push(eq(automationWorkflows.isActive, true));
+                } else if (params.status === "archived") {
+                    conditions.push(eq(automationWorkflows.isActive, false));
                 }
 
                 const workflowList = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(...conditions))
-                    .orderBy(desc(workflows.createdAt))
+                    .orderBy(desc(automationWorkflows.createdAt))
                     .limit(params.limit)
                     .offset(params.offset);
 
-                // Get step counts for each workflow
-                const workflowsWithStepCount = await Promise.all(
-                    workflowList.map(async (workflow) => {
-                        const steps = await db
-                            .select()
-                            .from(workflowSteps)
-                            .where(eq(workflowSteps.workflowId, workflow.id));
-
-                        return {
-                            ...workflow,
-                            stepCount: steps.length,
-                        };
-                    })
-                );
-
-                return workflowsWithStepCount;
-                */
-
-                // PLACEHOLDER: Return mock response
-                return [
-                    {
-                        id: 1,
-                        userId,
-                        name: "Sample Workflow",
-                        description: "Example workflow",
-                        trigger: "manual" as const,
-                        status: "active" as const,
-                        stepCount: 3,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                        _placeholder: "PLACEHOLDER: Add workflows table to drizzle/schema.ts",
-                    },
-                ];
+                return workflowList.map(wf => ({
+                    ...wf,
+                    stepCount: Array.isArray(wf.steps) ? wf.steps.length : 0,
+                }));
             } catch (error) {
                 console.error("Failed to list workflows:", error);
                 throw new TRPCError({
@@ -239,12 +157,10 @@ export const workflowsRouter = router({
      * Get a single workflow by ID with all steps
      * Includes full workflow configuration
      */
-    get: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    get: protectedProcedure
         .input(z.object({ id: z.number().int().positive() }))
         .query(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -255,14 +171,12 @@ export const workflowsRouter = router({
             }
 
             try {
-                // PLACEHOLDER: Implement workflow retrieval once schema is defined
-                /*
                 const [workflow] = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(
-                        eq(workflows.id, input.id),
-                        eq(workflows.userId, userId)
+                        eq(automationWorkflows.id, input.id),
+                        eq(automationWorkflows.userId, userId)
                     ))
                     .limit(1);
 
@@ -273,46 +187,7 @@ export const workflowsRouter = router({
                     });
                 }
 
-                const steps = await db
-                    .select()
-                    .from(workflowSteps)
-                    .where(eq(workflowSteps.workflowId, workflow.id))
-                    .orderBy(workflowSteps.order);
-
-                return {
-                    ...workflow,
-                    steps: steps.map(step => ({
-                        ...step,
-                        config: JSON.parse(step.config),
-                    })),
-                };
-                */
-
-                // PLACEHOLDER: Return mock response
-                return {
-                    id: input.id,
-                    userId,
-                    name: "Sample Workflow",
-                    description: "Example workflow with steps",
-                    trigger: "manual" as const,
-                    status: "active" as const,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    steps: [
-                        {
-                            id: 1,
-                            workflowId: input.id,
-                            order: 0,
-                            type: "navigate" as const,
-                            config: {
-                                url: "https://example.com",
-                                continueOnError: false,
-                            },
-                            createdAt: new Date(),
-                        },
-                    ],
-                    _placeholder: "PLACEHOLDER: Add workflows, workflowSteps tables to drizzle/schema.ts",
-                };
+                return workflow;
             } catch (error) {
                 console.error("Failed to get workflow:", error);
                 if (error instanceof TRPCError) throw error;
@@ -327,12 +202,10 @@ export const workflowsRouter = router({
      * Update an existing workflow
      * Can update metadata and steps
      */
-    update: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    update: protectedProcedure
         .input(updateWorkflowSchema)
         .mutation(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -343,15 +216,12 @@ export const workflowsRouter = router({
             }
 
             try {
-                // PLACEHOLDER: Implement workflow update once schema is defined
-                /*
-                // Verify ownership
                 const [existing] = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(
-                        eq(workflows.id, input.id),
-                        eq(workflows.userId, userId)
+                        eq(automationWorkflows.id, input.id),
+                        eq(automationWorkflows.userId, userId)
                     ))
                     .limit(1);
 
@@ -362,68 +232,21 @@ export const workflowsRouter = router({
                     });
                 }
 
-                // Update workflow metadata
-                const updateData: Partial<typeof workflows.$inferInsert> = {
+                const updateData: Partial<typeof automationWorkflows.$inferInsert> = {
                     updatedAt: new Date(),
                 };
                 if (input.name !== undefined) updateData.name = input.name;
                 if (input.description !== undefined) updateData.description = input.description;
-                if (input.trigger !== undefined) updateData.trigger = input.trigger;
-                if (input.status !== undefined) updateData.status = input.status;
+                if (input.status !== undefined) updateData.isActive = input.status === "active";
+                if (input.steps !== undefined) updateData.steps = input.steps;
 
                 const [updated] = await db
-                    .update(workflows)
+                    .update(automationWorkflows)
                     .set(updateData)
-                    .where(eq(workflows.id, input.id))
+                    .where(eq(automationWorkflows.id, input.id))
                     .returning();
 
-                // Update steps if provided
-                if (input.steps) {
-                    // Delete existing steps
-                    await db
-                        .delete(workflowSteps)
-                        .where(eq(workflowSteps.workflowId, input.id));
-
-                    // Insert new steps
-                    const stepValues = input.steps.map(step => ({
-                        workflowId: input.id,
-                        order: step.order,
-                        type: step.type,
-                        config: JSON.stringify(step.config),
-                    }));
-
-                    await db.insert(workflowSteps).values(stepValues);
-                }
-
-                // Fetch updated workflow with steps
-                const steps = await db
-                    .select()
-                    .from(workflowSteps)
-                    .where(eq(workflowSteps.workflowId, input.id))
-                    .orderBy(workflowSteps.order);
-
-                return {
-                    ...updated,
-                    steps: steps.map(step => ({
-                        ...step,
-                        config: JSON.parse(step.config),
-                    })),
-                };
-                */
-
-                // PLACEHOLDER: Return mock response
-                return {
-                    id: input.id,
-                    userId,
-                    name: input.name || "Updated Workflow",
-                    description: input.description,
-                    trigger: input.trigger || "manual" as const,
-                    status: input.status || "active" as const,
-                    updatedAt: new Date(),
-                    createdAt: new Date(),
-                    steps: input.steps || [],
-                    _placeholder: "PLACEHOLDER: Add workflows, workflowSteps tables to drizzle/schema.ts",
-                };
+                return updated;
             } catch (error) {
                 console.error("Failed to update workflow:", error);
                 if (error instanceof TRPCError) throw error;
@@ -438,12 +261,10 @@ export const workflowsRouter = router({
      * Delete a workflow and all associated steps and executions
      * Soft delete by setting status to 'archived'
      */
-    delete: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    delete: protectedProcedure
         .input(z.object({ id: z.number().int().positive() }))
         .mutation(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -454,15 +275,12 @@ export const workflowsRouter = router({
             }
 
             try {
-                // PLACEHOLDER: Implement workflow deletion once schema is defined
-                /*
-                // Verify ownership
                 const [existing] = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(
-                        eq(workflows.id, input.id),
-                        eq(workflows.userId, userId)
+                        eq(automationWorkflows.id, input.id),
+                        eq(automationWorkflows.userId, userId)
                     ))
                     .limit(1);
 
@@ -473,24 +291,16 @@ export const workflowsRouter = router({
                     });
                 }
 
-                // Soft delete by archiving
+                // Soft delete by setting isActive to false
                 await db
-                    .update(workflows)
+                    .update(automationWorkflows)
                     .set({
-                        status: "archived",
+                        isActive: false,
                         updatedAt: new Date(),
                     })
-                    .where(eq(workflows.id, input.id));
+                    .where(eq(automationWorkflows.id, input.id));
 
                 return { success: true, id: input.id };
-                */
-
-                // PLACEHOLDER: Return mock response
-                return {
-                    success: true,
-                    id: input.id,
-                    _placeholder: "PLACEHOLDER: Add workflows table to drizzle/schema.ts",
-                };
             } catch (error) {
                 console.error("Failed to delete workflow:", error);
                 if (error instanceof TRPCError) throw error;
@@ -505,7 +315,7 @@ export const workflowsRouter = router({
      * Execute a workflow
      * Creates a browser session, runs all steps sequentially, stores execution results
      */
-    execute: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    execute: protectedProcedure
         .input(
             z.object({
                 workflowId: z.number().int().positive(),
@@ -518,9 +328,7 @@ export const workflowsRouter = router({
             })
         )
         .mutation(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -534,14 +342,13 @@ export const workflowsRouter = router({
             let executionId: number | undefined;
 
             try {
-                // PLACEHOLDER: Fetch workflow and steps from database
-                /*
+                // Fetch workflow
                 const [workflow] = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(
-                        eq(workflows.id, input.workflowId),
-                        eq(workflows.userId, userId)
+                        eq(automationWorkflows.id, input.workflowId),
+                        eq(automationWorkflows.userId, userId)
                     ))
                     .limit(1);
 
@@ -552,41 +359,35 @@ export const workflowsRouter = router({
                     });
                 }
 
-                if (workflow.status !== "active") {
+                if (!workflow.isActive) {
                     throw new TRPCError({
                         code: "BAD_REQUEST",
                         message: "Workflow is not active",
                     });
                 }
 
-                const steps = await db
-                    .select()
-                    .from(workflowSteps)
-                    .where(eq(workflowSteps.workflowId, workflow.id))
-                    .orderBy(workflowSteps.order);
+                const steps = workflow.steps as any[]; // Cast JSONB to array
 
-                if (steps.length === 0) {
+                if (!Array.isArray(steps) || steps.length === 0) {
                     throw new TRPCError({
                         code: "BAD_REQUEST",
                         message: "Workflow has no steps",
                     });
                 }
-                */
 
                 // Create execution record
-                // PLACEHOLDER: Implement execution tracking
-                /*
                 const [execution] = await db
                     .insert(workflowExecutions)
                     .values({
                         workflowId: input.workflowId,
+                        userId,
                         status: "running",
                         startedAt: new Date(),
+                        input: input.variables,
                     })
                     .returning();
 
                 executionId = execution.id;
-                */
 
                 // Create Browserbase session
                 const browserbaseService = getBrowserbaseService();
@@ -596,6 +397,12 @@ export const workflowsRouter = router({
 
                 sessionId = session.id;
                 console.log(`Workflow execution session created: ${session.url}`);
+
+                // Update execution with sessionId
+                await db
+                    .update(workflowExecutions)
+                    .set({ sessionId: session.id as any }) // Cast if type mismatch
+                    .where(eq(workflowExecutions.id, executionId));
 
                 // Initialize Stagehand
                 const stagehand = new Stagehand({
@@ -629,20 +436,9 @@ export const workflowsRouter = router({
                 await stagehand.init();
                 const page = stagehand.context.pages()[0];
 
-                // PLACEHOLDER: Get steps from database
-                // For now, using mock steps for demonstration
-                const steps = [
-                    {
-                        id: 1,
-                        order: 0,
-                        type: "navigate" as const,
-                        config: { url: "https://example.com" },
-                    },
-                ];
-
                 // Execute workflow steps
                 const stepResults: Array<{
-                    stepId: number;
+                    stepId?: number;
                     type: string;
                     success: boolean;
                     result?: any;
@@ -650,9 +446,7 @@ export const workflowsRouter = router({
                 }> = [];
 
                 for (const step of steps) {
-                    const stepConfig = typeof step.config === 'string'
-                        ? JSON.parse(step.config)
-                        : step.config;
+                    const stepConfig = step.config;
 
                     try {
                         let result: any = null;
@@ -697,7 +491,7 @@ export const workflowsRouter = router({
                                                 phone: z.string().optional(),
                                                 address: z.string().optional(),
                                             })
-                                        })
+                                        }) as any
                                     );
                                 } else if (stepConfig.schemaType === "productInfo") {
                                     extractedData = await stagehand.extract(
@@ -709,7 +503,7 @@ export const workflowsRouter = router({
                                                 description: z.string().optional(),
                                                 availability: z.string().optional(),
                                             })
-                                        })
+                                        }) as any
                                     );
                                 } else {
                                     extractedData = await stagehand.extract(stepConfig.extractInstruction);
@@ -725,7 +519,6 @@ export const workflowsRouter = router({
 
                             case "condition":
                                 // PLACEHOLDER: Implement condition evaluation
-                                // This would evaluate variables and determine if workflow should continue
                                 result = { condition: stepConfig.condition, passed: true };
                                 break;
 
@@ -734,7 +527,6 @@ export const workflowsRouter = router({
                         }
 
                         stepResults.push({
-                            stepId: step.id,
                             type: step.type,
                             success: true,
                             result,
@@ -744,7 +536,6 @@ export const workflowsRouter = router({
                         const errorMessage = stepError instanceof Error ? stepError.message : "Unknown error";
 
                         stepResults.push({
-                            stepId: step.id,
                             type: step.type,
                             success: false,
                             error: errorMessage,
@@ -752,7 +543,7 @@ export const workflowsRouter = router({
 
                         // Stop execution if continueOnError is false
                         if (!stepConfig.continueOnError) {
-                            throw new Error(`Step ${step.id} failed: ${errorMessage}`);
+                            throw new Error(`Step failed: ${errorMessage}`);
                         }
                     }
                 }
@@ -760,48 +551,49 @@ export const workflowsRouter = router({
                 await stagehand.close();
 
                 // Update execution record
-                // PLACEHOLDER: Update execution in database
-                /*
                 await db
                     .update(workflowExecutions)
                     .set({
-                        sessionId,
                         status: "completed",
                         completedAt: new Date(),
-                        result: JSON.stringify(stepResults),
+                        output: stepResults,
+                        stepResults: stepResults,
                     })
                     .where(eq(workflowExecutions.id, executionId));
-                */
+
+                // Update workflow execution count
+                await db
+                    .update(automationWorkflows)
+                    .set({
+                        executionCount: (workflow.executionCount || 0) + 1,
+                        lastExecutedAt: new Date(),
+                    })
+                    .where(eq(automationWorkflows.id, input.workflowId));
 
                 return {
                     success: true,
                     workflowId: input.workflowId,
-                    executionId: executionId || Date.now(), // Mock ID
+                    executionId: executionId,
                     sessionId,
                     sessionUrl: session.url,
                     stepsExecuted: stepResults.length,
                     stepResults,
-                    _placeholder: "PLACEHOLDER: Add workflowExecutions table to drizzle/schema.ts",
                 };
 
             } catch (error) {
                 console.error("Workflow execution failed:", error);
 
                 // Update execution record with error
-                // PLACEHOLDER: Update execution in database
-                /*
                 if (executionId) {
                     await db
                         .update(workflowExecutions)
                         .set({
-                            sessionId,
                             status: "failed",
                             completedAt: new Date(),
                             error: error instanceof Error ? error.message : "Unknown error",
                         })
                         .where(eq(workflowExecutions.id, executionId));
                 }
-                */
 
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",

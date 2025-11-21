@@ -8,6 +8,13 @@
       "when": 1763544196936,
       "tag": "0000_outgoing_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763704678765,
+      "tag": "0001_moaning_annihilus",
+      "breakpoints": true
     }
   ]
 }

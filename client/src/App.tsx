@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -8,15 +8,29 @@ import { AlexRamozyPage } from './components/AlexRamozyPage';
 import { LandingPage } from './components/LandingPage';
 import { LoginScreen } from './components/LoginScreen';
 import { OnboardingFlow } from './components/OnboardingFlow';
+import { trpc } from "@/lib/trpc";
 
 type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY';
 type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 
 function App() {
-  // NOTE: Defaulting to ALEX_RAMOZY for immediate access as requested
-  const [currentView, setCurrentView] = useState<ViewState>('ALEX_RAMOZY');
+  // NOTE: Defaulting to LANDING as requested by user
+  const [currentView, setCurrentView] = useState<ViewState>('LANDING');
   const [userTier, setUserTier] = useState<UserTier>('WHITELABEL'); // Default to max tier for testing
   const [credits, setCredits] = useState(5000);
+
+  // Check for active session
+  const { data: user, isLoading: isAuthLoading, error: authError } = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (user) {
+      // User is logged in, redirect to dashboard
+      setCurrentView('DASHBOARD');
+    }
+  }, [user]);
 
   const handleLogin = (tier: UserTier) => {
     setUserTier(tier);
@@ -28,6 +42,14 @@ function App() {
     // Route to dashboard normally
     setCurrentView('DASHBOARD');
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Google OAuth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #cc0000;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #357ae8;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Google OAuth Configuration Test</h1>
+
+    <div class="info">
+        <h3>Current Configuration:</h3>
+        <pre id="config"></pre>
+    </div>
+
+    <div class="info">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Click the "Test Google Sign-In" button below</li>
+            <li>If you see an error page from Google, copy the error message</li>
+            <li>Check the server terminal for detailed logs</li>
+        </ol>
+    </div>
+
+    <button onclick="testGoogleAuth()">Test Google Sign-In</button>
+
+    <div id="error" style="display: none;" class="error">
+        <h3>Error Detected:</h3>
+        <p id="errorMessage"></p>
+    </div>
+
+    <div class="info">
+        <h3>Common Errors and Solutions:</h3>
+        <ul>
+            <li><strong>redirect_uri_mismatch:</strong> Add <code>http://localhost:3006/api/auth/google/callback</code>
+                to Authorized redirect URIs in Google Cloud Console</li>
+            <li><strong>invalid_client:</strong> Check that Client ID and Secret are correct in .env file</li>
+            <li><strong>access_denied:</strong> User denied permission or app is in testing mode without test users</li>
+        </ul>
+    </div>
+
+    <script>
+        // Display cuuration
+        fetch('/api/auth/google/config')
+            .then(r => r.json())
+            .catch(() => ({
+                clientId: '10128406567r5844adatke21ra2k7j6c5ecm12.apps.googleusercontent.com',
+                redirectUri: 'http://localhost:3006/api/auth/google/callback'
+            }))
+            .then(config => {
+                document.getElementById('config').textContent = JSON.stringify(config, null, 2);
+            });
+
+        // Check for error in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+            document.getElementById('error').style.display = '        document.getElementById('errorMessage').textContent = error;
+        }
+
+        function testGoogleAuth() {
+            window.location.h/google';
+        }
+    </script>
+</body>
+
+</html>

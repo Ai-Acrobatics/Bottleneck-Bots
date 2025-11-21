@@ -1,35 +1,80 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import * as schema from "../drizzle/schema";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 const { Pool } = pg;
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _pool: pg.Pool | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
+    const dbUrl = process.env.DATABASE_URL;
+
+    if (!dbUrl) {
+      console.warn("[Database] DATABASE_URL not set, database operations will fail");
+      return null;
+    }
+
     try {
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
+      console.log('[Database] Attempting to connect...');
+      console.log('[Database] URL present:', !!dbUrl);
+      console.log('[Database] URL type:', typeof dbUrl);
+      console.log('[Database] URL length:', dbUrl.length);
+      console.log('[Database] URL prefix:', dbUrl.substring(0, 25) + '...');
+
+      // Try creating pool with the connection string
+      _pool = new Pool({
+        connectionString: dbUrl,
         ssl: {
           rejectUnauthorized: false,
         },
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
       });
-      _db = drizzle(pool);
+
+      console.log('[Database] Pool created, testing connection...');
+
+      // Test connection
+      const testClient = await _pool.connect();
+      console.log('[Database] Connection test successful!');
+      testClient.release();
+
+      _db = drizzle(_pool, { schema });
+      console.log('[Database] Drizzle ORM initialized successfully');
+
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Connection failed!");
+      console.error("[Database] Error:", error);
+      console.error("[Database] Error type:", error instanceof Error ? error.constructor.name : typeof error);
+      if (error instanceof Error) {
+        console.error("[Database] Error message:", error.message);
+        console.error("[Database] Error stack:", error.stack?.substring(0, 500));
+      }
+
+      if (_pool) {
+        try {
+          await _pool.end();
+        } catch (e) {
+          console.error("[Database] Error closing pool:", e);
+        }
+        _pool = null;
+      }
       _db = null;
     }
   }
+
   return _db;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
+  if (!user.openId && !user.googleId) {
+    throw new Error("User openId or googleId is required for upsert");
   }
 
   const db = await getDb();
@@ -39,12 +84,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
+    const values: InsertUser = {};
+    if (user.openId) values.openId = user.openId;
+    if (user.googleId) values.googleId = user.googleId;
+
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "password", "googleId", "openId"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -80,8 +126,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
+    // Determine conflict target
+    const target = user.googleId ? users.googleId : users.openId;
+
     await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.openId,
+      target: target!,
       set: updateSet,
     });
   } catch (error) {
@@ -98,6 +147,18 @@ export async function getUserByOpenId(openId: string) {
   }
 
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByGoogleId(googleId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }

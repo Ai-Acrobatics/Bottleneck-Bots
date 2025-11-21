@@ -100,9 +100,24 @@ export function AIChatBox({
   // Use tRPC mutation
   const chatMutation = trpc.ai.chat.useMutation({
     onSuccess: (response) => {
+      // Format the response message with session details
+      let assistantMessage = response.message || 'Task completed successfully.';
+
+      if (response.liveViewUrl) {
+        assistantMessage += `\n\n**Live View:** [Watch Session](${response.liveViewUrl})`;
+      }
+
+      if (response.sessionUrl) {
+        assistantMessage += `\n**Session:** [View Details](${response.sessionUrl})`;
+      }
+
+      if (response.sessionId) {
+        assistantMessage += `\n**Session ID:** \`${response.sessionId}\``;
+      }
+
       setInternalMessages((prev) => [
         ...prev,
-        { role: "assistant", content: response },
+        { role: "assistant", content: assistantMessage },
       ]);
     },
     onError: (error) => {

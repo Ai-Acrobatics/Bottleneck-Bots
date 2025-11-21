@@ -3,9 +3,11 @@ import { router, publicProcedure } from "../../_core/trpc";
 import { Stagehand } from "@browserbasehq/stagehand";
 import { TRPCError } from "@trpc/server";
 import { browserbaseSDK } from "../../_core/browserbaseSDK";
-import { db } from "@/server/db";
-import { browserSessions, extractedData } from "@/drizzle/schema";
+import { getDb } from "../../db";
+import { browserSessions, extractedData } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
+
+const getBrowserbaseService = () => browserbaseSDK;
 
 export const aiRouter = router({
     /**
@@ -34,6 +36,12 @@ export const aiRouter = router({
             })
         )
         .mutation(async ({ input }) => {
+            // Database is optional: used for logging only
+            const db = await getDb();
+            if (!db) {
+                console.warn("[AI Router] Database not available - proceeding without session logging");
+            }
+
             const lastMessage = input.messages[input.messages.length - 1];
             if (!lastMessage || lastMessage.role !== "user") {
                 throw new TRPCError({
@@ -107,24 +115,26 @@ export const aiRouter = router({
                     // PLACEHOLDER: Replace with actual userId from auth context (e.g., ctx.session.user.id)
                     const placeholderUserId = 1;
 
-                    await db.insert(browserSessions).values({
-                        userId: placeholderUserId,
-                        sessionId: sessionId,
-                        status: "completed",
-                        url: liveViewUrl || `https://www.browserbase.com/sessions/${sessionId}`,
-                        debuggerUrl: debuggerUrl,
-                        projectId: process.env.BROWSERBASE_PROJECT_ID,
-                        metadata: {
-                            sessionType: "chat",
-                            prompt: prompt,
-                            startUrl: startUrl,
-                            modelName: input.modelName || "google/gemini-2.0-flash",
-                            geolocation: input.geolocation || null,
-                            environment: process.env.NODE_ENV || "development",
-                            liveViewUrl: liveViewUrl,
-                        },
-                    });
-                    console.log(`Session ${sessionId} persisted to database`);
+                    if (db) {
+                        await db.insert(browserSessions).values({
+                            userId: placeholderUserId,
+                            sessionId: sessionId,
+                            status: "completed",
+                            url: liveViewUrl || `https://www.browserbase.com/sessions/${sessionId}`,
+                            debugUrl: debuggerUrl,
+                            projectId: process.env.BROWSERBASE_PROJECT_ID,
+                            metadata: {
+                                sessionType: "chat",
+                                prompt: prompt,
+                                startUrl: startUrl,
+                                modelName: input.modelName || "google/gemini-2.0-flash",
+                                geolocation: input.geolocation || null,
+                                environment: process.env.NODE_ENV || "development",
+                                liveViewUrl: liveViewUrl,
+                            },
+                        });
+                        console.log(`Session ${sessionId} persisted to database`);
+                    }
                 } catch (dbError) {
                     console.error("Failed to persist session to database:", dbError);
                     // Don't throw - session was successful, just log the DB error
@@ -144,7 +154,7 @@ export const aiRouter = router({
                 console.error("Stagehand error:", error);
 
                 // Update session status to failed if we have a sessionId
-                if (sessionId) {
+                if (sessionId && db) {
                     try {
                         // PLACEHOLDER: Replace with actual userId from auth context
                         const placeholderUserId = 1;
@@ -181,25 +191,32 @@ export const aiRouter = router({
             })
         )
         .query(async ({ input }) => {
+            const db = await getDb();
+            if (!db) {
+                console.warn("[AI Router] Database not available - fetching recording directly from Browserbase");
+            }
+
             try {
                 // Check database first for cached recordingUrl (much faster)
-                const dbSession = await db.query.browserSessions.findFirst({
-                    where: eq(browserSessions.sessionId, input.sessionId),
-                    columns: {
-                        recordingUrl: true,
-                    },
-                });
+                if (db) {
+                    const dbSession = await db.query.browserSessions.findFirst({
+                        where: eq(browserSessions.sessionId, input.sessionId),
+                        columns: {
+                            recordingUrl: true,
+                        },
+                    });
 
-                // If we have a cached recording URL, return it immediately
-                if (dbSession?.recordingUrl) {
-                    console.log(`Using cached recording URL for session ${input.sessionId}`);
-                    return {
-                        sessionId: input.sessionId,
-                        events: [], // Events not cached, but URL is available
-                        recordingUrl: dbSession.recordingUrl,
-                        status: "completed",
-                        cached: true,
-                    };
+                    // If we have a cached recording URL, return it immediately
+                    if (dbSession?.recordingUrl) {
+                        console.log(`Using cached recording URL for session ${input.sessionId}`);
+                        return {
+                            sessionId: input.sessionId,
+                            events: [], // Events not cached, but URL is available
+                            recordingUrl: dbSession.recordingUrl,
+                            status: "completed",
+                            cached: true,
+                        };
+                    }
                 }
 
                 // Otherwise, fetch from Browserbase API using real SDK
@@ -207,7 +224,7 @@ export const aiRouter = router({
                 const recording = await browserbaseSDK.getSessionRecording(input.sessionId);
 
                 // Cache the recording URL in database for future requests
-                if (recording.recordingUrl) {
+                if (recording.recordingUrl && db) {
                     try {
                         await db.update(browserSessions)
                             .set({ recordingUrl: recording.recordingUrl })
@@ -336,6 +353,9 @@ export const aiRouter = router({
             })
         )
         .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
             let sessionId: string | undefined;
 
             try {
@@ -461,6 +481,9 @@ export const aiRouter = router({
             })
         )
         .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
             let sessionId: string | undefined;
 
             try {
@@ -595,6 +618,9 @@ export const aiRouter = router({
             })
         )
         .mutation(async ({ input }) => {
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
             let sessionId: string | undefined;
 
             try {
@@ -639,10 +665,10 @@ export const aiRouter = router({
                 await page.goto(input.url);
 
                 // Define schema based on type - extract is called on stagehand in V3
-                let extractedData: any;
+                let extractionResult: any;
 
                 if (input.schemaType === "contactInfo") {
-                    extractedData = await stagehand.extract(
+                    extractionResult = await stagehand.extract(
                         input.instruction,
                         z.object({
                             contactInfo: z.object({
@@ -650,10 +676,10 @@ export const aiRouter = router({
                                 phone: z.string().optional(),
                                 address: z.string().optional(),
                             })
-                        })
+                        }) as any
                     );
                 } else if (input.schemaType === "productInfo") {
-                    extractedData = await stagehand.extract(
+                    extractionResult = await stagehand.extract(
                         input.instruction,
                         z.object({
                             productInfo: z.object({
@@ -662,11 +688,11 @@ export const aiRouter = router({
                                 description: z.string().optional(),
                                 availability: z.string().optional(),
                             })
-                        })
+                        }) as any
                     );
                 } else {
                     // Generic extraction without schema returns { extraction: string }
-                    extractedData = await stagehand.extract(input.instruction);
+                    extractionResult = await stagehand.extract(input.instruction);
                 }
 
                 await stagehand.close();
@@ -691,7 +717,7 @@ export const aiRouter = router({
                         sessionId: dbSessionId,
                         url: input.url,
                         dataType: input.schemaType,
-                        data: extractedData,
+                        data: extractionResult,
                         metadata: {
                             instruction: input.instruction,
                             modelName: input.modelName || "google/gemini-2.0-flash",
@@ -706,7 +732,7 @@ export const aiRouter = router({
 
                 return {
                     success: true,
-                    data: extractedData,
+                    data: extractionResult,
                     sessionId: sessionId,
                     sessionUrl: session.url,
                 };
