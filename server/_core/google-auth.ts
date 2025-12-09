@@ -137,7 +137,7 @@ export function registerGoogleAuthRoutes(app: Express) {
 
             // Create session token using googleId as the identifier
             console.log('[Google Auth] Creating session token');
-            const sessionToken = await sdk.createSessionToken(googleId, {
+            const sessionToken = await sdk.createSessionTokenForGoogle(googleId, {
                 name: name || "Google User",
                 expiresInMs: ONE_YEAR_MS,
             });

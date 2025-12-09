@@ -171,11 +171,29 @@ class SDKServer {
     return this.signSession(
       {
         openId,
-        appId: ENV.appId,
-        name: options.name || "",
+        appId: ENV.appId || "default-app",
+        name: options.name || "User",
       },
       options
     );
+  }
+
+  /**
+   * Create a session token for a Google user
+   * @example
+   * const sessionToken = await sdk.createSessionTokenForGoogle(googleId, { name: "John Doe" });
+   */
+  async createSessionTokenForGoogle(
+    googleId: string,
+    options: { expiresInMs?: number; name?: string } = {}
+  ): Promise<string> {
+    const payload = {
+      openId: googleId,
+      appId: "google-oauth",
+      name: options.name || "Google User",
+    };
+    console.log("[Auth] Creating Google session with payload:", payload);
+    return this.signSession(payload, options);
   }
 
   async signSession(
@@ -217,7 +235,14 @@ class SDKServer {
         !isNonEmptyString(appId) ||
         !isNonEmptyString(name)
       ) {
-        console.warn("[Auth] Session payload missing required fields");
+        console.warn("[Auth] Session payload missing required fields", {
+          openId: openId || "(empty)",
+          appId: appId || "(empty)",
+          name: name || "(empty)",
+          hasOpenId: !!openId,
+          hasAppId: !!appId,
+          hasName: !!name,
+        });
         return null;
       }
 
