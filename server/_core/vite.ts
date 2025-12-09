@@ -7,8 +7,6 @@ import path from "path";
 export async function setupVite(app: Express, server: Server) {
   // Dynamic import to avoid loading vite in production
   const { createServer: createViteServer } = await import("vite");
-  const viteConfigModule = await import("../../vite.config.js");
-  const viteConfig = viteConfigModule.default || viteConfigModule;
   
   const serverOptions = {
     middlewareMode: true,
@@ -16,9 +14,9 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // Use vite's auto-detection of vite.config.ts instead of importing it
+  // This prevents bundling tailwindcss/lightningcss in the server bundle
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
     server: serverOptions,
     appType: "custom",
   });
