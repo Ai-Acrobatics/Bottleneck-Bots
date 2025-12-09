@@ -127,7 +127,7 @@ export function registerGoogleAuthRoutes(app: Express) {
             await db.upsertUser({
                 googleId: googleId,
                 openId: null, // Google users don't have a Manus openId
-                name: name,
+                name: name || "Google User",
                 email: email,
                 loginMethod: "google",
                 lastSignedIn: new Date(),
@@ -138,7 +138,7 @@ export function registerGoogleAuthRoutes(app: Express) {
             // Create session token using googleId as the identifier
             console.log('[Google Auth] Creating session token');
             const sessionToken = await sdk.createSessionToken(googleId, {
-                name: name || "",
+                name: name || "Google User",
                 expiresInMs: ONE_YEAR_MS,
             });
 
