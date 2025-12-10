@@ -299,6 +299,14 @@ class SDKServer {
       user = await db.getUserByGoogleId(sessionUserId);
     }
 
+    // Check for email-based auth (session ID starts with "email_")
+    if (!user && sessionUserId.startsWith("email_")) {
+      const userId = parseInt(sessionUserId.replace("email_", ""), 10);
+      if (!isNaN(userId)) {
+        user = await db.getUserById(userId);
+      }
+    }
+
     // If user not in DB, sync from OAuth server automatically (only for Manus users)
     if (!user && !sessionUserId.startsWith("google_")) { // Assuming google IDs might be distinguished or we just skip this for google
       try {

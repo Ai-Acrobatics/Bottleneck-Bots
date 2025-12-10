@@ -20,10 +20,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthenticated, onBac
     setError('');
 
     try {
-      // TODO: Implement actual email/password authentication with tRPC
-      // For now, just show a message that this feature is coming soon
-      setError('Email/password authentication coming soon. Please use Google Sign-In.');
-      setIsLoading(false);
+      const endpoint = isSignUp ? '/api/auth/signup' : '/api/auth/login';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name: email.split('@')[0] }),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Authentication failed');
+        setIsLoading(false);
+        return;
+      }
+
+      // Success - reload to show dashboard
+      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
       setIsLoading(false);
