@@ -329,11 +329,14 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      googleId: user.googleId,
-      lastSignedIn: signedInAt,
-    });
+    // Only call upsertUser if user has openId or googleId (not for email-only users)
+    if (user.openId || user.googleId) {
+      await db.upsertUser({
+        openId: user.openId,
+        googleId: user.googleId,
+        lastSignedIn: signedInAt,
+      });
+    }
 
     return user;
   }
