@@ -142,17 +142,21 @@ async function getStagehandInstance(
   // Create new instance
   console.log(`[Browser] Creating new Stagehand instance for session ${sessionId}`);
 
+  // Get model from environment variable with fallback
+  const modelName = process.env.STAGEHAND_MODEL || process.env.AI_MODEL || "google/gemini-2.0-flash";
+  const region = process.env.BROWSERBASE_REGION || "us-west-2";
+
   const stagehand = new Stagehand({
     env: "BROWSERBASE",
     verbose: 1,
     disablePino: true,
-    model: "google/gemini-2.0-flash",
+    model: modelName,
     apiKey: process.env.BROWSERBASE_API_KEY,
     projectId: process.env.BROWSERBASE_PROJECT_ID,
     browserbaseSessionCreateParams: {
       projectId: process.env.BROWSERBASE_PROJECT_ID!,
       proxies: true,
-      region: "us-west-2",
+      region: region as any,
       timeout: browserSettings?.timeout || 3600,
       keepAlive: browserSettings?.keepAlive !== false,
       browserSettings: {
@@ -215,11 +219,14 @@ export const browserRouter = router({
 
       try {
         // Create Browserbase session
+        // Note: recordSession goes inside browserSettings per Browserbase SDK v2.6+
         const sessionOptions: any = {
           browserSettings: {
             viewport: input.browserSettings?.viewport,
+            blockAds: input.browserSettings?.blockAds,
+            solveCaptchas: input.browserSettings?.solveCaptchas,
+            recordSession: input.recordSession,
           },
-          recordSession: input.recordSession,
           keepAlive: input.keepAlive,
           timeout: input.timeout,
         };
@@ -299,7 +306,7 @@ export const browserRouter = router({
         await page.goto(input.url, {
           waitUntil: input.waitUntil,
           timeout: input.timeout,
-        });
+        } as any);
 
         // Update session URL in database
         const db = await getDb();
@@ -355,7 +362,7 @@ export const browserRouter = router({
         // Try selector first if provided
         if (input.selector) {
           try {
-            await page.click(input.selector, { timeout: input.timeout });
+            await (page as any).click(input.selector, { timeout: input.timeout });
             success = true;
           } catch (error) {
             console.log(`[Browser] Selector click failed, trying AI instruction...`);
@@ -423,9 +430,12 @@ export const browserRouter = router({
         if (input.selector) {
           try {
             if (input.clearFirst) {
-              await page.fill(input.selector, "");
+              await (page as any).evaluate((selector: string) => {
+                const el = document.querySelector(selector) as any;
+                if (el) el.value = '';
+              }, input.selector);
             }
-            await page.type(input.selector, input.text, { delay: input.delay });
+            await (page as any).type(input.selector, input.text, { delay: input.delay });
             success = true;
           } catch (error) {
             console.log(`[Browser] Selector type failed, trying AI instruction...`);
@@ -552,7 +562,7 @@ export const browserRouter = router({
                 name: z.string().optional(),
                 company: z.string().optional(),
               }),
-            })
+            }) as any
           );
         } else if (input.schemaType === "productInfo") {
           extractedData = await stagehand.extract(
@@ -567,14 +577,14 @@ export const browserRouter = router({
                 rating: z.string().optional(),
                 reviews: z.number().optional(),
               }),
-            })
+            }) as any
           );
         } else if (input.schemaType === "tableData") {
           extractedData = await stagehand.extract(
             input.instruction,
             z.object({
               tableData: z.array(z.record(z.string(), z.any())),
-            })
+            }) as any
           );
         } else {
           // Custom extraction without schema
@@ -783,7 +793,7 @@ export const browserRouter = router({
           sessionId: input.sessionId,
           debugUrl: debugInfo.debuggerFullscreenUrl,
           wsUrl: debugInfo.wsUrl,
-          status: debugInfo.status || "RUNNING",
+          status: "RUNNING" as const,
         };
       } catch (error) {
         console.error("[Browser] Failed to get debug URL:", error);
@@ -865,6 +875,193 @@ export const browserRouter = router({
           message: `Failed to close session: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
+    }),
+
+  /**
+   * Delete a browser session from database
+   */
+  deleteSession: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+      const db = await getDb();
+
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not initialized",
+        });
+      }
+
+      try {
+        // First close the session if it's still active
+        await closeStagehandInstance(input.sessionId);
+
+        // Try to terminate on Browserbase side (ignore errors for already terminated sessions)
+        try {
+          await browserbaseSDK.terminateSession(input.sessionId);
+        } catch (e) {
+          console.log("[Browser] Session may already be terminated:", input.sessionId);
+        }
+
+        // First find the browser session to get its ID for related records
+        const [session] = await db.select()
+          .from(browserSessions)
+          .where(and(
+            eq(browserSessions.sessionId, input.sessionId),
+            eq(browserSessions.userId, userId)
+          ))
+          .limit(1);
+
+        if (session) {
+          // Delete any extracted data associated with this session (using the integer ID)
+          await db.delete(extractedData)
+            .where(eq(extractedData.sessionId, session.id));
+
+          // Delete the browser session
+          await db.delete(browserSessions)
+            .where(eq(browserSessions.id, session.id));
+        }
+
+        // Emit WebSocket event
+        websocketService.broadcastToUser(userId, "browser:session:deleted", {
+          sessionId: input.sessionId,
+          timestamp: new Date(),
+        });
+
+        return {
+          success: true,
+          sessionId: input.sessionId,
+          message: "Session deleted successfully",
+        };
+      } catch (error) {
+        console.error("[Browser] Failed to delete session:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to delete session: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
+   * Bulk terminate multiple sessions
+   */
+  bulkTerminate: protectedProcedure
+    .input(z.object({ sessionIds: z.array(z.string()).min(1).max(50) }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+      const db = await getDb();
+
+      const results = {
+        success: [] as string[],
+        failed: [] as { sessionId: string; error: string }[],
+      };
+
+      for (const sessionId of input.sessionIds) {
+        try {
+          await closeStagehandInstance(sessionId);
+          try {
+            await browserbaseSDK.terminateSession(sessionId);
+          } catch (e) {
+            // Ignore - session may already be terminated
+          }
+
+          if (db) {
+            await db.update(browserSessions)
+              .set({
+                status: "completed",
+                completedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(and(
+                eq(browserSessions.sessionId, sessionId),
+                eq(browserSessions.userId, userId)
+              ));
+          }
+
+          results.success.push(sessionId);
+        } catch (error) {
+          results.failed.push({
+            sessionId,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      // Emit WebSocket event
+      websocketService.broadcastToUser(userId, "browser:sessions:bulk-terminated", {
+        results,
+        timestamp: new Date(),
+      });
+
+      return results;
+    }),
+
+  /**
+   * Bulk delete multiple sessions
+   */
+  bulkDelete: protectedProcedure
+    .input(z.object({ sessionIds: z.array(z.string()).min(1).max(50) }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+      const db = await getDb();
+
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not initialized",
+        });
+      }
+
+      const results = {
+        success: [] as string[],
+        failed: [] as { sessionId: string; error: string }[],
+      };
+
+      for (const sessionId of input.sessionIds) {
+        try {
+          await closeStagehandInstance(sessionId);
+          try {
+            await browserbaseSDK.terminateSession(sessionId);
+          } catch (e) {
+            // Ignore
+          }
+
+          // Find the session first to get its integer ID
+          const [session] = await db.select()
+            .from(browserSessions)
+            .where(and(
+              eq(browserSessions.sessionId, sessionId),
+              eq(browserSessions.userId, userId)
+            ))
+            .limit(1);
+
+          if (session) {
+            // Delete extracted data first (foreign key constraint)
+            await db.delete(extractedData)
+              .where(eq(extractedData.sessionId, session.id));
+
+            // Delete the browser session
+            await db.delete(browserSessions)
+              .where(eq(browserSessions.id, session.id));
+          }
+
+          results.success.push(sessionId);
+        } catch (error) {
+          results.failed.push({
+            sessionId,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      // Emit WebSocket event
+      websocketService.broadcastToUser(userId, "browser:sessions:bulk-deleted", {
+        results,
+        timestamp: new Date(),
+      });
+
+      return results;
     }),
 
   /**

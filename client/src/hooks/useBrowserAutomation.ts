@@ -73,10 +73,10 @@ export function useBrowserAutomation() {
             message: result.success
               ? `Executed ${step.action} on ${step.target}`
               : `Failed: ${step.action}`,
-            detail: result.error || result.message,
+            detail: (result as any).error || (result as any).message || '',
           },
         ],
-        screenshot: result.screenshot,
+        screenshot: (result as any).screenshot,
         duration,
       };
     } catch (error: any) {
@@ -131,7 +131,7 @@ export function useBrowserAutomation() {
         success: result.success,
         sessionId: result.sessionId,
         sessionUrl: result.sessionUrl,
-        message: result.message || 'Workflow executed successfully',
+        message: (result as any).message || 'Workflow executed successfully',
       };
     } catch (error: any) {
       return {

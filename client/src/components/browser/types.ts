@@ -19,7 +19,7 @@ export const BrowserSessionSchema = z.object({
   createdAt: z.string(),
   completedAt: z.string().optional(),
   duration: z.number().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export type BrowserSession = z.infer<typeof BrowserSessionSchema>;
@@ -33,7 +33,7 @@ export const WorkflowStepSchema = z.object({
   type: WorkflowStepType,
   order: z.number(),
   label: z.string(),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
   enabled: z.boolean().default(true),
 });
 

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ghl-agency-ai.configMapName" . }}
+  labels:
+    {{- include "ghl-agency-ai.labels" . | nindent 4 }}
+data:
+  VITE_APP_ID: {{ .Values.config.appId | quote }}
+  VITE_APP_TITLE: {{ .Values.config.appTitle | quote }}
+  VITE_APP_LOGO: {{ .Values.config.appLogo | quote }}
+  VITE_OAUTH_PORTAL_URL: {{ .Values.config.oauthPortalUrl | quote }}
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: {{ .Values.config.playwrightSkipBrowserDownload | quote }}
+  # Browserbase configuration
+  BROWSERBASE_REGION: {{ .Values.browserbase.region | quote }}
+  STAGEHAND_MODEL: {{ .Values.browserbase.stagehandModel | quote }}
+  AI_MODEL: {{ .Values.browserbase.stagehandModel | quote }}
+  # Session cleanup configuration
+  SESSION_CLEANUP_INTERVAL: {{ .Values.sessionCleanup.intervalMs | quote }}

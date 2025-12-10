@@ -1,0 +1,19 @@
+apiVersion: v2
+name: ghl-agency-ai
+description: A Helm chart for GHL Agency AI - White-label SaaS platform for AI-powered GoHighLevel automation
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/ghl-agency-ai/ghl-agency-ai/main/public/logo.png
+keywords:
+  - ghl
+  - agency
+  - ai
+  - automation
+  - saas
+maintainers:
+  - name: GHL Agency AI Team
+home: https://github.com/ghl-agency-ai
+sources:
+  - https://github.com/ghl-agency-ai
+dependencies: []

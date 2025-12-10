@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ghl-agency-ai-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ghl-agency-ai
+    app.kubernetes.io/part-of: ghl-agency-ai
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/ghl-agency-ai/ghl-agency-ai.git
+    targetRevision: develop
+    path: helm/ghl-agency-ai
+    helm:
+      valueFiles:
+        - ../../gitops/overlays/staging/values.yaml
+      parameters:
+        - name: image.tag
+          value: develop  # Will be overridden by CI/CD
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ghl-agency-ai-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+
+  revisionHistoryLimit: 5

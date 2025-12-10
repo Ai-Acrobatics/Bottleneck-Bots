@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useBrowserSession } from '@/hooks/useBrowserSession';
 import { useWebSocketStore } from '@/stores/websocketStore';
+import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,32 +92,97 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
     }
   }, []);
 
+  // tRPC mutations
+  const navigateMutation = trpc.browser.navigateTo.useMutation();
+  const clickMutation = trpc.browser.clickElement.useMutation();
+  const typeMutation = trpc.browser.typeText.useMutation();
+  const screenshotMutation = trpc.browser.takeScreenshot.useMutation();
+  const actMutation = trpc.browser.act.useMutation();
+
   // Browser control actions
   const executeAction = useCallback(
     async (action: BrowserAction) => {
       try {
-        // PLACEHOLDER: Replace with actual browser control API
-        // This should call a tRPC mutation or API endpoint that sends commands to the browser
         toast.info(`Executing: ${action.type} ${action.target || ''}`);
 
-        // Simulated action execution - replace with real implementation
-        console.log('Browser action:', action);
+        switch (action.type) {
+          case 'navigate':
+            if (action.target) {
+              await navigateMutation.mutateAsync({
+                sessionId,
+                url: action.target.startsWith('http') ? action.target : `https://${action.target}`,
+                waitUntil: 'load',
+              });
+            }
+            break;
 
-        // Example API call structure:
-        // await trpc.ai.executeBrowserAction.mutate({
-        //   sessionId,
-        //   action: action.type,
-        //   target: action.target,
-        //   value: action.value,
-        //   options: action.options,
-        // });
+          case 'click':
+            if (action.target) {
+              await clickMutation.mutateAsync({
+                sessionId,
+                selector: action.target,
+                instruction: typeof action.value === 'string' ? action.value : undefined,
+              });
+            }
+            break;
+
+          case 'type':
+            if (action.target) {
+              await typeMutation.mutateAsync({
+                sessionId,
+                selector: action.target,
+                text: typeof action.value === 'string' ? action.value : '',
+              });
+            }
+            break;
+
+          case 'back':
+          case 'forward':
+          case 'refresh':
+            // Use act mutation for browser navigation commands
+            await actMutation.mutateAsync({
+              sessionId,
+              instruction: `Click the browser ${action.type} button`,
+            });
+            break;
+
+          case 'scroll':
+            await actMutation.mutateAsync({
+              sessionId,
+              instruction: `Scroll ${action.target || 'down'} on the page`,
+            });
+            break;
+
+          case 'extract':
+            await actMutation.mutateAsync({
+              sessionId,
+              instruction: action.target || 'Extract all visible text content',
+            });
+            break;
+
+          case 'wait':
+            await actMutation.mutateAsync({
+              sessionId,
+              instruction: `Wait for ${action.target || 'page to load'}`,
+            });
+            break;
+
+          default:
+            // Generic action via AI instruction
+            await actMutation.mutateAsync({
+              sessionId,
+              instruction: `${action.type}: ${action.target || ''} ${action.value || ''}`.trim(),
+            });
+        }
 
         toast.success(`Action completed: ${action.type}`);
+        refetch(); // Refresh session data
       } catch (error: any) {
+        console.error('Browser action error:', error);
         toast.error(`Action failed: ${error.message || 'Unknown error'}`);
       }
     },
-    [sessionId]
+    [sessionId, navigateMutation, clickMutation, typeMutation, actMutation, refetch]
   );
 
   // Navigation handlers
@@ -139,22 +205,25 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
   // Screenshot handler
   const handleScreenshot = useCallback(async () => {
     try {
-      // PLACEHOLDER: Replace with actual screenshot capture API
       toast.info('Capturing screenshot...');
 
-      // Example API call structure:
-      // const result = await trpc.ai.captureScreenshot.mutate({ sessionId });
-      // setScreenshotUrl(result.url);
+      const result = await screenshotMutation.mutateAsync({
+        sessionId,
+        fullPage: false,
+        quality: 90,
+      });
 
-      // Simulated screenshot capture
-      const timestamp = new Date().toISOString();
-      console.log('Screenshot captured at:', timestamp);
-
-      toast.success('Screenshot captured');
+      if (result.screenshot) {
+        setScreenshotUrl(result.screenshot);
+        toast.success('Screenshot captured successfully');
+      } else {
+        toast.success('Screenshot captured');
+      }
     } catch (error: any) {
+      console.error('Screenshot error:', error);
       toast.error(`Screenshot failed: ${error.message || 'Unknown error'}`);
     }
-  }, [sessionId]);
+  }, [sessionId, screenshotMutation]);
 
   // Recording handlers
   const toggleRecording = useCallback(async () => {
@@ -485,21 +554,23 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-1 max-h-64 overflow-y-auto font-mono text-xs">
-              {logs.map((log) => (
+              {logs.map((log, index) => (
                 <div
-                  key={log.id}
+                  key={`${log.timestamp}-${index}`}
                   className={`p-2 rounded ${
                     log.level === 'error'
                       ? 'bg-red-50 text-red-700'
-                      : log.level === 'warning'
+                      : log.level === 'warn'
                       ? 'bg-yellow-50 text-yellow-700'
-                      : log.level === 'success'
-                      ? 'bg-green-50 text-green-700'
                       : 'bg-slate-50 text-slate-700'
                   }`}
                 >
                   <span className="text-slate-500">{log.timestamp}</span> {log.message}
-                  {log.detail && <div className="text-xs opacity-75 mt-1">{log.detail}</div>}
+                  {log.metadata && (
+                    <div className="text-xs opacity-75 mt-1">
+                      {JSON.stringify(log.metadata, null, 2)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

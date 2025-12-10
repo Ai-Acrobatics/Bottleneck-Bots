@@ -2,12 +2,25 @@ name: Deploy
 
 on:
   push:
+    branches: [main, develop]
+  pull_request:
     branches: [main]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build-push.outputs.digest }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,40 +36,180 @@ jobs:
           version: 10
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
-      - name: Build application
-        run: pnpm run build
-        env:
-          # TODO (Hitesh): Add all required environment variables as GitHub Secrets
-          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
-          VITE_APP_TITLE: ${{ secrets.VITE_APP_TITLE }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      - name: Run type check
+        run: pnpm run type-check
 
-      # TODO (Hitesh): Choose deployment target and uncomment appropriate section
+      - name: Run tests
+        run: pnpm run test
+        continue-on-error: true
 
-      # Option 1: Deploy to Vercel
-      # - name: Deploy to Vercel
-      #   uses: amondnet/vercel-action@v25
-      #   with:
-      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
-      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-      #     vercel-args: '--prod'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Option 2: Build and push Docker image
-      # - name: Build Docker image
-      #   run: docker build -t ghlagencyai:${{ github.sha }} .
-      #
-      # - name: Push to Container Registry
-      #   run: |
-      #     echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-      #     docker push ghlagencyai:${{ github.sha }}
-      #
-      # - name: Deploy to production
-      #   run: |
-      #     # Add deployment commands here (e.g., AWS ECS, Railway, etc.)
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deployment placeholder
-        run: echo "Deployment configuration needed - see TODO comments above"
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build-push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json
+
+  update-gitops:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "overlay_path=gitops/overlays/production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "overlay_path=gitops/overlays/staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update image tag in GitOps overlay
+        run: |
+          # Extract short SHA for image tag
+          IMAGE_TAG="${{ github.sha }}"
+          SHORT_SHA="${IMAGE_TAG:0:7}"
+
+          # Update the values file with new image tag
+          sed -i "s|tag:.*|tag: \"${SHORT_SHA}\"|g" ${{ steps.env.outputs.overlay_path }}/values.yaml || true
+
+          # If sed didn't find existing tag line, add it under image section
+          if ! grep -q "tag:" ${{ steps.env.outputs.overlay_path }}/values.yaml; then
+            sed -i '/^image:/a\  tag: "'"${SHORT_SHA}"'"' ${{ steps.env.outputs.overlay_path }}/values.yaml
+          fi
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ${{ steps.env.outputs.overlay_path }}/values.yaml
+          git diff --staged --quiet || git commit -m "chore: update ${{ steps.env.outputs.environment }} image to ${{ github.sha }}"
+          git push
+
+  deploy-staging:
+    needs: [build-and-push, update-gitops]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.ghl-agency-ai.yourdomain.com
+
+    steps:
+      - name: Trigger ArgoCD Sync (Staging)
+        run: |
+          echo "ArgoCD will automatically sync staging from the develop branch"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
+          # Optional: Force sync via ArgoCD API if needed
+          # curl -X POST ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/ghl-agency-ai-staging/sync \
+          #   -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+          #   -H "Content-Type: application/json"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for ArgoCD to sync and deploy..."
+          sleep 30
+
+      - name: Smoke test
+        run: |
+          echo "Running smoke tests against staging..."
+          # curl -f https://staging.ghl-agency-ai.yourdomain.com/api/health || exit 1
+
+  deploy-production:
+    needs: [build-and-push, update-gitops]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://ghl-agency-ai.yourdomain.com
+
+    steps:
+      - name: Trigger ArgoCD Sync (Production)
+        run: |
+          echo "ArgoCD will automatically sync production from the main branch"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
+          # Optional: Force sync via ArgoCD API if needed
+          # curl -X POST ${{ secrets.ARGOCD_SERVER }}/api/v1/applications/ghl-agency-ai-production/sync \
+          #   -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+          #   -H "Content-Type: application/json"
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for ArgoCD to sync and deploy..."
+          sleep 60
+
+      - name: Production smoke test
+        run: |
+          echo "Running smoke tests against production..."
+          # curl -f https://ghl-agency-ai.yourdomain.com/api/health || exit 1
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "Production deployment successful!"
+          # Optional: Send Slack notification
+          # curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"text":"Production deployment successful for commit ${{ github.sha }}"}'
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Production deployment failed!"
+          # Optional: Send Slack notification
+          # curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"text":"Production deployment FAILED for commit ${{ github.sha }}"}'

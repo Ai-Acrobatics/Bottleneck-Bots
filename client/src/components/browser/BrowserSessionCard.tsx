@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
+  Timer,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -62,12 +64,35 @@ export function BrowserSessionCard({
   isSelected,
   onSelect,
 }: BrowserSessionCardProps) {
+  // Live duration tracking for running sessions
+  const [liveDuration, setLiveDuration] = useState<number>(0);
+
+  useEffect(() => {
+    if (session.status === 'running') {
+      const startTime = new Date(session.createdAt).getTime();
+
+      const updateDuration = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        setLiveDuration(elapsed);
+      };
+
+      // Update immediately
+      updateDuration();
+
+      // Update every second
+      const interval = setInterval(updateDuration, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [session.status, session.createdAt]);
+
   const getStatusConfig = (status: BrowserSession['status']) => {
     switch (status) {
       case 'running':
         return {
           variant: 'default' as const,
-          className: 'bg-blue-500 hover:bg-blue-600',
+          className: 'bg-blue-500 hover:bg-blue-600 animate-pulse',
           icon: Play,
           label: 'Running',
         };
@@ -115,11 +140,40 @@ export function BrowserSessionCard({
     if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
+    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
   };
 
+  // Get duration display and warning level
+  const getDurationInfo = () => {
+    const duration = session.status === 'running' ? liveDuration : session.duration;
+    if (!duration) return null;
+
+    const minutes = duration / 1000 / 60;
+    let warningClass = 'text-slate-600';
+
+    // Color-code by duration (30min = yellow, 60min = orange)
+    if (minutes > 60) {
+      warningClass = 'text-orange-600 font-semibold';
+    } else if (minutes > 30) {
+      warningClass = 'text-yellow-600 font-medium';
+    }
+
+    return {
+      display: session.status === 'running'
+        ? `Active for ${formatDuration(duration)}`
+        : `Duration: ${formatDuration(duration)}`,
+      warningClass,
+      isLongRunning: minutes > 30,
+    };
+  };
+
+  const durationInfo = getDurationInfo();
+
   return (
-    <Card className={`hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+    <Card className={`group hover:shadow-lg transition-all duration-200 ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4">
           {/* Left: Checkbox and Session Info */}
@@ -161,17 +215,18 @@ export function BrowserSessionCard({
                 </div>
               )}
 
-              {/* Timestamps */}
-              <div className="flex items-center gap-4 text-xs text-slate-500">
-                <div className="flex items-center gap-1">
+              {/* Timestamps and Duration */}
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1 text-slate-500">
                   <Clock className="h-3 w-3" />
                   <span>
                     {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
                   </span>
                 </div>
-                {session.duration && (
-                  <div className="flex items-center gap-1">
-                    <span>Duration: {formatDuration(session.duration)}</span>
+                {durationInfo && (
+                  <div className={`flex items-center gap-1 ${durationInfo.warningClass} ${session.status === 'running' ? 'animate-pulse' : ''}`}>
+                    <Timer className="h-3 w-3" />
+                    <span>{durationInfo.display}</span>
                   </div>
                 )}
               </div>
@@ -180,14 +235,14 @@ export function BrowserSessionCard({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            {/* Quick Actions */}
-            <div className="flex gap-1">
+            {/* Quick Actions - Visible on hover */}
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:translate-x-0 translate-x-2">
               {session.status === 'running' && session.debugUrl && onLiveView && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onLiveView(session)}
-                  className="gap-1"
+                  className="gap-1 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600"
                 >
                   <ExternalLink className="h-3 w-3" />
                   <span className="hidden sm:inline">Live</span>
@@ -199,7 +254,7 @@ export function BrowserSessionCard({
                   variant="outline"
                   size="sm"
                   onClick={() => onViewRecording(session)}
-                  className="gap-1"
+                  className="gap-1 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600"
                 >
                   <Video className="h-3 w-3" />
                   <span className="hidden sm:inline">Recording</span>
@@ -267,6 +322,24 @@ export function BrowserSessionCard({
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Progress Indicator for Running Sessions */}
+        {session.status === 'running' && (
+          <div className="mt-3 pt-3 border-t border-slate-200 animate-in fade-in-50 duration-300">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-xs text-slate-500 font-medium">Session in progress</div>
+              <div className="flex gap-1">
+                <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse" />
+                <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse delay-75" />
+                <div className="h-1 w-1 rounded-full bg-blue-500 animate-pulse delay-150" />
+              </div>
+            </div>
+            <Progress
+              value={undefined}
+              className="h-2 [&>div]:animate-[progress_2s_ease-in-out_infinite] [&>div]:bg-gradient-to-r [&>div]:from-blue-400 [&>div]:via-blue-500 [&>div]:to-blue-600 shadow-sm"
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

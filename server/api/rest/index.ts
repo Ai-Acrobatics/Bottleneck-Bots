@@ -18,6 +18,7 @@ import {
 import tasksRouter from "./routes/tasks";
 import executionsRouter from "./routes/executions";
 import templatesRouter from "./routes/templates";
+import webhooksRouter from "./routes/webhooks";
 
 /**
  * Create and configure REST API Express app
@@ -87,6 +88,9 @@ export function createRestApi(): Express {
   app.use("/api/v1/tasks", apiKeyRateLimit, tasksRouter);
   app.use("/api/v1/executions", apiKeyRateLimit, executionsRouter);
   app.use("/api/v1/templates", apiKeyRateLimit, templatesRouter);
+
+  // Webhooks route (uses simpler secret-based auth for n8n compatibility)
+  app.use("/api/v1/webhooks", webhooksRouter);
 
   // ========================================
   // ERROR HANDLING

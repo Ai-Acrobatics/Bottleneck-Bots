@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ghl-agency-ai
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ghl-agency-ai
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: GHL Agency AI Application Project
+
+  # Source repositories
+  sourceRepos:
+    - https://github.com/ghl-agency-ai/ghl-agency-ai.git
+    - ghcr.io/ghl-agency-ai/*
+
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: ghl-agency-ai-production
+      server: https://kubernetes.default.svc
+    - namespace: ghl-agency-ai-staging
+      server: https://kubernetes.default.svc
+
+  # Allowed cluster resources
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: networking.k8s.io
+      kind: IngressClass
+
+  # Allowed namespace resources
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+
+  # Roles for RBAC
+  roles:
+    - name: read-only
+      description: Read-only access to GHL Agency AI applications
+      policies:
+        - p, proj:ghl-agency-ai:read-only, applications, get, ghl-agency-ai/*, allow
+      groups:
+        - ghl-agency-ai-viewers
+
+    - name: admin
+      description: Admin access to GHL Agency AI applications
+      policies:
+        - p, proj:ghl-agency-ai:admin, applications, *, ghl-agency-ai/*, allow
+        - p, proj:ghl-agency-ai:admin, repositories, *, ghl-agency-ai/*, allow
+      groups:
+        - ghl-agency-ai-admins
+
+  # Sync windows (optional - restrict sync times)
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: '0 * * * *'
+  #     duration: 1h
+  #     applications:
+  #       - '*-production'

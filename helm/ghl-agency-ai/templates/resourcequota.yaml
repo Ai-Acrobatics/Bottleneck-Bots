@@ -1,0 +1,40 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "ghl-agency-ai.fullname" . }}-quota
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ghl-agency-ai.labels" . | nindent 4 }}
+spec:
+  hard:
+    {{- with .Values.resourceQuota.hard }}
+    {{- if .requestsCpu }}
+    requests.cpu: {{ .requestsCpu | quote }}
+    {{- end }}
+    {{- if .requestsMemory }}
+    requests.memory: {{ .requestsMemory | quote }}
+    {{- end }}
+    {{- if .limitsCpu }}
+    limits.cpu: {{ .limitsCpu | quote }}
+    {{- end }}
+    {{- if .limitsMemory }}
+    limits.memory: {{ .limitsMemory | quote }}
+    {{- end }}
+    {{- if .pods }}
+    pods: {{ .pods | quote }}
+    {{- end }}
+    {{- if .services }}
+    services: {{ .services | quote }}
+    {{- end }}
+    {{- if .persistentvolumeclaims }}
+    persistentvolumeclaims: {{ .persistentvolumeclaims | quote }}
+    {{- end }}
+    {{- if .secrets }}
+    secrets: {{ .secrets | quote }}
+    {{- end }}
+    {{- if .configmaps }}
+    configmaps: {{ .configmaps | quote }}
+    {{- end }}
+    {{- end }}
+{{- end }}

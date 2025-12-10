@@ -361,6 +361,193 @@ class BrowserbaseSDKService {
       // TODO: Map geolocation to proxy settings if supported by Browserbase SDK directly
     });
   }
+
+  /**
+   * Terminate/close a Browserbase session
+   *
+   * @param sessionId - The session ID to terminate
+   * @param projectId - Optional project ID (uses default if not provided)
+   * @returns Success status
+   *
+   * @example
+   * ```ts
+   * await browserbaseSDK.terminateSession('session_123');
+   * ```
+   */
+  public async terminateSession(sessionId: string, projectId?: string): Promise<{ success: boolean; sessionId: string }> {
+    const client = this.ensureClient();
+
+    if (!sessionId) {
+      throw new BrowserbaseSDKError(
+        'Session ID is required',
+        'MISSING_SESSION_ID'
+      );
+    }
+
+    try {
+      console.log('[BrowserbaseSDK] Terminating session:', sessionId);
+
+      // Update session status to REQUEST_RELEASE to gracefully close it
+      const resolvedProjectId = this.getProjectId(projectId);
+      await client.sessions.update(sessionId, {
+        projectId: resolvedProjectId,
+        status: 'REQUEST_RELEASE'
+      });
+
+      console.log('[BrowserbaseSDK] Session terminated successfully:', sessionId);
+
+      return { success: true, sessionId };
+    } catch (error) {
+      console.error('[BrowserbaseSDK] Failed to terminate session:', error);
+      throw new BrowserbaseSDKError(
+        `Failed to terminate session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'TERMINATE_SESSION_ERROR',
+        error
+      );
+    }
+  }
+
+  /**
+   * Get session details
+   *
+   * @param sessionId - The session ID to retrieve
+   * @returns Session details
+   */
+  public async getSession(sessionId: string): Promise<any> {
+    const client = this.ensureClient();
+
+    if (!sessionId) {
+      throw new BrowserbaseSDKError(
+        'Session ID is required',
+        'MISSING_SESSION_ID'
+      );
+    }
+
+    try {
+      console.log('[BrowserbaseSDK] Getting session:', sessionId);
+
+      const session = await client.sessions.retrieve(sessionId);
+
+      console.log('[BrowserbaseSDK] Session retrieved successfully');
+
+      return session;
+    } catch (error) {
+      console.error('[BrowserbaseSDK] Failed to get session:', error);
+      throw new BrowserbaseSDKError(
+        `Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'GET_SESSION_ERROR',
+        error
+      );
+    }
+  }
+
+  /**
+   * Update session status
+   *
+   * @param sessionId - The session ID to update
+   * @param status - The new status
+   * @param projectId - Optional project ID (uses default if not provided)
+   * @returns Updated session
+   */
+  public async updateSessionStatus(
+    sessionId: string,
+    status: 'REQUEST_RELEASE',
+    projectId?: string
+  ): Promise<any> {
+    const client = this.ensureClient();
+
+    if (!sessionId) {
+      throw new BrowserbaseSDKError(
+        'Session ID is required',
+        'MISSING_SESSION_ID'
+      );
+    }
+
+    try {
+      console.log('[BrowserbaseSDK] Updating session status:', sessionId, status);
+
+      const resolvedProjectId = this.getProjectId(projectId);
+      const session = await client.sessions.update(sessionId, {
+        projectId: resolvedProjectId,
+        status
+      });
+
+      console.log('[BrowserbaseSDK] Session status updated successfully');
+
+      return session;
+    } catch (error) {
+      console.error('[BrowserbaseSDK] Failed to update session status:', error);
+      throw new BrowserbaseSDKError(
+        `Failed to update session status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'UPDATE_SESSION_ERROR',
+        error
+      );
+    }
+  }
+
+  /**
+   * Get session downloads
+   *
+   * @param sessionId - The session ID
+   * @returns Download URLs
+   */
+  public async getSessionDownloads(sessionId: string): Promise<any> {
+    const client = this.ensureClient();
+
+    if (!sessionId) {
+      throw new BrowserbaseSDKError(
+        'Session ID is required',
+        'MISSING_SESSION_ID'
+      );
+    }
+
+    try {
+      console.log('[BrowserbaseSDK] Getting downloads for session:', sessionId);
+
+      const downloads = await client.sessions.downloads.list(sessionId);
+
+      return downloads;
+    } catch (error) {
+      console.error('[BrowserbaseSDK] Failed to get session downloads:', error);
+      throw new BrowserbaseSDKError(
+        `Failed to get session downloads: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'GET_DOWNLOADS_ERROR',
+        error
+      );
+    }
+  }
+
+  /**
+   * Get session uploads
+   * Note: The Browserbase SDK currently only supports creating uploads, not listing them.
+   * This method is a placeholder for future functionality.
+   *
+   * @param sessionId - The session ID
+   * @returns Upload configuration (currently returns empty array)
+   */
+  public async getSessionUploads(sessionId: string): Promise<any> {
+    if (!sessionId) {
+      throw new BrowserbaseSDKError(
+        'Session ID is required',
+        'MISSING_SESSION_ID'
+      );
+    }
+
+    try {
+      console.log('[BrowserbaseSDK] Getting uploads for session:', sessionId);
+
+      // Note: uploads.list() is not available in the current SDK
+      // Returning empty array as placeholder
+      return [];
+    } catch (error) {
+      console.error('[BrowserbaseSDK] Failed to get session uploads:', error);
+      throw new BrowserbaseSDKError(
+        `Failed to get session uploads: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'GET_UPLOADS_ERROR',
+        error
+      );
+    }
+  }
 }
 
 // Export singleton instance

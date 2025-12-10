@@ -1,0 +1,156 @@
+# Staging environment values
+# These override the base values.yaml for staging deployment
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/ghl-agency-ai/ghl-agency-ai
+  pullPolicy: Always
+  # tag is set by CI/CD pipeline
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 85
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: staging.ghl-agency-ai.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: ghl-agency-ai-staging-tls
+      hosts:
+        - staging.ghl-agency-ai.yourdomain.com
+
+# Use External Secrets in staging too
+externalSecrets:
+  enabled: true
+  secretStoreRef: "vault-backend"
+  secretStoreKind: ClusterSecretStore
+  refreshInterval: "30m"
+  data:
+    - secretKey: DATABASE_URL
+      remoteRef:
+        key: ghl-agency-ai/staging/database
+        property: url
+    - secretKey: JWT_SECRET
+      remoteRef:
+        key: ghl-agency-ai/staging/auth
+        property: jwt_secret
+    - secretKey: OAUTH_SERVER_URL
+      remoteRef:
+        key: ghl-agency-ai/staging/auth
+        property: oauth_server_url
+    - secretKey: OWNER_OPEN_ID
+      remoteRef:
+        key: ghl-agency-ai/staging/auth
+        property: owner_open_id
+    - secretKey: GEMINI_API_KEY
+      remoteRef:
+        key: ghl-agency-ai/staging/ai
+        property: gemini_api_key
+    - secretKey: OPENAI_API_KEY
+      remoteRef:
+        key: ghl-agency-ai/staging/ai
+        property: openai_api_key
+    - secretKey: ANTHROPIC_API_KEY
+      remoteRef:
+        key: ghl-agency-ai/staging/ai
+        property: anthropic_api_key
+    - secretKey: BROWSERBASE_API_KEY
+      remoteRef:
+        key: ghl-agency-ai/staging/browserbase
+        property: api_key
+    - secretKey: BROWSERBASE_PROJECT_ID
+      remoteRef:
+        key: ghl-agency-ai/staging/browserbase
+        property: project_id
+
+config:
+  appId: "ghl-agency-ai-staging"
+  appTitle: "GHL Agency AI (Staging)"
+  appLogo: "/logo.png"
+  oauthPortalUrl: "https://auth.manus.im"
+  playwrightSkipBrowserDownload: "1"
+
+# Browserbase configuration for staging
+browserbase:
+  region: "us-west-2"
+  stagehandModel: "google/gemini-2.0-flash"
+
+# Session cleanup - default interval for staging (5 minutes)
+sessionCleanup:
+  intervalMs: 300000
+
+# Resource quota for staging namespace
+resourceQuota:
+  enabled: true
+  hard:
+    requestsCpu: "8"
+    requestsMemory: "16Gi"
+    limitsCpu: "16"
+    limitsMemory: "32Gi"
+    pods: "30"
+    services: "10"
+    persistentvolumeclaims: "5"
+    secrets: "20"
+    configmaps: "20"
+
+env:
+  NODE_ENV: production
+  PORT: "3000"
+
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    - {}  # Allow all egress in staging for easier debugging
+
+serviceMonitor:
+  enabled: true
+  interval: 60s
+  scrapeTimeout: 10s
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - ghl-agency-ai
+          topologyKey: kubernetes.io/hostname

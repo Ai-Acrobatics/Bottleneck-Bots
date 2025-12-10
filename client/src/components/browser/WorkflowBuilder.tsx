@@ -785,13 +785,13 @@ function getStepConfigSummary(step: WorkflowStep): string {
 
   switch (type) {
     case 'navigate':
-      return config.url || 'No URL configured';
+      return String(config.url || 'No URL configured');
     case 'act':
-      return config.instruction || config.selector || 'No action configured';
+      return String(config.instruction || config.selector || 'No action configured');
     case 'observe':
-      return config.selector || 'No selector configured';
+      return String(config.selector || 'No selector configured');
     case 'extract':
-      return config.extractInstruction || 'No extraction configured';
+      return String(config.extractInstruction || 'No extraction configured');
     case 'wait':
       return `Wait ${config.waitMs || 0}ms${config.condition ? ` - ${config.condition}` : ''}`;
     case 'custom':

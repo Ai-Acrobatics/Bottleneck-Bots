@@ -7,14 +7,14 @@ import { useCallback } from "react";
  * Provides CRUD operations and real-time updates
  */
 export function useBrowserSessions() {
-  // Query for listing sessions
-  const sessionsQuery = trpc.ai.listSessions.useQuery(undefined, {
+  // Query for listing sessions - use browser router
+  const sessionsQuery = trpc.browser.listSessions.useQuery(undefined, {
     retry: false,
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
-  // Mutation for terminating a session
-  const terminateSessionMutation = trpc.ai.terminateSession.useMutation({
+  // Mutation for closing/terminating a session
+  const closeSessionMutation = trpc.browser.closeSession.useMutation({
     onSuccess: () => {
       toast.success("Session terminated successfully");
       sessionsQuery.refetch();
@@ -24,8 +24,8 @@ export function useBrowserSessions() {
     },
   });
 
-  // Mutation for deleting a session (placeholder - you may need to add this endpoint)
-  const deleteSessionMutation = trpc.ai.deleteSession.useMutation({
+  // Mutation for deleting a session
+  const deleteSessionMutation = trpc.browser.deleteSession.useMutation({
     onSuccess: () => {
       toast.success("Session deleted successfully");
       sessionsQuery.refetch();
@@ -35,11 +35,38 @@ export function useBrowserSessions() {
     },
   });
 
+  // Bulk operations mutations
+  const bulkTerminateMutation = trpc.browser.bulkTerminate.useMutation({
+    onSuccess: (data: { success: string[]; failed: Array<{ sessionId: string; error: string }> }) => {
+      toast.success(`Terminated ${data.success.length} sessions`);
+      if (data.failed.length > 0) {
+        toast.warning(`Failed to terminate ${data.failed.length} sessions`);
+      }
+      sessionsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(`Bulk terminate failed: ${error.message}`);
+    },
+  });
+
+  const bulkDeleteMutation = trpc.browser.bulkDelete.useMutation({
+    onSuccess: (data: { success: string[]; failed: Array<{ sessionId: string; error: string }> }) => {
+      toast.success(`Deleted ${data.success.length} sessions`);
+      if (data.failed.length > 0) {
+        toast.warning(`Failed to delete ${data.failed.length} sessions`);
+      }
+      sessionsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(`Bulk delete failed: ${error.message}`);
+    },
+  });
+
   const terminateSession = useCallback(
     async (sessionId: string) => {
-      await terminateSessionMutation.mutateAsync({ sessionId });
+      await closeSessionMutation.mutateAsync({ sessionId });
     },
-    [terminateSessionMutation]
+    [closeSessionMutation]
   );
 
   const deleteSession = useCallback(
@@ -51,26 +78,20 @@ export function useBrowserSessions() {
 
   const bulkTerminate = useCallback(
     async (sessionIds: string[]) => {
-      const promises = sessionIds.map((id) => terminateSessionMutation.mutateAsync({ sessionId: id }));
-      await Promise.all(promises);
-      toast.success(`Terminated ${sessionIds.length} sessions`);
-      sessionsQuery.refetch();
+      await bulkTerminateMutation.mutateAsync({ sessionIds });
     },
-    [terminateSessionMutation, sessionsQuery]
+    [bulkTerminateMutation]
   );
 
   const bulkDelete = useCallback(
     async (sessionIds: string[]) => {
-      const promises = sessionIds.map((id) => deleteSessionMutation.mutateAsync({ sessionId: id }));
-      await Promise.all(promises);
-      toast.success(`Deleted ${sessionIds.length} sessions`);
-      sessionsQuery.refetch();
+      await bulkDeleteMutation.mutateAsync({ sessionIds });
     },
-    [deleteSessionMutation, sessionsQuery]
+    [bulkDeleteMutation]
   );
 
   return {
-    sessions: sessionsQuery.data?.sessions ?? [],
+    sessions: sessionsQuery.data ?? [],
     isLoading: sessionsQuery.isLoading,
     error: sessionsQuery.error,
     refetch: sessionsQuery.refetch,
@@ -78,7 +99,7 @@ export function useBrowserSessions() {
     deleteSession,
     bulkTerminate,
     bulkDelete,
-    isTerminating: terminateSessionMutation.isPending,
-    isDeleting: deleteSessionMutation.isPending,
+    isTerminating: closeSessionMutation.isPending || bulkTerminateMutation.isPending,
+    isDeleting: deleteSessionMutation.isPending || bulkDeleteMutation.isPending,
   };
 }
