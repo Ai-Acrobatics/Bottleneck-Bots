@@ -20,32 +20,34 @@ function App() {
   const [credits, setCredits] = useState(5000);
 
   // Check for active session
-  const { data: user, isLoading: isAuthLoading, error: authError } = trpc.auth.me.useQuery(undefined, {
+  const { data: user, isLoading: isAuthLoading, error: authError, refetch: refetchUser } = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
     if (user) {
-      // User is logged in, redirect to dashboard
-      setCurrentView('DASHBOARD');
+      // User is logged in - check if onboarding is completed
+      if (user.onboardingCompleted === false) {
+        setCurrentView('ONBOARDING');
+      } else {
+        setCurrentView('DASHBOARD');
+      }
     }
   }, [user]);
 
-  const handleLogin = (tier: UserTier) => {
+  const handleLogin = (tier: UserTier, needsOnboarding?: boolean) => {
     setUserTier(tier);
     // Set credits based on tier
     if (tier === 'STARTER') setCredits(500);
     if (tier === 'GROWTH') setCredits(1500);
     if (tier === 'WHITELABEL') setCredits(5000);
 
-    // Route to onboarding for new users, then dashboard
-    // Check localStorage to see if user has completed onboarding
-    const hasCompletedOnboarding = localStorage.getItem('onboardingCompleted');
-    if (hasCompletedOnboarding) {
-      setCurrentView('DASHBOARD');
-    } else {
+// Route to onboarding if needed, otherwise go to dashboard
+    if (needsOnboarding) {
       setCurrentView('ONBOARDING');
+    } else {
+      setCurrentView('DASHBOARD');
     }
   };
 
@@ -77,7 +79,11 @@ function App() {
           )}
 
           {currentView === 'ONBOARDING' && (
-            <OnboardingFlow onComplete={() => setCurrentView('DASHBOARD')} />
+            <OnboardingFlow onComplete={async () => {
+              // Refetch user data to get updated onboardingCompleted status
+              await refetchUser();
+              setCurrentView('DASHBOARD');
+            }} />
           )}
 
           {currentView === 'DASHBOARD' && (

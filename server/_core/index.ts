@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerGoogleAuthRoutes } from "./google-auth.ts";
 import { emailAuthRouter } from "./email-auth";
+import { onboardingRouter } from "./onboarding";
 import { registerSSERoutes } from "./sse-routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -41,6 +42,8 @@ export async function createApp() {
   registerGoogleAuthRoutes(app);
   // Email/Password Auth routes
   app.use("/api/auth", emailAuthRouter);
+  // Onboarding routes
+  app.use("/api/onboarding", onboardingRouter);
   // SSE routes for real-time streaming
   registerSSERoutes(app);
   // tRPC API

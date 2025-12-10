@@ -79,10 +79,12 @@ router.post("/signup", async (req, res) => {
 
     return res.json({
       success: true,
+      isNewUser: true,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        onboardingCompleted: user.onboardingCompleted,
       },
     });
   } catch (error) {
@@ -142,6 +144,7 @@ router.post("/login", async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        onboardingCompleted: user.onboardingCompleted,
       },
     });
   } catch (error) {

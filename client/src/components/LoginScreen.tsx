@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { GlassPane } from './GlassPane';
 
 interface LoginScreenProps {
-  onAuthenticated: (tier: 'STARTER' | 'GROWTH' | 'WHITELABEL') => void;
+  onAuthenticated: (tier: 'STARTER' | 'GROWTH' | 'WHITELABEL', needsOnboarding?: boolean) => void;
   onBack: () => void;
 }
 
@@ -39,21 +39,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthenticated, onBac
         return;
       }
 
-      if (isSignUp) {
-        // After signup success, switch to login mode with success message
-        setIsSignUp(false);
-        setError('');
-        setPassword('');
-        setSuccessMessage('Account created successfully! Please log in.');
-        setTimeout(() => setSuccessMessage(''), 5000);
-        setIsLoading(false);
-        return;
-      }
+// Success - determine tier and onboarding status
+      const tier = 'WHITELABEL'; // Default tier, could be from response in the future
+      const needsOnboarding = isSignUp || data.user?.onboardingCompleted === false;
 
-      // Login success - use proper callback instead of reload
-      // Default to WHITELABEL tier for now - could be fetched from server
-      setIsLoading(false);
-      onAuthenticated('WHITELABEL');
+      // Call onAuthenticated with tier and onboarding flag
+      onAuthenticated(tier, needsOnboarding);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
       setIsLoading(false);

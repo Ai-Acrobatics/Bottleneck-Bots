@@ -1,28 +1,114 @@
 
 import React, { useState } from 'react';
 import { GlassPane } from './GlassPane';
+import { trpc } from '../lib/trpc';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
 }
 
+interface OnboardingData {
+  fullName: string;
+  companyName: string;
+  phoneNumber: string;
+  industry: string;
+  monthlyRevenue: string;
+  employeeCount: string;
+  websiteUrl: string;
+  goals: string[];
+  otherGoal: string;
+  ghlApiKey: string;
+}
+
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
-  const [agencyName, setAgencyName] = useState('');
-  const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleNext = () => {
-    if (step < 3) {
+  // Step 1: About You
+  const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Step 2: About Your Business
+  const [industry, setIndustry] = useState('');
+  const [monthlyRevenue, setMonthlyRevenue] = useState('');
+  const [employeeCount, setEmployeeCount] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+
+  // Step 3: Your Goals
+  const [goals, setGoals] = useState<string[]>([]);
+  const [otherGoal, setOtherGoal] = useState('');
+
+  // Step 4: Connect GoHighLevel
+  const [ghlApiKey, setGhlApiKey] = useState('');
+
+  // tRPC mutation for submitting onboarding data
+  const submitOnboarding = trpc.onboarding.submit.useMutation();
+
+  const handleGoalToggle = (goal: string) => {
+    setGoals(prev =>
+      prev.includes(goal)
+        ? prev.filter(g => g !== goal)
+        : [...prev, goal]
+    );
+  };
+
+  const canProceed = () => {
+    switch (step) {
+      case 1:
+        return fullName.trim() && companyName.trim() && phoneNumber.trim();
+      case 2:
+        return industry && monthlyRevenue && employeeCount;
+      case 3:
+        return goals.length > 0;
+      case 4:
+        return ghlApiKey.trim();
+      case 5:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const handleNext = async () => {
+    if (step < 5) {
       setStep(step + 1);
+      setError(null);
     } else {
       setIsLoading(true);
-      // Simulate Setup
-      setTimeout(() => {
-        // Mark onboarding as complete
-        localStorage.setItem('onboardingCompleted', 'true');
-        onComplete();
-      }, 2000);
+      setError(null);
+
+      try {
+        // Submit onboarding data via tRPC
+        await submitOnboarding.mutateAsync({
+          fullName,
+          companyName,
+          phoneNumber,
+          industry: industry as any,
+          monthlyRevenue: monthlyRevenue as any,
+          employeeCount: employeeCount as any,
+          websiteUrl: websiteUrl || '',
+          goals,
+          otherGoal,
+          ghlApiKey,
+        });
+
+        // Simulate setup process for better UX
+        setTimeout(() => {
+          onComplete();
+        }, 2000);
+      } catch (error: any) {
+        console.error('Onboarding error:', error);
+        setError(error?.message || 'Failed to save onboarding data. Please try again.');
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
     }
   };
 
@@ -35,7 +121,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
              <span className="font-bold text-slate-700 text-lg">Agency Setup</span>
           </div>
           <div className="flex gap-2">
-             {[1, 2, 3].map(i => (
+             {[1, 2, 3, 4, 5].map(i => (
                <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${step >= i ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-200'}`}></div>
              ))}
           </div>
@@ -47,64 +133,256 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-purple-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
 
           <div className="relative z-10">
+            {/* Step 1: About You */}
             {step === 1 && (
               <div className="animate-slide-in-right duration-500">
-                <h2 className="text-3xl font-bold text-slate-800 mb-2">Name your Command Center</h2>
-                <p className="text-slate-500 mb-8 text-lg">How should the AI agents refer to your agency in reports?</p>
-                
-                <div className="space-y-4">
-                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Agency Name</label>
-                   <input 
-                     type="text" 
-                     value={agencyName}
-                     onChange={(e) => setAgencyName(e.target.value)}
-                     className="w-full text-3xl font-bold bg-transparent border-b-2 border-slate-200 focus:border-indigo-600 outline-none py-2 text-slate-800 placeholder-slate-300 transition-colors"
-                     placeholder="e.g. Zenith Growth Ops"
-                     autoFocus
-                   />
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">About You</h2>
+                <p className="text-slate-500 mb-8 text-lg">Let's start with some basic information about you and your agency.</p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      placeholder="John Smith"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Company/Agency Name</label>
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      placeholder="e.g. Zenith Growth Ops"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
+            {/* Step 2: About Your Business */}
             {step === 2 && (
+              <div className="animate-slide-in-right duration-500">
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">About Your Business</h2>
+                <p className="text-slate-500 mb-8 text-lg">Help us understand your business to provide better insights.</p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Industry</label>
+                    <select
+                      value={industry}
+                      onChange={(e) => setIndustry(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                    >
+                      <option value="">Select your industry</option>
+                      <option value="marketing-agency">Marketing Agency</option>
+                      <option value="real-estate">Real Estate</option>
+                      <option value="healthcare">Healthcare</option>
+                      <option value="ecommerce">E-commerce</option>
+                      <option value="saas">SaaS</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Monthly Revenue Range</label>
+                    <select
+                      value={monthlyRevenue}
+                      onChange={(e) => setMonthlyRevenue(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                    >
+                      <option value="">Select revenue range</option>
+                      <option value="0-10k">$0 - $10k</option>
+                      <option value="10k-50k">$10k - $50k</option>
+                      <option value="50k-100k">$50k - $100k</option>
+                      <option value="100k-500k">$100k - $500k</option>
+                      <option value="500k+">$500k+</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Employee Count</label>
+                    <select
+                      value={employeeCount}
+                      onChange={(e) => setEmployeeCount(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                    >
+                      <option value="">Select employee count</option>
+                      <option value="just-me">Just me</option>
+                      <option value="2-5">2-5</option>
+                      <option value="6-20">6-20</option>
+                      <option value="21-50">21-50</option>
+                      <option value="50+">50+</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Website URL (Optional)</label>
+                    <input
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      placeholder="https://yourwebsite.com"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Your Goals */}
+            {step === 3 && (
+              <div className="animate-slide-in-right duration-500">
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">Your Goals</h2>
+                <p className="text-slate-500 mb-8 text-lg">What are you looking to achieve? Select all that apply.</p>
+
+                <div className="space-y-4">
+                  {[
+                    { id: 'lead-generation', label: 'Lead Generation' },
+                    { id: 'client-management', label: 'Client Management' },
+                    { id: 'marketing-automation', label: 'Marketing Automation' },
+                    { id: 'sales-automation', label: 'Sales Automation' },
+                    { id: 'reporting-analytics', label: 'Reporting & Analytics' },
+                  ].map((goal) => (
+                    <label
+                      key={goal.id}
+                      className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        goals.includes(goal.id)
+                          ? 'border-indigo-600 bg-indigo-50/50'
+                          : 'border-slate-200 bg-white/30 hover:border-indigo-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={goals.includes(goal.id)}
+                        onChange={() => handleGoalToggle(goal.id)}
+                        className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500/20"
+                      />
+                      <span className="text-lg text-slate-800 font-medium">{goal.label}</span>
+                    </label>
+                  ))}
+
+                  <label
+                    className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      goals.includes('other')
+                        ? 'border-indigo-600 bg-indigo-50/50'
+                        : 'border-slate-200 bg-white/30 hover:border-indigo-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={goals.includes('other')}
+                      onChange={() => handleGoalToggle('other')}
+                      className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                    <span className="text-lg text-slate-800 font-medium">Other</span>
+                  </label>
+
+                  {goals.includes('other') && (
+                    <div className="ml-9 mt-2">
+                      <input
+                        type="text"
+                        value={otherGoal}
+                        onChange={(e) => setOtherGoal(e.target.value)}
+                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        placeholder="Please specify..."
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Connect GoHighLevel */}
+            {step === 4 && (
               <div className="animate-slide-in-right duration-500">
                 <h2 className="text-3xl font-bold text-slate-800 mb-2">Connect GoHighLevel</h2>
                 <p className="text-slate-500 mb-8 text-lg">Enter your Agency API Key to enable automated sub-account discovery.</p>
-                
+
                 <div className="space-y-6">
-                   <div>
-                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Agency API Key</label>
-                     <div className="relative">
-                       <input 
-                         type="password" 
-                         value={apiKey}
-                         onChange={(e) => setApiKey(e.target.value)}
-                         className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-lg shadow-inner"
-                         placeholder="pit_xxxxxxxxxxxxxxxx"
-                       />
-                       <div className={`absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 transition-all duration-300 ${apiKey.length > 10 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                       </div>
-                     </div>
-                     <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
-                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                       Your key is encrypted with AES-256 before storage.
-                     </p>
-                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">GHL Agency API Key</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={ghlApiKey}
+                        onChange={(e) => setGhlApiKey(e.target.value)}
+                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-lg shadow-inner"
+                        placeholder="pit_xxxxxxxxxxxxxxxx"
+                      />
+                      <div className={`absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 transition-all duration-300 ${ghlApiKey.length > 10 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                      Your key is encrypted with AES-256 before storage.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {step === 3 && (
+            {/* Step 5: Ready to Launch */}
+            {step === 5 && (
               <div className="animate-slide-in-right duration-500 text-center">
                 <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/20">
-                  <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <h2 className="text-3xl font-bold text-slate-800 mb-2">Ready to Deploy</h2>
-                <p className="text-slate-500 mb-8 text-lg">We have detected <span className="font-bold text-slate-800">2 active sub-accounts</span> and initialized <span className="font-bold text-slate-800">3 AI agents</span>.</p>
-                
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">Ready to Launch</h2>
+                <p className="text-slate-500 mb-8 text-lg">Your AI-powered agency dashboard is ready to go!</p>
+
+                <div className="bg-white/50 border border-slate-200 rounded-xl p-6 max-w-md mx-auto text-left mb-8 shadow-lg">
+                  <h3 className="font-bold text-slate-800 mb-4 text-lg">Summary</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Agency:</span>
+                      <span className="text-slate-800 font-medium">{companyName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Industry:</span>
+                      <span className="text-slate-800 font-medium capitalize">{industry.replace('-', ' ')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Revenue:</span>
+                      <span className="text-slate-800 font-medium">{monthlyRevenue}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Team Size:</span>
+                      <span className="text-slate-800 font-medium capitalize">{employeeCount.replace('-', ' ')}</span>
+                    </div>
+                    <div className="pt-3 border-t border-slate-200">
+                      <span className="text-slate-500 block mb-2">Goals:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {goals.map(goal => (
+                          <span key={goal} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                            {goal === 'other' ? otherGoal || 'Other' : goal.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-slate-900 text-slate-200 rounded-xl p-6 max-w-md mx-auto text-left mb-8 shadow-2xl font-mono text-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-50 to-purple-500"></div>
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
                   <div className="flex items-center gap-3 mb-4 border-b border-slate-700 pb-4">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                     <span className="font-bold text-white">System Online</span>
@@ -119,16 +397,37 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               </div>
             )}
 
-            <div className="flex justify-end pt-8 mt-4">
-              <button 
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-center gap-2 text-red-800">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium">{error}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between pt-8 mt-4 gap-4">
+              {step > 1 && (
+                <button
+                  onClick={handleBack}
+                  disabled={isLoading}
+                  className="bg-white/50 border border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold hover:bg-white/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  Back
+                </button>
+              )}
+              <button
                 onClick={handleNext}
-                disabled={isLoading || (step === 1 && !agencyName) || (step === 2 && !apiKey)}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg w-full justify-center sm:w-auto"
+                disabled={isLoading || !canProceed()}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg ml-auto"
               >
                 {isLoading ? (
-                   <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Initializing...</>
-                ) : step === 3 ? 'Launch Dashboard' : 'Continue'}
-                {!isLoading && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>}
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Initializing...</>
+                ) : step === 5 ? 'Launch Dashboard' : 'Continue'}
+                {!isLoading && step < 5 && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>}
               </button>
             </div>
           </div>

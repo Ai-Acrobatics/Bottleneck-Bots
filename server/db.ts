@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "../drizzle/schema";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, InsertUserProfile, users, userProfiles } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 const { Pool } = pg;
@@ -211,6 +211,92 @@ export async function createUserWithPassword(data: {
     return result.length > 0 ? result[0] : undefined;
   } catch (error) {
     console.error("[Database] Failed to create user:", error);
+    throw error;
+  }
+}
+
+// User Profile functions for onboarding data
+
+export async function createUserProfile(data: InsertUserProfile): Promise<typeof userProfiles.$inferSelect | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create user profile: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(userProfiles).values(data).returning();
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to create user profile:", error);
+    throw error;
+  }
+}
+
+export async function getUserProfile(userId: number): Promise<typeof userProfiles.$inferSelect | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user profile: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateUserProfile(userId: number, data: Partial<InsertUserProfile>): Promise<typeof userProfiles.$inferSelect | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update user profile: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.update(userProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to update user profile:", error);
+    throw error;
+  }
+}
+
+export async function upsertUserProfile(data: InsertUserProfile): Promise<typeof userProfiles.$inferSelect | undefined> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user profile: database not available");
+    return undefined;
+  }
+
+  try {
+    const result = await db.insert(userProfiles).values(data)
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: { ...data, updatedAt: new Date() },
+      })
+      .returning();
+    return result.length > 0 ? result[0] : undefined;
+  } catch (error) {
+    console.error("[Database] Failed to upsert user profile:", error);
+    throw error;
+  }
+}
+
+export async function markOnboardingComplete(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot mark onboarding complete: database not available");
+    return;
+  }
+
+  try {
+    await db.update(users)
+      .set({ onboardingCompleted: true, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  } catch (error) {
+    console.error("[Database] Failed to mark onboarding complete:", error);
     throw error;
   }
 }

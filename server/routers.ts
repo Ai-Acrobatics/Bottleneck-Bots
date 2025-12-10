@@ -12,6 +12,7 @@ import { templatesRouter } from "./api/routers/templates";
 import { workflowsRouter } from "./api/routers/workflows";
 import { quizRouter } from "./api/routers/quiz";
 import { browserRouter } from "./api/routers/browser";
+import { onboardingRouter } from "./api/routers/onboarding";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -40,6 +41,7 @@ export const appRouter = router({
   workflows: workflowsRouter,
   quiz: quizRouter,
   browser: browserRouter,
+  onboarding: onboardingRouter,
 });
 
 export type AppRouter = typeof appRouter;

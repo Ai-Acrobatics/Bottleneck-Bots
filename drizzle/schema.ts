@@ -10,23 +10,45 @@ export const users = pgTable("users", {
    * Surrogate primary key. Auto-incremented numeric value managed by the database.
    * Use this for relations between tables.
    */
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: serial("id").primaryKey(),
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).unique(),
   googleId: varchar("googleId", { length: 64 }).unique(),
   password: text("password"), // Hashed password for email/password login
   name: text("name"),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).unique(),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: varchar("role", { length: 20 }).default("user").notNull(),
+  onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
+
+/**
+ * User business profiles for onboarding data collection
+ * Stores business info for sales opportunities and upsells
+ */
+export const userProfiles = pgTable("user_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id).notNull().unique(),
+  companyName: text("companyName"),
+  industry: varchar("industry", { length: 100 }),
+  monthlyRevenue: varchar("monthlyRevenue", { length: 50 }), // e.g. "0-10k", "10k-50k", "50k-100k", "100k+"
+  employeeCount: varchar("employeeCount", { length: 50 }), // e.g. "1-5", "6-20", "21-50", "50+"
+  website: text("website"),
+  phone: varchar("phone", { length: 30 }),
+  goals: jsonb("goals"), // Array of user goals/pain points
+  currentTools: jsonb("currentTools"), // Array of current tools/software they use
+  referralSource: varchar("referralSource", { length: 100 }), // How they heard about us
+  ghlApiKey: text("ghlApiKey"), // Encrypted GoHighLevel API key
+  notes: text("notes"), // Any additional notes
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = typeof userProfiles.$inferInsert;
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
