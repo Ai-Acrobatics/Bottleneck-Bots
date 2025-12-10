@@ -11,16 +11,20 @@ const aliasPlugin = {
     // Handle @/server/* -> ./server/*
     build.onResolve({ filter: /^@\/server\// }, args => {
       const resolved = args.path.replace('@/server/', '');
+      const fullPath = path.resolve(__dirname, 'server', resolved);
+      // Try with .ts extension first
       return {
-        path: path.resolve(__dirname, 'server', resolved),
+        path: fullPath + '.ts',
       };
     });
 
     // Handle @/drizzle/* -> ./drizzle/*
     build.onResolve({ filter: /^@\/drizzle\// }, args => {
       const resolved = args.path.replace('@/drizzle/', '');
+      const fullPath = path.resolve(__dirname, 'drizzle', resolved);
+      // Try with .ts extension first
       return {
-        path: path.resolve(__dirname, 'drizzle', resolved),
+        path: fullPath + '.ts',
       };
     });
   },
