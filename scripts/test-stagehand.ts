@@ -6,16 +6,24 @@
  */
 
 import dotenv from 'dotenv';
-dotenv.config({ override: true });
+dotenv.config({ path: '.env.local', override: true });
 
 import { Stagehand } from '@browserbasehq/stagehand';
 
 const API_KEY = process.env.BROWSERBASE_API_KEY;
 const PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
-const MODEL = process.env.STAGEHAND_MODEL || 'google/gemini-2.0-flash';
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+
+// Auto-select model based on available API key
+let MODEL = process.env.STAGEHAND_MODEL;
+if (!MODEL) {
+  if (ANTHROPIC_KEY) MODEL = 'anthropic/claude-sonnet-4-20250514';
+  else if (GEMINI_KEY) MODEL = 'google/gemini-2.0-flash';
+  else if (OPENAI_KEY) MODEL = 'openai/gpt-4o';
+  else MODEL = 'google/gemini-2.0-flash'; // fallback
+}
 
 async function testStagehand() {
   console.log('\n========================================');
@@ -53,31 +61,37 @@ async function testStagehand() {
     // Initialize Stagehand
     console.log('1. Initializing Stagehand...');
 
+    // Determine which API key to use based on model
+    let modelApiKey: string | undefined;
+    if (MODEL?.startsWith('google/')) {
+      modelApiKey = GEMINI_KEY;
+    } else if (MODEL?.startsWith('openai/')) {
+      modelApiKey = OPENAI_KEY;
+    } else if (MODEL?.startsWith('anthropic/')) {
+      modelApiKey = ANTHROPIC_KEY;
+    }
+
+    console.log('   Model API Key available:', modelApiKey ? 'Yes (' + modelApiKey.substring(0, 15) + '...)' : 'No');
+
+    if (!modelApiKey) {
+      console.error('ERROR: No API key found for model:', MODEL);
+      console.error('   Available keys - Anthropic:', !!ANTHROPIC_KEY, 'Gemini:', !!GEMINI_KEY, 'OpenAI:', !!OPENAI_KEY);
+      process.exit(1);
+    }
+
     const stagehandConfig: any = {
       env: 'BROWSERBASE',
       verbose: 1,
-      disablePino: true,
       apiKey: API_KEY,
       projectId: PROJECT_ID,
+      model: {
+        modelName: MODEL,
+        apiKey: modelApiKey,
+      },
     };
 
-    // Only add model config if we have an AI key
-    if (hasAIKey) {
-      stagehandConfig.modelName = MODEL;
-      if (MODEL.startsWith('google/')) {
-        stagehandConfig.modelClientOptions = {
-          apiKey: GEMINI_KEY,
-        };
-      } else if (MODEL.startsWith('openai/')) {
-        stagehandConfig.modelClientOptions = {
-          apiKey: OPENAI_KEY,
-        };
-      } else if (MODEL.startsWith('anthropic/')) {
-        stagehandConfig.modelClientOptions = {
-          apiKey: ANTHROPIC_KEY,
-        };
-      }
-    }
+    console.log('   Config - model:', MODEL);
+    console.log('   Config - apiKey length:', modelApiKey?.length);
 
     stagehand = new Stagehand(stagehandConfig);
     await stagehand.init();

@@ -6,7 +6,7 @@
  */
 
 import dotenv from 'dotenv';
-dotenv.config({ override: true });
+dotenv.config({ path: '.env.local', override: true });
 
 const API_KEY = process.env.BROWSERBASE_API_KEY;
 const PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
