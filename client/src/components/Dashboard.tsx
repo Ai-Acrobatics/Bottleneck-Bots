@@ -23,6 +23,7 @@ import { AdManagerPanel } from './AdManagerPanel';
 import { MarketplacePanel } from './MarketplacePanel';
 import { AIBrowserPanel } from './AIBrowserPanel';
 import { SkipLink } from './SkipLink';
+import { ClientProfileModal } from './ClientProfileModal';
 
 // Demo data only loaded when VITE_DEMO_MODE=1 (disabled by default in production)
 
@@ -59,8 +60,82 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
   const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
 
-  // Client list state (empty by default - connect real data from backend)
-  const [clients] = useState<ClientContext[]>([]);
+  // Client list state - fetched from backend
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<ClientContext | null>(null);
+
+  // Fetch client profiles from backend
+  const clientProfilesQuery = trpc.clientProfiles.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+
+  const clients: ClientContext[] = (clientProfilesQuery.data?.data || []).map((profile: any) => ({
+    id: `client_${profile.id}`,
+    source: 'MANUAL' as const,
+    name: profile.name,
+    subaccountName: profile.subaccountName || '',
+    subaccountId: profile.subaccountId || '',
+    brandVoice: profile.brandVoice || '',
+    primaryGoal: profile.primaryGoal || '',
+    website: profile.website || '',
+    seo: typeof profile.seoConfig === 'string' ? JSON.parse(profile.seoConfig) : (profile.seoConfig || { siteTitle: '', metaDescription: '', keywords: [], robotsTxt: '' }),
+    assets: typeof profile.assets === 'string' ? JSON.parse(profile.assets) : (profile.assets || []),
+    _dbId: profile.id, // Store the DB ID for updates
+  }));
+
+  // Create client profile mutation
+  const createClientMutation = trpc.clientProfiles.create.useMutation({
+    onSuccess: () => {
+      clientProfilesQuery.refetch();
+      addLog('success', 'Client Profile Created', 'New client profile added successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to create client profile:', error);
+      addLog('error', 'Failed to Create Profile', error.message);
+    },
+  });
+
+  // Update client profile mutation
+  const updateClientMutation = trpc.clientProfiles.update.useMutation({
+    onSuccess: () => {
+      clientProfilesQuery.refetch();
+      addLog('success', 'Client Profile Updated', 'Client profile updated successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to update client profile:', error);
+      addLog('error', 'Failed to Update Profile', error.message);
+    },
+  });
+
+  const handleSaveClientProfile = async (profileData: Omit<ClientContext, 'id' | 'source'>) => {
+    if (editingClient && (editingClient as any)._dbId) {
+      // Update existing profile
+      await updateClientMutation.mutateAsync({
+        id: (editingClient as any)._dbId,
+        name: profileData.name,
+        subaccountName: profileData.subaccountName,
+        subaccountId: profileData.subaccountId,
+        brandVoice: profileData.brandVoice,
+        primaryGoal: profileData.primaryGoal,
+        website: profileData.website,
+        seoConfig: profileData.seo,
+        assets: profileData.assets,
+      });
+    } else {
+      // Create new profile
+      await createClientMutation.mutateAsync({
+        name: profileData.name,
+        subaccountName: profileData.subaccountName,
+        subaccountId: profileData.subaccountId,
+        brandVoice: profileData.brandVoice,
+        primaryGoal: profileData.primaryGoal,
+        website: profileData.website,
+        seoConfig: profileData.seo,
+        assets: profileData.assets,
+      });
+    }
+    setEditingClient(null);
+  };
 
   // User/Team State
   const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
@@ -699,11 +774,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
                     <GlassPane title="Mission Context" className="h-full">
                       <div className="p-4 space-y-4">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Select Client Profile</label>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Select Client Profile</label>
+                            <button
+                              onClick={() => {
+                                setEditingClient(null);
+                                setIsClientModalOpen(true);
+                              }}
+                              className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                              title="Add New Client"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </button>
+                          </div>
                           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                            {clients.length === 0 && (
+                            {clientProfilesQuery.isLoading && (
                               <p className="text-xs text-slate-500">
-                                No client profiles yet. Enable demo mode or connect a sub-account to get started.
+                                Loading client profiles...
+                              </p>
+                            )}
+                            {!clientProfilesQuery.isLoading && clients.length === 0 && (
+                              <p className="text-xs text-slate-500">
+                                No client profiles yet. Click the + button above to add your first client.
                               </p>
                             )}
                             {clients.map(client => (
@@ -873,6 +967,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
         availableCredits={availableCredits}
         onAddCredits={(amount) => setAvailableCredits(prev => prev + amount)}
         initialTab={settingsTab}
+      />
+
+      <ClientProfileModal
+        isOpen={isClientModalOpen}
+        onClose={() => {
+          setIsClientModalOpen(false);
+          setEditingClient(null);
+        }}
+        onSave={handleSaveClientProfile}
+        existingProfile={editingClient}
       />
     </div>
   );

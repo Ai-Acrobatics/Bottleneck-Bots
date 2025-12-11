@@ -67,6 +67,29 @@ export type InsertUser = typeof users.$inferInsert;
 // and re-exported below. This basic version is kept for reference only.
 // export const leads = pgTable("leads", { ... });
 
+/**
+ * Client profiles for mission context
+ * Stores detailed client information used by AI agents for context-aware operations
+ */
+export const clientProfiles = pgTable("client_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").references(() => users.id).notNull(),
+  name: text("name").notNull(), // Client/business name
+  subaccountName: text("subaccountName"), // GHL subaccount name
+  subaccountId: text("subaccountId"), // GHL subaccount ID
+  brandVoice: text("brandVoice"), // Brand voice description (e.g., "Professional, Empathetic")
+  primaryGoal: text("primaryGoal"), // Primary business goal (e.g., "Increase Lead Conversion")
+  website: text("website"), // Client website URL
+  seoConfig: jsonb("seoConfig"), // SEO configuration (title, meta, keywords, robots.txt)
+  assets: jsonb("assets"), // Array of asset metadata (logos, images, etc.)
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type ClientProfile = typeof clientProfiles.$inferSelect;
+export type InsertClientProfile = typeof clientProfiles.$inferInsert;
+
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   userId: serial("userId").references(() => users.id),
