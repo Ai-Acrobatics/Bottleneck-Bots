@@ -1,7 +1,9 @@
 
 import React, { useState } from 'react';
+import { Check } from 'lucide-react';
 import { GlassPane } from './GlassPane';
 import { trpc } from '../lib/trpc';
+import { cn } from '../lib/utils';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -24,6 +26,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Step configuration
+  const steps = [
+    { number: 1, label: 'Account' },
+    { number: 2, label: 'Business' },
+    { number: 3, label: 'Goals' },
+    { number: 4, label: 'Integration' },
+    { number: 5, label: 'Complete' },
+  ];
 
   // Step 1: About You
   const [fullName, setFullName] = useState('');
@@ -36,9 +48,59 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [employeeCount, setEmployeeCount] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
 
+  // Validation functions
+  const validateFullName = (name: string) => {
+    if (!name.trim()) return 'Full name is required';
+    if (name.trim().length < 2) return 'Name must be at least 2 characters';
+    return '';
+  };
+
+  const validateCompanyName = (name: string) => {
+    if (!name.trim()) return 'Company name is required';
+    if (name.trim().length < 2) return 'Company name must be at least 2 characters';
+    return '';
+  };
+
+  const validatePhoneNumber = (phone: string) => {
+    if (!phone.trim()) return 'Phone number is required';
+    if (!/^[\d\s\-\(\)\+]+$/.test(phone)) return 'Invalid phone number format';
+    if (phone.replace(/\D/g, '').length < 10) return 'Phone number must be at least 10 digits';
+    return '';
+  };
+
+  const validateWebsiteUrl = (url: string) => {
+    if (!url) return ''; // Optional field
+    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+    if (!urlPattern.test(url)) return 'Invalid website URL format';
+    return '';
+  };
+
+  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFullName(value);
+    const error = validateFullName(value);
+    setErrors(prev => ({ ...prev, fullName: error }));
+  };
+
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCompanyName(value);
+    const error = validateCompanyName(value);
+    setErrors(prev => ({ ...prev, companyName: error }));
+  };
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPhoneNumber(value);
+    const error = validatePhoneNumber(value);
+    setErrors(prev => ({ ...prev, phoneNumber: error }));
+  };
+
   // Auto-add https:// to website URL if missing
   const handleWebsiteUrlChange = (value: string) => {
     setWebsiteUrl(value);
+    const error = validateWebsiteUrl(value);
+    setErrors(prev => ({ ...prev, websiteUrl: error }));
   };
 
   const handleWebsiteUrlBlur = () => {
@@ -46,7 +108,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       const trimmed = websiteUrl.trim();
       // Only add https:// if there's content and it doesn't already have a protocol
       if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-        setWebsiteUrl('https://' + trimmed);
+        const newUrl = 'https://' + trimmed;
+        setWebsiteUrl(newUrl);
+        const error = validateWebsiteUrl(newUrl);
+        setErrors(prev => ({ ...prev, websiteUrl: error }));
       }
     }
   };
@@ -72,9 +137,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const canProceed = () => {
     switch (step) {
       case 1:
-        return fullName.trim() && companyName.trim() && phoneNumber.trim();
+        return fullName.trim() && companyName.trim() && phoneNumber.trim() &&
+               !errors.fullName && !errors.companyName && !errors.phoneNumber;
       case 2:
-        return industry && monthlyRevenue && employeeCount;
+        return industry && monthlyRevenue && employeeCount && !errors.websiteUrl;
       case 3:
         return goals.length > 0;
       case 4:
@@ -128,18 +194,48 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     }
   };
 
+  const handleSkip = () => {
+    if (step < 5) {
+      setStep(step + 1);
+      setError(null);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white p-4">
       <div className="w-full max-w-2xl">
-        <div className="mb-8 flex justify-between items-center px-4">
-          <div className="flex items-center gap-2">
+        <div className="mb-8 px-4">
+          <div className="flex items-center gap-2 mb-6">
              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg">AI</div>
              <span className="font-bold text-slate-700 text-lg">Agency Setup</span>
           </div>
-          <div className="flex gap-2">
-             {[1, 2, 3, 4, 5].map(i => (
-               <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${step >= i ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-200'}`}></div>
-             ))}
+
+          {/* Step Indicator */}
+          <div className="flex justify-between">
+            {steps.map((stepItem, index) => (
+              <div key={stepItem.number} className="flex flex-col items-center flex-1">
+                <div className="flex items-center w-full">
+                  {index > 0 && (
+                    <div className={cn("flex-1 h-0.5", step > index ? "bg-indigo-600" : "bg-slate-200")} />
+                  )}
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0",
+                    step > stepItem.number ? "bg-indigo-600 text-white" :
+                    step === stepItem.number ? "bg-indigo-600 text-white" :
+                    "bg-slate-200 text-slate-400"
+                  )}>
+                    {step > stepItem.number ? <Check className="h-4 w-4" /> : stepItem.number}
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={cn("flex-1 h-0.5", step > stepItem.number ? "bg-indigo-600" : "bg-slate-200")} />
+                  )}
+                </div>
+                <span className={cn(
+                  "text-xs mt-2",
+                  step >= stepItem.number ? "text-slate-700 font-medium" : "text-slate-400"
+                )}>{stepItem.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -161,11 +257,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <input
                       type="text"
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      onChange={handleFullNameChange}
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                        errors.fullName ? 'border-red-500' : 'border-slate-200'
+                      }`}
                       placeholder="John Smith"
                       autoFocus
+                      aria-invalid={!!errors.fullName}
+                      aria-describedby={errors.fullName ? 'fullName-error' : undefined}
                     />
+                    {errors.fullName && (
+                      <p id="fullName-error" className="text-sm text-red-600 mt-1" role="alert">
+                        {errors.fullName}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -173,10 +278,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <input
                       type="text"
                       value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      onChange={handleCompanyNameChange}
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                        errors.companyName ? 'border-red-500' : 'border-slate-200'
+                      }`}
                       placeholder="e.g. Zenith Growth Ops"
+                      aria-invalid={!!errors.companyName}
+                      aria-describedby={errors.companyName ? 'companyName-error' : undefined}
                     />
+                    {errors.companyName && (
+                      <p id="companyName-error" className="text-sm text-red-600 mt-1" role="alert">
+                        {errors.companyName}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -184,10 +298,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <input
                       type="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      onChange={handlePhoneNumberChange}
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                        errors.phoneNumber ? 'border-red-500' : 'border-slate-200'
+                      }`}
                       placeholder="+1 (555) 123-4567"
+                      aria-invalid={!!errors.phoneNumber}
+                      aria-describedby={errors.phoneNumber ? 'phoneNumber-error' : undefined}
                     />
+                    {errors.phoneNumber && (
+                      <p id="phoneNumber-error" className="text-sm text-red-600 mt-1" role="alert">
+                        {errors.phoneNumber}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -256,10 +379,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       value={websiteUrl}
                       onChange={(e) => handleWebsiteUrlChange(e.target.value)}
                       onBlur={handleWebsiteUrlBlur}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                        errors.websiteUrl ? 'border-red-500' : 'border-slate-200'
+                      }`}
                       placeholder="yourwebsite.com"
+                      aria-invalid={!!errors.websiteUrl}
+                      aria-describedby={errors.websiteUrl ? 'websiteUrl-error' : undefined}
                     />
-                    <p className="text-xs text-slate-400 mt-1">https:// will be added automatically</p>
+                    {errors.websiteUrl ? (
+                      <p id="websiteUrl-error" className="text-sm text-red-600 mt-1" role="alert">
+                        {errors.websiteUrl}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-1">https:// will be added automatically</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -434,27 +567,36 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               </div>
             )}
 
-            <div className="flex justify-between pt-8 mt-4 gap-4">
-              {step > 1 && (
-                <button
-                  onClick={handleBack}
-                  disabled={isLoading}
-                  className="bg-white/50 border border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold hover:bg-white/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                  Back
-                </button>
-              )}
+            <div className="flex justify-between items-center pt-8 mt-4 gap-4">
               <button
-                onClick={handleNext}
-                disabled={isLoading || !canProceed()}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg ml-auto"
+                onClick={handleBack}
+                disabled={step === 1 || isLoading}
+                className="bg-white/50 border border-slate-200 text-slate-700 px-8 py-4 rounded-xl font-bold hover:bg-white/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
               >
-                {isLoading ? (
-                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Initializing...</>
-                ) : step === 5 ? 'Launch Dashboard' : 'Continue'}
-                {!isLoading && step < 5 && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>}
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Back
               </button>
+              <div className="flex gap-2">
+                {step > 1 && step < 5 && (
+                  <button
+                    onClick={handleSkip}
+                    disabled={isLoading}
+                    className="bg-white/50 border border-slate-200 text-slate-500 px-6 py-4 rounded-xl font-medium hover:bg-white/80 hover:text-slate-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                  >
+                    Skip for now
+                  </button>
+                )}
+                <button
+                  onClick={handleNext}
+                  disabled={isLoading || !canProceed()}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
+                >
+                  {isLoading ? (
+                    <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Initializing...</>
+                  ) : step === 5 ? 'Launch Dashboard' : 'Continue'}
+                  {!isLoading && step < 5 && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>}
+                </button>
+              </div>
             </div>
           </div>
         </GlassPane>

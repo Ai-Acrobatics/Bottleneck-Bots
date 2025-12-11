@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { CallHistoryTable } from '@/components/leads/CallHistoryTable';
 import { useAICalling } from '@/hooks/useAICalling';
 import {
@@ -210,54 +211,56 @@ export default function CampaignDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => setLocation('/ai-campaigns')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      </div>
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b -mx-4 px-4 py-4 mb-4">
+        <Breadcrumb
+          items={[
+            { label: 'Campaigns', onClick: () => setLocation('/ai-campaigns') },
+            { label: campaign.name },
+          ]}
+        />
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{campaign.name}</h1>
-            {getStatusBadge(campaign.status)}
+        <div className="flex items-start justify-between mt-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{campaign.name}</h1>
+              {getStatusBadge(campaign.status)}
+            </div>
+            {campaign.description && (
+              <p className="text-muted-foreground mt-2">{campaign.description}</p>
+            )}
           </div>
-          {campaign.description && (
-            <p className="text-muted-foreground mt-2">{campaign.description}</p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {campaign.status === 'draft' && (
-            <Button onClick={() => handleControlAction('start')}>
-              <Play className="h-4 w-4 mr-2" />
-              Start Campaign
-            </Button>
-          )}
-          {campaign.status === 'running' && (
-            <Button variant="outline" onClick={() => handleControlAction('pause')}>
-              <Pause className="h-4 w-4 mr-2" />
-              Pause
-            </Button>
-          )}
-          {campaign.status === 'paused' && (
-            <>
+          <div className="flex gap-2">
+            {campaign.status === 'draft' && (
               <Button onClick={() => handleControlAction('start')}>
                 <Play className="h-4 w-4 mr-2" />
-                Resume
+                Start Campaign
               </Button>
-              <Button variant="outline" onClick={() => handleControlAction('stop')}>
-                <Square className="h-4 w-4 mr-2" />
-                Stop
+            )}
+            {campaign.status === 'running' && (
+              <Button variant="outline" onClick={() => handleControlAction('pause')}>
+                <Pause className="h-4 w-4 mr-2" />
+                Pause
               </Button>
-            </>
-          )}
-          <Button variant="outline" onClick={handleExportResults}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Results
-          </Button>
+            )}
+            {campaign.status === 'paused' && (
+              <>
+                <Button onClick={() => handleControlAction('start')}>
+                  <Play className="h-4 w-4 mr-2" />
+                  Resume
+                </Button>
+                <Button variant="outline" onClick={() => handleControlAction('stop')}>
+                  <Square className="h-4 w-4 mr-2" />
+                  Stop
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={handleExportResults}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Results
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

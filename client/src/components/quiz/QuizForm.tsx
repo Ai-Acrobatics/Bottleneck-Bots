@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { TextareaWithCount } from '@/components/ui/textarea-with-count';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,7 +64,7 @@ export function QuizForm({ quiz = defaultQuiz, onChange }: QuizFormProps) {
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea
+          <TextareaWithCount
             id="description"
             value={formData.description}
             onChange={(e) => handleChange('description', e.target.value)}
@@ -72,9 +72,6 @@ export function QuizForm({ quiz = defaultQuiz, onChange }: QuizFormProps) {
             rows={3}
             maxLength={1000}
           />
-          <p className="text-xs text-muted-foreground">
-            {formData.description.length}/1000 characters
-          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

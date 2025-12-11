@@ -238,31 +238,33 @@ export default function QuizBuilder() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleCancel}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {isEditing ? 'Edit Quiz' : 'Create Quiz'}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {isEditing ? 'Update quiz details and questions' : 'Build a new knowledge assessment'}
-            </p>
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b -mx-4 px-4 py-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={handleCancel}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">
+                {isEditing ? 'Edit Quiz' : 'Create Quiz'}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {isEditing ? 'Update quiz details and questions' : 'Build a new knowledge assessment'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsPreviewMode(!isPreviewMode)}
+            >
+              <Eye className="w-4 h-4 mr-1.5" />
+              {isPreviewMode ? 'Edit' : 'Preview'}
+            </Button>
           </div>
         </div>
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
-          >
-            <Eye className="w-4 h-4 mr-1.5" />
-            {isPreviewMode ? 'Edit' : 'Preview'}
-          </Button>
-        </div>
-      </div>
+      </header>
 
       {!isPreviewMode && (
         <>
@@ -301,24 +303,26 @@ export default function QuizBuilder() {
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-6 border-t">
-            <Button variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handleSave(false)}
-                disabled={isSaving}
-              >
-                {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                <Save className="w-4 h-4 mr-1.5" />
-                Save Draft
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t -mx-4 px-4 py-4 mt-auto">
+            <div className="flex items-center justify-between">
+              <Button variant="outline" onClick={handleCancel}>
+                Cancel
               </Button>
-              <Button onClick={() => handleSave(true)} disabled={isSaving}>
-                {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                Publish Quiz
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleSave(false)}
+                  disabled={isSaving}
+                >
+                  {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                  <Save className="w-4 h-4 mr-1.5" />
+                  Save Draft
+                </Button>
+                <Button onClick={() => handleSave(true)} disabled={isSaving}>
+                  {isSaving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                  Publish Quiz
+                </Button>
+              </div>
             </div>
           </div>
         </>

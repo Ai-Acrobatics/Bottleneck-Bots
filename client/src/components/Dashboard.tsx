@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { trpc } from '../lib/trpc';
 // Gemini service removed - will be implemented server-side via tRPC
 import { MissionStatus } from './MissionStatus';
@@ -36,6 +37,16 @@ const DEFAULT_USER: User = {
   isOnline: true,
 };
 
+// ViewMode type definition
+type ViewMode = 'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER';
+
+// Helper function to parse view from URL hash
+const getViewFromHash = (): ViewMode => {
+  const hash = window.location.hash.slice(1); // remove #
+  const validViews: ViewMode[] = ['GLOBAL', 'TERMINAL', 'EMAIL_AGENT', 'VOICE_AGENT', 'SETTINGS', 'SEO', 'ADS', 'MARKETPLACE', 'AI_BROWSER'];
+  return validViews.includes(hash.toUpperCase() as ViewMode) ? hash.toUpperCase() as ViewMode : 'GLOBAL';
+};
+
 interface DashboardProps {
   userTier: string; // 'STARTER' | 'GROWTH' | 'WHITELABEL'
   credits: number;
@@ -44,7 +55,26 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initialCredits }) => {
   // Demo mode disabled by default for production (set VITE_DEMO_MODE=1 to enable)
   const isDemo = import.meta.env.VITE_DEMO_MODE === '1';
-  const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER'>('GLOBAL');
+
+  // URL-based routing for viewMode
+  const [location, setLocation] = useLocation();
+  const [viewMode, setViewModeState] = useState<ViewMode>(getViewFromHash());
+
+  // Custom setViewMode that updates both state and URL
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    window.location.hash = mode.toLowerCase();
+  };
+
+  // Listen for hash changes (back button support)
+  useEffect(() => {
+    const handleHashChange = () => {
+      setViewModeState(getViewFromHash());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [task, setTask] = useState<AgentTask | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);

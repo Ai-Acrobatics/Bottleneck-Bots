@@ -1,7 +1,7 @@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { TextareaWithCount } from '@/components/ui/textarea-with-count';
 import { Label } from '@/components/ui/label';
 
 type Question = {
@@ -93,11 +93,12 @@ export function AnswerInput({ question, value, onChange }: AnswerInputProps) {
     case 'essay':
       return (
         <div className="space-y-2">
-          <Textarea
+          <TextareaWithCount
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Enter your detailed answer..."
             rows={6}
+            maxLength={2000}
             className="resize-y"
           />
           {question.hint && (

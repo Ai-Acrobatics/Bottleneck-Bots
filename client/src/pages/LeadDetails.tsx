@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { LeadTable } from '@/components/leads/LeadTable';
 import { EnrichmentProgress } from '@/components/leads/EnrichmentProgress';
 import { useLeadEnrichment } from '@/hooks/useLeadEnrichment';
@@ -169,41 +170,43 @@ export default function LeadDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => setLocation('/lead-lists')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      </div>
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b -mx-4 px-4 py-4 mb-4">
+        <Breadcrumb
+          items={[
+            { label: 'Leads', onClick: () => setLocation('/lead-lists') },
+            { label: leadList.name },
+          ]}
+        />
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">{leadList.name}</h1>
-            {getStatusBadge(leadList.status)}
+        <div className="flex items-start justify-between mt-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{leadList.name}</h1>
+              {getStatusBadge(leadList.status)}
+            </div>
+            {leadList.description && (
+              <p className="text-muted-foreground mt-2">{leadList.description}</p>
+            )}
           </div>
-          {leadList.description && (
-            <p className="text-muted-foreground mt-2">{leadList.description}</p>
-          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLocation(`/ai-campaigns/create?listId=${id}`)}
+            >
+              <Phone className="h-4 w-4 mr-2" />
+              Create Campaign
+            </Button>
+            <Button variant="outline" onClick={() => handleExport('csv')}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button variant="outline" onClick={() => handleExport('json')}>
+              <Download className="h-4 w-4 mr-2" />
+              Export JSON
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setLocation(`/ai-campaigns/create?listId=${id}`)}
-          >
-            <Phone className="h-4 w-4 mr-2" />
-            Create Campaign
-          </Button>
-          <Button variant="outline" onClick={() => handleExport('csv')}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" onClick={() => handleExport('json')}>
-            <Download className="h-4 w-4 mr-2" />
-            Export JSON
-          </Button>
-        </div>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

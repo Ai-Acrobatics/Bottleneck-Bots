@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Asset, SeoConfig } from '../types';
 import { GlassPane } from './GlassPane';
+import { TextareaWithCount } from './ui/textarea-with-count';
 
 interface AssetManagerProps {
   assets: Asset[];
@@ -70,10 +71,11 @@ export const AssetManager: React.FC<AssetManagerProps> = ({ assets, seoConfig, o
           
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Meta Description</label>
-            <textarea 
+            <TextareaWithCount
               value={seoConfig.metaDescription}
               onChange={(e) => onSeoUpdate({...seoConfig, metaDescription: e.target.value})}
               rows={2}
+              maxLength={160}
               className="w-full bg-white/50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
               placeholder="Describe the value proposition for search engines..."
             />

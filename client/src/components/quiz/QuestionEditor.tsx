@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { TextareaWithCount } from '@/components/ui/textarea-with-count';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -101,12 +101,13 @@ export function QuestionEditor({ question, onChange, onDelete, index }: Question
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={`question-text-${index}`}>Question Text *</Label>
-          <Textarea
+          <TextareaWithCount
             id={`question-text-${index}`}
             value={question.questionText}
             onChange={(e) => handleQuestionTextChange(e.target.value)}
             placeholder="Enter your question..."
             rows={3}
+            maxLength={500}
           />
         </div>
 
@@ -230,12 +231,13 @@ export function QuestionEditor({ question, onChange, onDelete, index }: Question
 
         <div className="space-y-2">
           <Label htmlFor={`explanation-${index}`}>Explanation (Optional)</Label>
-          <Textarea
+          <TextareaWithCount
             id={`explanation-${index}`}
             value={question.explanation || ''}
             onChange={(e) => onChange({ ...question, explanation: e.target.value })}
             placeholder="Explain the correct answer..."
             rows={2}
+            maxLength={500}
           />
         </div>
       </CardContent>

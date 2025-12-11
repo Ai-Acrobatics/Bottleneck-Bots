@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, File, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 
@@ -19,10 +20,25 @@ export function FileUploader({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const processFile = useCallback(async (file: File) => {
     setIsProcessing(true);
+    setIsUploading(true);
+    setUploadProgress(0);
     setError('');
+
+    // Simulate initial upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 100);
 
     try {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
@@ -32,38 +48,65 @@ export function FileUploader({
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
-            if (results.data && results.data.length > 0) {
-              const columns = Object.keys(results.data[0] as any);
-              onFileSelect(results.data, columns, file.name);
-            } else {
-              setError('CSV file is empty or invalid');
-            }
-            setIsProcessing(false);
+            clearInterval(progressInterval);
+            setUploadProgress(100);
+
+            setTimeout(() => {
+              if (results.data && results.data.length > 0) {
+                const columns = Object.keys(results.data[0] as any);
+                onFileSelect(results.data, columns, file.name);
+              } else {
+                setError('CSV file is empty or invalid');
+              }
+              setIsProcessing(false);
+              setIsUploading(false);
+              setUploadProgress(0);
+            }, 300);
           },
           error: (error) => {
+            clearInterval(progressInterval);
             setError(`Error parsing CSV: ${error.message}`);
             setIsProcessing(false);
+            setIsUploading(false);
+            setUploadProgress(0);
           }
         });
       } else if (fileExtension === 'json') {
         const text = await file.text();
+        setUploadProgress(70);
+
         const data = JSON.parse(text);
+        setUploadProgress(90);
+
         const arrayData = Array.isArray(data) ? data : [data];
 
-        if (arrayData.length > 0) {
-          const columns = Object.keys(arrayData[0]);
-          onFileSelect(arrayData, columns, file.name);
-        } else {
-          setError('JSON file is empty or invalid');
-        }
-        setIsProcessing(false);
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        setTimeout(() => {
+          if (arrayData.length > 0) {
+            const columns = Object.keys(arrayData[0]);
+            onFileSelect(arrayData, columns, file.name);
+          } else {
+            setError('JSON file is empty or invalid');
+          }
+          setIsProcessing(false);
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 300);
       } else {
+        clearInterval(progressInterval);
         setError('Unsupported file format');
         setIsProcessing(false);
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     } catch (err) {
+      clearInterval(progressInterval);
       setError(err instanceof Error ? err.message : 'Error processing file');
       setIsProcessing(false);
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   }, [onFileSelect]);
 
@@ -85,12 +128,15 @@ export function FileUploader({
     onDrop,
     accept: acceptedFormats.reduce((acc, format) => ({ ...acc, [format]: [] }), {}),
     maxFiles: 1,
-    multiple: false
+    multiple: false,
+    disabled: isUploading
   });
 
   const removeFile = () => {
     setFile(null);
     setError('');
+    setUploadProgress(0);
+    setIsUploading(false);
   };
 
   return (
@@ -102,7 +148,8 @@ export function FileUploader({
           isDragActive
             ? "border-primary bg-primary/5"
             : "border-border hover:border-primary/50 hover:bg-accent/50",
-          file && "border-solid border-primary bg-primary/5"
+          file && "border-solid border-primary bg-primary/5",
+          isUploading && "cursor-not-allowed opacity-60"
         )}
       >
         <input {...getInputProps()} />
@@ -143,6 +190,16 @@ export function FileUploader({
           )}
         </div>
       </div>
+
+      {isUploading && (
+        <div className="w-full space-y-2 animate-fade-in">
+          <Progress value={uploadProgress} className="h-2" />
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Uploading...</span>
+            <span>{uploadProgress}%</span>
+          </div>
+        </div>
+      )}
 
       {file && !isProcessing && (
         <div className="flex items-center justify-between p-3 bg-accent rounded-lg">

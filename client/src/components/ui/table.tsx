@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -102,6 +103,34 @@ function TableCaption({
   );
 }
 
+interface SortableTableHeaderProps {
+  children: React.ReactNode;
+  sorted?: 'asc' | 'desc' | false;
+  onSort?: () => void;
+  className?: string;
+}
+
+function SortableTableHeader({
+  children,
+  sorted,
+  onSort,
+  className
+}: SortableTableHeaderProps) {
+  return (
+    <TableHead className={className}>
+      <button
+        onClick={onSort}
+        className="flex items-center gap-1 hover:text-foreground transition-colors -ml-2 px-2 py-1 rounded"
+      >
+        {children}
+        {sorted === 'asc' && <ChevronUp className="h-4 w-4" />}
+        {sorted === 'desc' && <ChevronDown className="h-4 w-4" />}
+        {sorted === false && <ChevronsUpDown className="h-4 w-4 opacity-50" />}
+      </button>
+    </TableHead>
+  );
+}
+
 export {
   Table,
   TableHeader,
@@ -111,4 +140,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  SortableTableHeader,
 };

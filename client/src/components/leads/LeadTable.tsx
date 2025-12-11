@@ -6,6 +6,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  SortableTableHeader,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, ArrowUpDown } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -123,20 +124,23 @@ export function LeadTable({
               </TableHead>
             )}
             {columns.map((column) => (
-              <TableHead key={column.key}>
-                {column.sortable ? (
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort(column.key)}
-                    className="h-8 px-2 hover:bg-transparent"
-                  >
-                    {column.label}
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                ) : (
-                  column.label
-                )}
-              </TableHead>
+              column.sortable ? (
+                <SortableTableHeader
+                  key={column.key}
+                  sorted={
+                    sortConfig?.key === column.key
+                      ? sortConfig.direction
+                      : false
+                  }
+                  onSort={() => handleSort(column.key)}
+                >
+                  {column.label}
+                </SortableTableHeader>
+              ) : (
+                <TableHead key={column.key}>
+                  {column.label}
+                </TableHead>
+              )
             ))}
             <TableHead className="w-12"></TableHead>
           </TableRow>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { TextareaWithCount } from '@/components/ui/textarea-with-count';
 import {
   Select,
   SelectContent,
@@ -86,12 +86,13 @@ export function CampaignForm({ leadLists, onSubmit, onCancel }: CampaignFormProp
 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea
+          <TextareaWithCount
             id="description"
             value={formData.description}
             onChange={(e) => updateField('description', e.target.value)}
             placeholder="Describe the purpose of this campaign..."
             rows={3}
+            maxLength={500}
           />
         </div>
 
@@ -117,12 +118,13 @@ export function CampaignForm({ leadLists, onSubmit, onCancel }: CampaignFormProp
 
         <div className="space-y-2">
           <Label htmlFor="callScript">Call Script</Label>
-          <Textarea
+          <TextareaWithCount
             id="callScript"
             value={formData.callScript}
             onChange={(e) => updateField('callScript', e.target.value)}
             placeholder="Hi {firstName}, I'm calling from {company}..."
             rows={6}
+            maxLength={1000}
             required
           />
           <p className="text-xs text-muted-foreground">

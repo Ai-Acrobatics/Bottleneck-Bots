@@ -44,7 +44,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isThisMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AICampaigns() {
@@ -152,6 +152,25 @@ export default function AICampaigns() {
           <Plus className="h-4 w-4 mr-2" />
           Create Campaign
         </Button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Active Campaigns</p>
+          <p className="text-2xl font-bold">{campaigns?.filter(c => c.status === 'running').length || 0}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Total Leads</p>
+          <p className="text-2xl font-bold">{campaigns?.reduce((sum, c) => sum + (c.totalLeads || 0), 0) || 0}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Conversion Rate</p>
+          <p className="text-2xl font-bold">-</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm text-muted-foreground">This Month</p>
+          <p className="text-2xl font-bold">{campaigns?.filter(c => isThisMonth(new Date(c.createdAt))).length || 0}</p>
+        </Card>
       </div>
 
       {isLoading ? (
