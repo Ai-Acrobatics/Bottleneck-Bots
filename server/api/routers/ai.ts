@@ -637,6 +637,7 @@ export const aiRouter = router({
                     env: "BROWSERBASE",
                     verbose: 0,
                     enableCaching: false,
+                    disablePino: true,
                     apiKey: process.env.BROWSERBASE_API_KEY,
                     projectId: process.env.BROWSERBASE_PROJECT_ID,
                     model: {
@@ -776,6 +777,7 @@ export const aiRouter = router({
                     env: "BROWSERBASE",
                     verbose: 0,
                     enableCaching: false,
+                    disablePino: true,
                     apiKey: process.env.BROWSERBASE_API_KEY,
                     projectId: process.env.BROWSERBASE_PROJECT_ID,
                     model: {
@@ -924,6 +926,7 @@ export const aiRouter = router({
                     env: "BROWSERBASE",
                     verbose: 0,
                     enableCaching: false,
+                    disablePino: true,
                     apiKey: process.env.BROWSERBASE_API_KEY,
                     projectId: process.env.BROWSERBASE_PROJECT_ID,
                     model: {
@@ -1081,6 +1084,7 @@ export const aiRouter = router({
                     env: "BROWSERBASE",
                     verbose: 0,
                     enableCaching: false,
+                    disablePino: true,
                     apiKey: process.env.BROWSERBASE_API_KEY,
                     projectId: process.env.BROWSERBASE_PROJECT_ID,
                     model: {
