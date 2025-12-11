@@ -37,7 +37,14 @@ await esbuild.build({
   format: 'esm',
   outdir: 'dist',
   packages: 'external',
-  external: ['vite', '@tailwindcss/*', 'tailwindcss', 'lightningcss'],
+  external: [
+    'vite', 
+    '@tailwindcss/*', 
+    'tailwindcss', 
+    'lightningcss',
+    'pino-pretty',
+    'pino',
+  ],
   plugins: [aliasPlugin],
 });
 
