@@ -144,10 +144,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             <Button
               variant="outline"
               size="lg"
+              onClick={() => {
+                // Scroll to features section as an alternative to demo video
+                document.getElementById('solution')?.scrollIntoView({ behavior: 'smooth' });
+              }}
               className="w-full sm:w-auto rounded-full px-6 sm:px-10 h-12 sm:h-16 text-base sm:text-xl font-bold border-2 border-purple-300 hover:bg-purple-50 text-slate-800 shadow-lg"
             >
               <Play className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
-              Watch 3-Min Demo
+              See How It Works
             </Button>
           </div>
 

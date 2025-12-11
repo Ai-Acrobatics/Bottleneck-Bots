@@ -24,81 +24,7 @@ import { MarketplacePanel } from './MarketplacePanel';
 import { AIBrowserPanel } from './AIBrowserPanel';
 import { SkipLink } from './SkipLink';
 
-// Optional demo data (used only when VITE_DEMO_MODE=1)
-const DEMO_CLIENTS: ClientContext[] = [
-  {
-    id: "c1",
-    source: "NOTION",
-    name: "Solar Solutions Inc.",
-    subaccountName: "Solar Solutions - Denver",
-    subaccountId: "loc_denver_001",
-    brandVoice: "Professional, Eco-friendly, Urgent but reassuring",
-    primaryGoal: "Book appointments for roof inspections",
-    website: "solarsolutions.demo",
-    seo: {
-      siteTitle: "Solar Denver",
-      metaDescription: "Best solar",
-      keywords: ["solar", "denver"],
-      robotsTxt: "User-agent: * Allow: /",
-    },
-    assets: [],
-  },
-  {
-    id: "c2",
-    source: "NOTION",
-    name: "Prestige Dental",
-    subaccountName: "Prestige Dental - Main",
-    subaccountId: "loc_dental_992",
-    brandVoice: "Warm, Caring, Clinical Authority",
-    primaryGoal: "Reactivate dormant patients for cleaning",
-    website: "prestigedental.demo",
-    seo: {
-      siteTitle: "Prestige Dental",
-      metaDescription: "Gentle care",
-      keywords: ["dentist", "implants"],
-      robotsTxt: "User-agent: * Allow: /",
-    },
-    assets: [],
-  },
-];
-
-const DEMO_DRIVE_FILES: DriveFile[] = [
-  {
-    id: "d1",
-    name: "SOP_Onboarding_V2.gdoc",
-    mimeType: "application/vnd.google-apps.document",
-    content:
-      'SOP FOR NEW CLIENTS:\n1. Create Subaccount\n2. Install Snapshot "Agency_Standard"\n3. Connect Twilio & Stripe\n4. Create "Welcome" Email Campaign.',
-    selected: true,
-    icon: "📝",
-  },
-  {
-    id: "d2",
-    name: "Brand_Assets_Kit.pdf",
-    mimeType: "application/pdf",
-    content:
-      "BRAND GUIDELINES:\nPrimary Color: #4F46E5\nSecondary: #9333EA\nFont: Inter\nTone: Innovative, Bold, Futuristic.",
-    selected: true,
-    icon: "🎨",
-  },
-  {
-    id: "d3",
-    name: "Funnel_Copy_Draft.gdoc",
-    mimeType: "application/vnd.google-apps.document",
-    content:
-      'HEADLINE: "Automate Your Agency in Minutes"\nSUBHEAD: "The first AI workforce for GHL"\nCTA: "Get Started Now"',
-    selected: true,
-    icon: "📄",
-  },
-  {
-    id: "d4",
-    name: "Client_Logo_Pack.zip",
-    mimeType: "application/zip",
-    content: "[Binary Data] - Contains logo files.",
-    selected: false,
-    icon: "📦",
-  },
-];
+// Demo data only loaded when VITE_DEMO_MODE=1 (disabled by default in production)
 
 const DEFAULT_USER: User = {
   id: "current-user",
@@ -114,8 +40,8 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initialCredits }) => {
-  // Enable demo mode by default (set VITE_DEMO_MODE=0 to disable)
-  const isDemo = import.meta.env.VITE_DEMO_MODE !== '0';
+  // Demo mode disabled by default for production (set VITE_DEMO_MODE=1 to enable)
+  const isDemo = import.meta.env.VITE_DEMO_MODE === '1';
   const [viewMode, setViewMode] = useState<'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER'>('GLOBAL');
   const [status, setStatus] = useState<AgentStatus>(AgentStatus.IDLE);
   const [task, setTask] = useState<AgentTask | null>(null);
@@ -131,10 +57,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
   // Drive State
   const [isDriveConnected, setIsDriveConnected] = useState(false);
-  const [driveFiles, setDriveFiles] = useState<DriveFile[]>(isDemo ? DEMO_DRIVE_FILES : []);
+  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
 
-  // Client list state (demo clients enabled by default)
-  const [clients] = useState<ClientContext[]>(isDemo ? DEMO_CLIENTS : []);
+  // Client list state (empty by default - connect real data from backend)
+  const [clients] = useState<ClientContext[]>([]);
 
   // User/Team State
   const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
@@ -180,13 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
         console.error('Failed to load settings');
       }
     }
-    // In demo mode, default select first client
-    console.log('[Dashboard] Demo mode:', isDemo, 'Clients available:', clients.length);
-    if (isDemo && clients.length > 0 && !selectedClient) {
-      console.log('[Dashboard] Auto-selecting first client:', clients[0].name);
-      setSelectedClient(clients[0]);
-    }
-  }, [isDemo, clients, selectedClient]);
+  }, []);
 
   const handleOpenSettings = (tab: SettingsTab = 'GENERAL') => {
     setSettingsTab(tab);

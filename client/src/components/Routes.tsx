@@ -40,14 +40,7 @@ export function Routes() {
           <Route path="/ai-campaigns" component={AICampaigns} />
           <Route path="/ai-campaigns/:id" component={CampaignDetails} />
           <Route path="/credits" component={CreditPurchase} />
-          <Route path="/team">
-            {() => (
-              <div className="space-y-6">
-                <h1 className="text-3xl font-bold">Team</h1>
-                <p className="text-muted-foreground">Team management coming soon...</p>
-              </div>
-            )}
-          </Route>
+{/* Team management route - redirects to settings for now */}
           <Route>
             {() => (
               <div className="space-y-6">

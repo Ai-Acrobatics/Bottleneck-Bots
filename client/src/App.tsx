@@ -16,8 +16,8 @@ type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 function App() {
   // NOTE: Defaulting to LANDING as requested by user
   const [currentView, setCurrentView] = useState<ViewState>('LANDING');
-  const [userTier, setUserTier] = useState<UserTier>('WHITELABEL'); // Default to max tier for testing
-  const [credits, setCredits] = useState(5000);
+  const [userTier, setUserTier] = useState<UserTier>('STARTER'); // Default tier for new users
+  const [credits, setCredits] = useState(100); // Default credits for new users
 
   // Check for active session
   const { data: user, isLoading: isAuthLoading, error: authError, refetch: refetchUser } = trpc.auth.me.useQuery(undefined, {

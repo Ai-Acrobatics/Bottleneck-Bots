@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 // TypeScript Definitions for Speech Recognition
 interface SpeechRecognitionEvent {
@@ -88,7 +88,7 @@ export const CommandBar: React.FC<CommandBarProps> = ({ onSend, disabled, hasAct
 
   const toggleListening = () => {
     if (!recognition) {
-        alert("Speech recognition is not supported in this browser.");
+        toast.error("Speech recognition is not supported in this browser.");
         return;
     }
 
