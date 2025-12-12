@@ -12,6 +12,7 @@ import { getBrowserbaseService } from "../_core/browserbase";
 import { browserbaseSDK } from "../_core/browserbaseSDK";
 import { cacheService, CACHE_TTL } from "./cache.service";
 import { cacheKeys } from "../lib/cacheKeys";
+import { evaluateExpression } from "../lib/safeExpressionParser";
 import type {
   WorkflowStep,
   WorkflowStepType,
@@ -90,7 +91,7 @@ function resolveModelApiKey(modelName: string): string {
  * Substitute variables in a string value
  * Supports {{variableName}} syntax
  */
-function substituteVariables(value: unknown, variables: Record<string, unknown>): unknown {
+export function substituteVariables(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
     return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
       return variables[varName] !== undefined ? String(variables[varName]) : match;
@@ -333,28 +334,43 @@ async function executeConditionStep(
     throw new Error("Condition step requires condition expression");
   }
 
-  // Simple condition evaluation
-  // Supports: variable comparison, existence checks
+  // Safely evaluate condition using secure expression parser
+  // Supports: comparisons, logical operators, property access
   let passed = false;
+  let evaluationError: string | undefined;
 
   try {
-    // Check for existence: {{variable}}
-    if (condition.startsWith("{{") && condition.endsWith("}}")) {
+    // Check for legacy {{variable}} syntax for backward compatibility
+    if (typeof condition === "string" && condition.startsWith("{{") && condition.endsWith("}}")) {
       const varName = condition.slice(2, -2);
       passed = context.variables[varName] !== undefined && context.variables[varName] !== null;
     } else {
-      // For more complex conditions, use Function constructor (be careful with security)
-      // This is a simplified implementation
-      passed = Boolean(eval(condition));
+      // Use safe expression parser (NO eval, NO Function constructor)
+      const result = evaluateExpression(String(condition), context.variables);
+
+      if (result.success) {
+        passed = result.result;
+      } else {
+        // Log evaluation error but don't throw - allow workflow to continue
+        console.error("Condition evaluation error:", result.error);
+        evaluationError = result.error;
+        passed = false;
+      }
     }
   } catch (error) {
     console.error("Condition evaluation error:", error);
+    evaluationError = error instanceof Error ? error.message : "Unknown error";
     passed = false;
   }
 
   return {
     success: true,
-    result: { condition, passed, timestamp: new Date() },
+    result: {
+      condition,
+      passed,
+      timestamp: new Date(),
+      ...(evaluationError && { evaluationError })
+    },
   };
 }
 

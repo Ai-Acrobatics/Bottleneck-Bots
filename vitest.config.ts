@@ -6,19 +6,30 @@ const templateRoot = path.resolve(import.meta.dirname);
 export default defineConfig({
   root: templateRoot,
   resolve: {
-    alias: {
-      "@": path.resolve(templateRoot),
-      "@/server": path.resolve(templateRoot, "server"),
-      "@/client": path.resolve(templateRoot, "client", "src"),
-      "@/drizzle": path.resolve(templateRoot, "drizzle"),
-      "@/__tests__": path.resolve(templateRoot, "client", "src", "__tests__"),
-      "@shared": path.resolve(templateRoot, "shared"),
-      "@assets": path.resolve(templateRoot, "attached_assets"),
-    },
+    alias: [
+      // More specific aliases first
+      { find: "@/server", replacement: path.resolve(templateRoot, "server") },
+      { find: "@shared", replacement: path.resolve(templateRoot, "shared") },
+      { find: "@assets", replacement: path.resolve(templateRoot, "attached_assets") },
+      // Least specific last - client imports
+      { find: "@", replacement: path.resolve(templateRoot, "client", "src") },
+    ],
   },
   test: {
-    environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
     globals: true,
+    include: [
+      "server/**/*.test.ts",
+      "server/**/*.spec.ts",
+      "client/src/**/*.test.ts",
+      "client/src/**/*.test.tsx",
+    ],
+    // Default to jsdom since most tests are UI tests
+    environment: "jsdom",
+    // Override to node for server tests
+    environmentMatchGlobs: [
+      ["server/**/*.test.ts", "node"],
+      ["server/**/*.spec.ts", "node"],
+    ],
+    setupFiles: ["./vitest.setup.ts"],
   },
 });
