@@ -76,7 +76,10 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <TourProvider>
+          <TourProvider
+            onboardingCompleted={user?.onboardingCompleted === true}
+            isDashboardActive={currentView === 'DASHBOARD'}
+          >
             <Toaster />
             <Suspense fallback={<LoadingSpinner />}>
               {currentView === 'ALEX_RAMOZY' && (

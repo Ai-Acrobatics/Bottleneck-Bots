@@ -8,9 +8,13 @@ import { HelpCenter } from './HelpCenter';
 
 interface TourProviderProps {
   children: React.ReactNode;
+  /** Whether the user has completed onboarding - tour only starts after this */
+  onboardingCompleted?: boolean;
+  /** Whether the dashboard is currently active/visible */
+  isDashboardActive?: boolean;
 }
 
-export function TourProvider({ children }: TourProviderProps) {
+export function TourProvider({ children, onboardingCompleted = false, isDashboardActive = false }: TourProviderProps) {
   const {
     activeTour,
     currentStepIndex,
@@ -31,14 +35,19 @@ export function TourProvider({ children }: TourProviderProps) {
   const currentStep = currentTour?.steps[currentStepIndex];
 
   useEffect(() => {
-    if (autoStartTours && !hasSeenWelcome) {
+    // Only auto-start tour when:
+    // 1. autoStartTours is enabled
+    // 2. User hasn't seen the welcome tour yet
+    // 3. User has completed onboarding (agency setup)
+    // 4. User is currently on the dashboard
+    if (autoStartTours && !hasSeenWelcome && onboardingCompleted && isDashboardActive) {
       const timer = setTimeout(() => {
         startTour('welcome');
         setHasSeenWelcome(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [autoStartTours, hasSeenWelcome, startTour, setHasSeenWelcome]);
+  }, [autoStartTours, hasSeenWelcome, onboardingCompleted, isDashboardActive, startTour, setHasSeenWelcome]);
 
   useEffect(() => {
     if (!currentStep) {
