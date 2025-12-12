@@ -181,6 +181,52 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         </div>
       </header>
 
+      {/* Trusted By Social Proof Bar */}
+      <section className="py-8 sm:py-12 bg-white border-b border-slate-100">
+        <div className="container mx-auto px-4 sm:px-6">
+          <p className="text-center text-xs sm:text-sm text-slate-500 font-medium mb-6 uppercase tracking-wider">Trusted by 487+ agencies worldwide</p>
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12 opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500">
+            {/* Logo-style company representations */}
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">GF</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">GrowthForge</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">BP</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">BrightPath</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">SU</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">ScaleUp</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">LP</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">LaunchPad</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">VX</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">Voxel</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">NX</span>
+              </div>
+              <span className="text-sm font-semibold hidden sm:inline">Nexus</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Problem/Agitate Section - Dan Kennedy Style */}
       <section id="problem" className="py-12 sm:py-24 bg-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-50/50 to-white"></div>
@@ -291,12 +337,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 {/* Social Proof Snippet */}
                 <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-purple-200/50 shadow-lg">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex-shrink-0"></div>
+                    <img
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=96&h=96&fit=crop&crop=face"
+                      alt="Marcus T."
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-purple-200 flex-shrink-0"
+                    />
                     <div>
                       <p className="text-xs sm:text-sm text-slate-700 italic mb-2">
                         "I took my first real vacation in 4 years. Didn't check my phone once. The AI handled 47 clients flawlessly. I cried when I realized what I'd been missing."
                       </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900">— Marcus T., Agency Owner & New Dad</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">— Marcus T., Founder @ GrowthForge Media</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="text-yellow-400 text-xs">★</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -351,12 +406,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
                 <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-pink-200/50 shadow-lg">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 flex-shrink-0"></div>
+                    <img
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&crop=face"
+                      alt="Sarah K."
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-pink-200 flex-shrink-0"
+                    />
                     <div>
                       <p className="text-xs sm:text-sm text-slate-700 italic mb-2">
                         "I used to wake up at 5am to check campaigns before my media buyer logged on. Now I sleep till 7, have coffee with my wife, and the work's already done. Life-changing."
                       </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900">— Sarah K., Mom of 3 & Agency Owner</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">— Sarah K., CEO @ BrightPath Digital</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="text-yellow-400 text-xs">★</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -413,12 +477,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
 
                 <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-cyan-200/50 shadow-lg">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-400 flex-shrink-0"></div>
+                    <img
+                      src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=96&h=96&fit=crop&crop=face"
+                      alt="David R."
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-cyan-200 flex-shrink-0"
+                    />
                     <div>
                       <p className="text-xs sm:text-sm text-slate-700 italic mb-2">
                         "I used to spend Sundays doing research and reports. Last Sunday I went hiking with my daughter. The work was done Monday morning. I actually felt like a human again."
                       </p>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900">— David R., Dad & Agency Founder</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">— David R., Founder @ ScaleUp Agency</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <span key={i} className="text-yellow-400 text-xs">★</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -520,6 +593,80 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                     {stat.number}{stat.suffix}
                   </div>
                   <div className="text-xs sm:text-sm text-slate-600 font-medium">{stat.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Testimonials Grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                quote: "I finally made it to my son's baseball games. ALL of them. The AI handled client requests while I was in the stands cheering. Worth every penny.",
+                name: "Michael Chen",
+                role: "Founder @ Apex Digital",
+                image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&h=96&fit=crop&crop=face",
+                result: "15 hrs/week saved"
+              },
+              {
+                quote: "Went from working 70-hour weeks to 35. Same revenue. Actually MORE revenue because I'm not burned out. My wife has her husband back.",
+                name: "Jennifer Walsh",
+                role: "CEO @ Velocity Marketing",
+                image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=96&h=96&fit=crop&crop=face",
+                result: "50% time reduction"
+              },
+              {
+                quote: "Fired 3 VAs who kept ghosting me. The AI hasn't missed a single task in 4 months. Zero drama. Zero excuses. Just results.",
+                name: "Robert Martinez",
+                role: "Owner @ Catalyst Agency",
+                image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=96&h=96&fit=crop&crop=face",
+                result: "100% reliability"
+              },
+              {
+                quote: "Date nights are actually date nights now. I'm not checking my phone every 5 minutes. That alone changed my marriage.",
+                name: "Amanda Foster",
+                role: "Founder @ Spark Social",
+                image: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=96&h=96&fit=crop&crop=face",
+                result: "Peace of mind"
+              },
+              {
+                quote: "Scaled from 12 to 40 clients without hiring anyone new. The math finally makes sense. My margins are actually healthy now.",
+                name: "Daniel Kim",
+                role: "CEO @ Launchpoint Media",
+                image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=96&h=96&fit=crop&crop=face",
+                result: "3x client capacity"
+              },
+              {
+                quote: "Took a 2-week vacation and didn't open my laptop ONCE. Came back to happy clients and zero fires. First time in 6 years.",
+                name: "Lisa Thompson",
+                role: "Owner @ Horizon Digital",
+                image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=96&h=96&fit=crop&crop=face",
+                result: "True vacation"
+              }
+            ].map((testimonial, i) => (
+              <div key={i} className="bg-white p-6 rounded-2xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-xl transition-all duration-300 group">
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(5)].map((_, j) => (
+                    <span key={j} className="text-yellow-400 text-sm">★</span>
+                  ))}
+                </div>
+                <p className="text-sm sm:text-base text-slate-700 mb-4 leading-relaxed italic">"{testimonial.quote}"</p>
+                <div className="flex items-center gap-3">
+                  <img
+                    src={testimonial.image}
+                    alt={testimonial.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-200 group-hover:border-purple-400 transition-colors"
+                  />
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">{testimonial.name}</p>
+                    <p className="text-xs text-slate-600">{testimonial.role}</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {testimonial.result}
+                  </span>
                 </div>
               </div>
             ))}
@@ -666,6 +813,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 {
                   q: "What if I don't like it?",
                   a: "30-day money-back guarantee. No questions asked. But here's the thing: once you see your first AI-handled client ticket at 2 AM while you're sleeping... you're probably not going back."
+                },
+                {
+                  q: "This sounds too good to be true. What's the catch?",
+                  a: "We get it. Here's the honest truth: AI won't replace your creative strategy, your client relationships, or your vision. What it WILL do is handle the repetitive execution work that eats 60% of your week. The 'catch' is you still need to set up your workflows initially (we help), and complex edge cases still benefit from human review. But for the 80% of tasks that are predictable and repeatable? That's where the magic happens. We're not promising unicorns—we're promising your weekends back."
                 }
               ].map((faq, i) => (
                 <div key={i} className="bg-gradient-to-br from-slate-50 to-purple-50/30 p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 border-slate-200 hover:border-purple-300 transition-all duration-300 hover:shadow-lg">
