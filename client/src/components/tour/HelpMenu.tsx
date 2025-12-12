@@ -39,11 +39,11 @@ export function HelpMenu({ onOpenHelpCenter }: HelpMenuProps) {
           scale: { duration: 0.2 },
           rotate: { duration: 0.5, ease: 'easeInOut' },
         }}
-        className="group relative flex items-center justify-center w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl transition-colors duration-200"
+        className="group relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white rounded-full shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-200"
         aria-label="Open help center"
       >
         <motion.div
-          className="absolute inset-0 bg-gradient-to-br from-indigo-500/50 to-purple-500/50 rounded-full blur-xl"
+          className="absolute inset-0 bg-gradient-to-br from-emerald-400/50 to-teal-500/50 rounded-full blur-xl"
           animate={prefersReducedMotion ? {} : {
             opacity: isHovered ? 1 : 0,
             scale: isHovered ? 1.2 : 1,

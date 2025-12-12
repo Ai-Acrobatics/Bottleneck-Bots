@@ -43,132 +43,132 @@
 }
 
 :root {
-  /* Coral/Peach Pop (Primary Action) */
-  --primary: oklch(0.72 0.18 25);
-  --primary-foreground: oklch(0.99 0.005 85);
+  /* Emerald Green (Primary Action) */
+  --primary: oklch(0.70 0.17 155);
+  --primary-foreground: oklch(0.99 0.005 90);
 
-  /* Sidebar with warm tones */
-  --sidebar-primary: oklch(0.72 0.18 25);
-  --sidebar-primary-foreground: oklch(0.99 0.005 85);
+  /* Sidebar with emerald tones */
+  --sidebar-primary: oklch(0.70 0.17 155);
+  --sidebar-primary-foreground: oklch(0.99 0.005 90);
 
-  /* Chart colors with warm palette */
-  --chart-1: oklch(0.72 0.18 25);   /* Coral */
-  --chart-2: oklch(0.75 0.12 175);  /* Teal */
-  --chart-3: oklch(0.78 0.10 300);  /* Lavender */
-  --chart-4: oklch(0.85 0.15 85);   /* Warm gold */
-  --chart-5: oklch(0.65 0.15 350);  /* Warm pink */
+  /* Chart colors with green palette */
+  --chart-1: oklch(0.70 0.17 155);  /* Emerald */
+  --chart-2: oklch(0.75 0.14 195);  /* Teal */
+  --chart-3: oklch(0.80 0.12 165);  /* Mint green */
+  --chart-4: oklch(0.55 0.15 150);  /* Forest green */
+  --chart-5: oklch(0.75 0.14 135);  /* Lime/yellow-green */
 
   --radius: 0.65rem;
 
-  /* Warm Cream/Off-White Base */
-  --background: oklch(0.98 0.01 85);
-  --foreground: oklch(0.25 0.02 45);
+  /* Very light warm white base */
+  --background: oklch(0.99 0.005 90);
+  --foreground: oklch(0.20 0.02 150);
 
-  /* Cards with subtle warmth */
-  --card: oklch(0.995 0.005 85);
-  --card-foreground: oklch(0.25 0.02 45);
+  /* Cards with pure white or slight green tint */
+  --card: oklch(1.0 0.0 0);
+  --card-foreground: oklch(0.20 0.02 150);
 
   /* Popovers */
-  --popover: oklch(0.995 0.005 85);
-  --popover-foreground: oklch(0.25 0.02 45);
+  --popover: oklch(1.0 0.0 0);
+  --popover-foreground: oklch(0.20 0.02 150);
 
-  /* Soft Lavender Secondary */
-  --secondary: oklch(0.92 0.05 300);
-  --secondary-foreground: oklch(0.35 0.05 300);
-  /* Muted elements with warm tint */
-  --muted: oklch(0.93 0.02 85);
-  --muted-foreground: oklch(0.50 0.02 60);
+  /* Soft Sage Secondary */
+  --secondary: oklch(0.92 0.04 145);
+  --secondary-foreground: oklch(0.30 0.04 145);
+  /* Muted elements with green tint */
+  --muted: oklch(0.93 0.02 145);
+  --muted-foreground: oklch(0.50 0.03 150);
 
-  /* Teal/Mint Accent */
-  --accent: oklch(0.75 0.12 175);
-  --accent-foreground: oklch(0.15 0.02 175);
+  /* Teal/Cyan Accent */
+  --accent: oklch(0.75 0.14 195);
+  --accent-foreground: oklch(0.15 0.02 195);
 
-  /* Destructive (keep warm-toned) */
+  /* Destructive (keep red for errors) */
   --destructive: oklch(0.60 0.22 30);
-  --destructive-foreground: oklch(0.99 0.005 85);
+  --destructive-foreground: oklch(0.99 0.005 90);
 
-  /* Warm borders */
-  --border: oklch(0.90 0.02 85);
-  --input: oklch(0.90 0.02 85);
+  /* Very light gray borders with subtle green */
+  --border: oklch(0.90 0.02 145);
+  --input: oklch(0.90 0.02 145);
 
-  /* Ring colors match coral primary */
-  --ring: oklch(0.72 0.18 25);
+  /* Ring colors match emerald primary */
+  --ring: oklch(0.70 0.17 155);
 
   /* Additional custom properties */
-  --highlight: oklch(0.85 0.15 85);
-  --success: oklch(0.70 0.15 145);
+  --highlight: oklch(0.85 0.12 155);
+  --success: oklch(0.68 0.18 145);
 
   /* Sidebar colors */
-  --sidebar: oklch(0.995 0.005 85);
-  --sidebar-foreground: oklch(0.25 0.02 45);
-  --sidebar-accent: oklch(0.93 0.02 85);
-  --sidebar-accent-foreground: oklch(0.25 0.02 45);
-  --sidebar-border: oklch(0.90 0.02 85);
-  --sidebar-ring: oklch(0.72 0.18 25);
+  --sidebar: oklch(1.0 0.0 0);
+  --sidebar-foreground: oklch(0.20 0.02 150);
+  --sidebar-accent: oklch(0.93 0.02 145);
+  --sidebar-accent-foreground: oklch(0.20 0.02 150);
+  --sidebar-border: oklch(0.90 0.02 145);
+  --sidebar-ring: oklch(0.70 0.17 155);
 }
 
 .dark {
-  /* Keep coral primary in dark mode */
-  --primary: oklch(0.68 0.16 25);
-  --primary-foreground: oklch(0.99 0.005 85);
+  /* Brighter emerald for dark mode visibility */
+  --primary: oklch(0.72 0.18 155);
+  --primary-foreground: oklch(0.99 0.005 90);
 
-  /* Sidebar maintains warm coral */
-  --sidebar-primary: oklch(0.68 0.16 25);
-  --sidebar-primary-foreground: oklch(0.99 0.005 85);
+  /* Sidebar maintains emerald */
+  --sidebar-primary: oklch(0.72 0.18 155);
+  --sidebar-primary-foreground: oklch(0.99 0.005 90);
 
-  /* Dark mode: Warm charcoal base */
-  --background: oklch(0.18 0.01 50);
-  --foreground: oklch(0.92 0.01 85);
+  /* Dark mode: Very dark green-tinted gray base */
+  --background: oklch(0.15 0.02 150);
+  --foreground: oklch(0.95 0.01 90);
 
-  /* Cards slightly lighter with warmth */
-  --card: oklch(0.22 0.01 50);
-  --card-foreground: oklch(0.92 0.01 85);
+  /* Cards slightly lighter than background */
+  --card: oklch(0.18 0.02 150);
+  --card-foreground: oklch(0.95 0.01 90);
 
   /* Popovers */
-  --popover: oklch(0.22 0.01 50);
-  --popover-foreground: oklch(0.92 0.01 85);
+  --popover: oklch(0.18 0.02 150);
+  --popover-foreground: oklch(0.95 0.01 90);
 
-  /* Secondary lavender (adjusted for dark) */
-  --secondary: oklch(0.30 0.04 300);
-  --secondary-foreground: oklch(0.85 0.03 300);
+  /* Dark sage secondary */
+  --secondary: oklch(0.28 0.05 145);
+  --secondary-foreground: oklch(0.88 0.03 145);
 
-  /* Muted with warmth */
-  --muted: oklch(0.28 0.01 60);
-  --muted-foreground: oklch(0.65 0.02 80);
+  /* Muted with green tint */
+  --muted: oklch(0.25 0.02 150);
+  --muted-foreground: oklch(0.65 0.02 150);
 
-  /* Teal accent (adjusted for dark) */
-  --accent: oklch(0.60 0.10 175);
-  --accent-foreground: oklch(0.95 0.01 175);
+  /* Brighter teal accent for dark mode */
+  --accent: oklch(0.68 0.14 195);
+  --accent-foreground: oklch(0.96 0.01 195);
 
-  /* Destructive warm red */
+  /* Destructive red */
   --destructive: oklch(0.65 0.20 30);
-  --destructive-foreground: oklch(0.99 0.005 85);
+  --destructive-foreground: oklch(0.99 0.005 90);
 
-  /* Warm-tinted borders */
-  --border: oklch(0.35 0.02 60);
-  --input: oklch(0.35 0.02 60);
+  /* Dark gray borders with green tint */
+  --border: oklch(0.32 0.02 150);
+  --input: oklch(0.32 0.02 150);
 
-  /* Ring matches coral */
-  --ring: oklch(0.68 0.16 25);
+  /* Ring matches emerald */
+  --ring: oklch(0.72 0.18 155);
 
   /* Additional properties */
-  --highlight: oklch(0.75 0.12 85);
-  --success: oklch(0.65 0.12 145);
+  --highlight: oklch(0.78 0.14 155);
+  --success: oklch(0.70 0.16 145);
 
   /* Chart colors for dark mode */
-  --chart-1: oklch(0.68 0.16 25);   /* Coral */
-  --chart-2: oklch(0.65 0.10 175);  /* Teal */
-  --chart-3: oklch(0.70 0.08 300);  /* Lavender */
-  --chart-4: oklch(0.75 0.12 85);   /* Warm gold */
-  --chart-5: oklch(0.60 0.13 350);  /* Warm pink */
+  --chart-1: oklch(0.72 0.18 155);  /* Emerald */
+  --chart-2: oklch(0.68 0.14 195);  /* Teal */
+  --chart-3: oklch(0.78 0.12 165);  /* Mint green */
+  --chart-4: oklch(0.58 0.15 150);  /* Forest green */
+  --chart-5: oklch(0.72 0.14 135);  /* Lime/yellow-green */
 
   /* Sidebar dark mode */
-  --sidebar: oklch(0.22 0.01 50);
-  --sidebar-foreground: oklch(0.92 0.01 85);
-  --sidebar-accent: oklch(0.28 0.01 60);
-  --sidebar-accent-foreground: oklch(0.95 0.01 85);
-  --sidebar-border: oklch(0.35 0.02 60);
-  --sidebar-ring: oklch(0.68 0.16 25);
+  --sidebar: oklch(0.18 0.02 150);
+  --sidebar-foreground: oklch(0.95 0.01 90);
+  --sidebar-accent: oklch(0.25 0.02 150);
+  --sidebar-accent-foreground: oklch(0.96 0.01 90);
+  --sidebar-border: oklch(0.32 0.02 150);
+  --sidebar-ring: oklch(0.72 0.18 155);
 }
 
 @layer base {
@@ -269,12 +269,12 @@
     overflow: visible;
     clip: auto;
     white-space: normal;
-    background-color: oklch(0.72 0.18 25);
-    color: oklch(0.99 0.005 85);
+    background-color: oklch(0.70 0.17 155);
+    color: oklch(0.99 0.005 90);
     border-radius: 0.375rem;
-    box-shadow: 0 10px 15px -3px rgba(255, 127, 80, 0.2);
+    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2);
     outline: none;
-    ring: 2px solid oklch(0.72 0.18 25);
+    ring: 2px solid oklch(0.70 0.17 155);
   }
 }
 

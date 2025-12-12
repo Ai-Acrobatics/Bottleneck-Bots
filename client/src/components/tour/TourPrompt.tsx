@@ -15,7 +15,7 @@ export function TourPrompt({ tourId, featureName }: TourPromptProps) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <Sparkles className="w-5 h-5" />
         <span>New to {featureName}? Take a quick tour to get started!</span>

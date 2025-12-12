@@ -14,6 +14,9 @@ import {
 } from "../../drizzle/schema-rag";
 import { generateEmbedding, generateEmbeddings, chunkText } from "../rag/embeddings";
 import crypto from "crypto";
+import { serviceLoggers } from "../lib/logger";
+
+const logger = serviceLoggers.rag;
 
 export interface IngestDocumentInput {
   platform: string;
@@ -118,7 +121,7 @@ class RAGService {
         .limit(1);
 
       if (existing.length > 0) {
-        console.log(`Document already exists with hash ${contentHash}`);
+        logger.info({ contentHash, sourceId: existing[0].id }, 'Document already exists');
         return {
           sourceId: existing[0].id,
           chunkCount: 0,
@@ -145,14 +148,14 @@ class RAGService {
         })
         .returning();
 
-      console.log(`Created documentation source: ${source.id}`);
+      logger.info({ sourceId: source.id, platform: input.platform, title: input.title }, 'Created documentation source');
 
       // Chunk the content
       const chunkSize = input.chunkingOptions?.maxTokens || 1000;
       const overlap = input.chunkingOptions?.overlapTokens || 200;
       const chunks = chunkDocument(input.content, chunkSize, overlap);
 
-      console.log(`Generated ${chunks.length} chunks`);
+      logger.info({ chunkCount: chunks.length, sourceId: source.id }, 'Generated chunks');
 
       // Generate embeddings for all chunks in batch
       const embeddings = await generateEmbeddings(chunks);
@@ -185,7 +188,12 @@ class RAGService {
 
       const totalTokens = chunkValues.reduce((sum, chunk) => sum + chunk.tokenCount, 0);
 
-      console.log(`Ingested ${chunks.length} chunks with ${totalTokens} total tokens`);
+      logger.info({
+        sourceId: source.id,
+        chunkCount: chunks.length,
+        totalTokens,
+        platform: input.platform
+      }, 'Document ingestion completed');
 
       return {
         sourceId: source.id,
@@ -193,7 +201,7 @@ class RAGService {
         totalTokens: totalTokens,
       };
     } catch (error) {
-      console.error("[RAG Service] Ingest failed:", error);
+      logger.error({ error, platform: input.platform }, 'Document ingest failed');
       throw error;
     }
   }
@@ -207,7 +215,7 @@ class RAGService {
     title?: string;
   }): Promise<IngestResult> {
     try {
-      console.log(`Fetching URL: ${url}`);
+      logger.info({ url }, 'Fetching URL for ingestion');
 
       // Fetch the URL content
       const response = await fetch(url);
@@ -260,7 +268,7 @@ class RAGService {
         userId: userId,
       });
     } catch (error) {
-      console.error("[RAG Service] URL ingestion failed:", error);
+      logger.error({ error, url }, 'URL ingestion failed');
       throw error;
     }
   }
@@ -298,7 +306,7 @@ class RAGService {
 
       return sources;
     } catch (error) {
-      console.error("[RAG Service] List sources failed:", error);
+      logger.error({ error, userId }, 'List sources failed');
       throw error;
     }
   }
@@ -358,7 +366,7 @@ class RAGService {
 
       return results.rows as DocumentChunk[];
     } catch (error) {
-      console.error("[RAG Service] Retrieve failed:", error);
+      logger.error({ error, query }, 'Retrieve failed');
       throw error;
     }
   }
@@ -452,7 +460,7 @@ class RAGService {
         detectedPlatforms: platforms,
       };
     } catch (error) {
-      console.error("[RAG Service] Build system prompt failed:", error);
+      logger.error({ error, userPrompt }, 'Build system prompt failed');
       // Fallback to basic prompt without RAG
       return {
         systemPrompt: userPrompt,
@@ -492,7 +500,7 @@ class RAGService {
 
       return platforms;
     } catch (error) {
-      console.error("[RAG Service] Platform detection failed:", error);
+      logger.error({ error, query }, 'Platform detection failed');
       return [];
     }
   }
@@ -538,9 +546,9 @@ class RAGService {
         .delete(documentationSources)
         .where(eq(documentationSources.id, sourceId));
 
-      console.log(`Deleted documentation source ${sourceId}`);
+      logger.info({ sourceId }, 'Deleted documentation source');
     } catch (error) {
-      console.error("[RAG Service] Delete source failed:", error);
+      logger.error({ error, sourceId }, 'Delete source failed');
       throw error;
     }
   }
@@ -622,7 +630,7 @@ class RAGService {
           `);
         }
 
-        console.log(`Re-chunked and re-embedded source ${sourceId} with ${chunks.length} chunks`);
+        logger.info({ sourceId, chunkCount: chunks.length }, 'Re-chunked and re-embedded source');
       } else {
         // Just update metadata
         await db
@@ -633,10 +641,10 @@ class RAGService {
           })
           .where(eq(documentationSources.id, sourceId));
 
-        console.log(`Updated source ${sourceId}`);
+        logger.info({ sourceId, updates }, 'Updated source');
       }
     } catch (error) {
-      console.error("[RAG Service] Update source failed:", error);
+      logger.error({ error, sourceId }, 'Update source failed');
       throw error;
     }
   }

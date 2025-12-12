@@ -5,6 +5,9 @@
 
 import cronParser from "cron-parser";
 import cronstrue from "cronstrue";
+import { serviceLoggers } from "../lib/logger";
+
+const logger = serviceLoggers.cron;
 
 // ========================================
 // TYPES
@@ -80,7 +83,7 @@ class CronSchedulerService {
         expression: cronExpression,
       };
     } catch (error) {
-      console.error("Failed to parse cron expression:", error);
+      logger.error({ error, cronExpression }, "Failed to parse cron expression");
       return null;
     }
   }
@@ -115,7 +118,7 @@ class CronSchedulerService {
         verbose: false,
       });
     } catch (error) {
-      console.error("Failed to describe cron expression:", error);
+      logger.error({ error, cronExpression }, "Failed to describe cron expression");
       return cronExpression; // Fallback to raw expression
     }
   }
@@ -133,7 +136,7 @@ class CronSchedulerService {
       const next = interval.next();
       return next.toDate();
     } catch (error) {
-      console.error("Failed to calculate next run time:", error);
+      logger.error({ error, cronExpression, timezone }, "Failed to calculate next run time");
       return null;
     }
   }
@@ -160,7 +163,7 @@ class CronSchedulerService {
 
       return runTimes;
     } catch (error) {
-      console.error("Failed to calculate next run times:", error);
+      logger.error({ error, cronExpression, count, timezone }, "Failed to calculate next run times");
       return [];
     }
   }
@@ -229,7 +232,7 @@ class CronSchedulerService {
       // Task should run if next scheduled time has passed
       return nextRun <= now;
     } catch (error) {
-      console.error("Failed to check if time to run:", error);
+      logger.error({ error, cronExpression, timezone }, "Failed to check if time to run");
       return false;
     }
   }

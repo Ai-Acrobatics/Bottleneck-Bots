@@ -202,11 +202,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-100 via-slate-50 to-white p-4">
       <div className="w-full max-w-2xl">
         <div className="mb-8 px-4">
           <div className="flex items-center gap-2 mb-6">
-             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg">AI</div>
+             <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold shadow-lg">AI</div>
              <span className="font-bold text-slate-700 text-lg">Agency Setup</span>
           </div>
 
@@ -216,18 +216,18 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
               <div key={stepItem.number} className="flex flex-col items-center flex-1">
                 <div className="flex items-center w-full">
                   {index > 0 && (
-                    <div className={cn("flex-1 h-0.5", step > index ? "bg-indigo-600" : "bg-slate-200")} />
+                    <div className={cn("flex-1 h-0.5", step > index ? "bg-emerald-600" : "bg-slate-200")} />
                   )}
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shrink-0",
-                    step > stepItem.number ? "bg-indigo-600 text-white" :
-                    step === stepItem.number ? "bg-indigo-600 text-white" :
+                    step > stepItem.number ? "bg-emerald-600 text-white" :
+                    step === stepItem.number ? "bg-emerald-600 text-white" :
                     "bg-slate-200 text-slate-400"
                   )}>
                     {step > stepItem.number ? <Check className="h-4 w-4" /> : stepItem.number}
                   </div>
                   {index < steps.length - 1 && (
-                    <div className={cn("flex-1 h-0.5", step > stepItem.number ? "bg-indigo-600" : "bg-slate-200")} />
+                    <div className={cn("flex-1 h-0.5", step > stepItem.number ? "bg-emerald-600" : "bg-slate-200")} />
                   )}
                 </div>
                 <span className={cn(
@@ -241,8 +241,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
 
         <GlassPane className="p-12 shadow-2xl relative overflow-hidden min-h-[500px] flex flex-col justify-center">
           {/* Decorative Background Elements */}
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-purple-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-teal-50 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
 
           <div className="relative z-10">
             {/* Step 1: About You */}
@@ -258,7 +258,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       type="text"
                       value={fullName}
                       onChange={handleFullNameChange}
-                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg transition-all ${
                         errors.fullName ? 'border-red-500' : 'border-slate-200'
                       }`}
                       placeholder="John Smith"
@@ -279,7 +279,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       type="text"
                       value={companyName}
                       onChange={handleCompanyNameChange}
-                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg transition-all ${
                         errors.companyName ? 'border-red-500' : 'border-slate-200'
                       }`}
                       placeholder="e.g. Zenith Growth Ops"
@@ -299,7 +299,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       type="tel"
                       value={phoneNumber}
                       onChange={handlePhoneNumberChange}
-                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg transition-all ${
                         errors.phoneNumber ? 'border-red-500' : 'border-slate-200'
                       }`}
                       placeholder="+1 (555) 123-4567"
@@ -328,7 +328,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <select
                       value={industry}
                       onChange={(e) => setIndustry(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg"
                     >
                       <option value="">Select your industry</option>
                       <option value="marketing-agency">Marketing Agency</option>
@@ -345,7 +345,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <select
                       value={monthlyRevenue}
                       onChange={(e) => setMonthlyRevenue(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg"
                     >
                       <option value="">Select revenue range</option>
                       <option value="0-10k">$0 - $10k</option>
@@ -361,7 +361,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <select
                       value={employeeCount}
                       onChange={(e) => setEmployeeCount(e.target.value)}
-                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg"
+                      className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg"
                     >
                       <option value="">Select employee count</option>
                       <option value="just-me">Just me</option>
@@ -379,7 +379,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       value={websiteUrl}
                       onChange={(e) => handleWebsiteUrlChange(e.target.value)}
                       onBlur={handleWebsiteUrlBlur}
-                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none text-lg transition-all ${
+                      className={`w-full bg-white/50 border rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg transition-all ${
                         errors.websiteUrl ? 'border-red-500' : 'border-slate-200'
                       }`}
                       placeholder="yourwebsite.com"
@@ -416,15 +416,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       key={goal.id}
                       className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
                         goals.includes(goal.id)
-                          ? 'border-indigo-600 bg-indigo-50/50'
-                          : 'border-slate-200 bg-white/30 hover:border-indigo-300'
+                          ? 'border-emerald-600 bg-emerald-50/50'
+                          : 'border-slate-200 bg-white/30 hover:border-emerald-300'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={goals.includes(goal.id)}
                         onChange={() => handleGoalToggle(goal.id)}
-                        className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500/20"
+                        className="w-5 h-5 text-emerald-600 rounded focus:ring-2 focus:ring-emerald-500/20"
                       />
                       <span className="text-lg text-slate-800 font-medium">{goal.label}</span>
                     </label>
@@ -433,15 +433,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                   <label
                     className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
                       goals.includes('other')
-                        ? 'border-indigo-600 bg-indigo-50/50'
-                        : 'border-slate-200 bg-white/30 hover:border-indigo-300'
+                        ? 'border-emerald-600 bg-emerald-50/50'
+                        : 'border-slate-200 bg-white/30 hover:border-emerald-300'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={goals.includes('other')}
                       onChange={() => handleGoalToggle('other')}
-                      className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500/20"
+                      className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-emerald-500/20"
                     />
                     <span className="text-lg text-slate-800 font-medium">Other</span>
                   </label>
@@ -452,7 +452,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                         type="text"
                         value={otherGoal}
                         onChange={(e) => setOtherGoal(e.target.value)}
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                         placeholder="Please specify..."
                       />
                     </div>
@@ -477,7 +477,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                         type="password"
                         value={ghlApiKey}
                         onChange={(e) => setGhlApiKey(e.target.value)}
-                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none font-mono text-lg shadow-inner"
+                        className="w-full bg-white/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-800 focus:ring-2 focus:ring-emerald-500/20 outline-none font-mono text-lg shadow-inner"
                         placeholder="pit_xxxxxxxxxxxxxxxx"
                       />
                       <div className={`absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 transition-all duration-300 ${ghlApiKey.length > 10 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
@@ -502,7 +502,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             {/* Step 5: Ready to Launch */}
             {step === 5 && (
               <div className="animate-slide-in-right duration-500 text-center">
-                <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/20">
+                <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-500/20">
                   <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <h2 className="text-3xl font-bold text-slate-800 mb-2">Ready to Launch</h2>
@@ -531,7 +531,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                       <span className="text-slate-500 block mb-2">Goals:</span>
                       <div className="flex flex-wrap gap-2">
                         {goals.map(goal => (
-                          <span key={goal} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                          <span key={goal} className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
                             {goal === 'other' ? otherGoal || 'Other' : goal.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                           </span>
                         ))}
@@ -541,7 +541,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                 </div>
 
                 <div className="bg-slate-900 text-slate-200 rounded-xl p-6 max-w-md mx-auto text-left mb-8 shadow-2xl font-mono text-sm relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-600"></div>
                   <div className="flex items-center gap-3 mb-4 border-b border-slate-700 pb-4">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                     <span className="font-bold text-white">System Online</span>
@@ -550,7 +550,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                     <p className="flex justify-between"><span>{'>'} Initializing Neural Core...</span> <span className="text-emerald-400">OK</span></p>
                     <p className="flex justify-between"><span>{'>'} Syncing Notion DB...</span> <span className="text-emerald-400">OK</span></p>
                     <p className="flex justify-between"><span>{'>'} Verifying Agency API...</span> <span className="text-emerald-400">OK</span></p>
-                    <p className="text-indigo-400 mt-2">{'>'} Awaiting First Command...</p>
+                    <p className="text-emerald-400 mt-2">{'>'} Awaiting First Command...</p>
                   </div>
                 </div>
               </div>
@@ -589,7 +589,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
                 <button
                   onClick={handleNext}
                   disabled={isLoading || !canProceed()}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg"
                 >
                   {isLoading ? (
                     <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Initializing...</>

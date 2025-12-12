@@ -564,3 +564,10 @@ export {
   type SecurityEvent,
   type InsertSecurityEvent,
 } from "./schema-admin";
+
+// Webhooks
+export {
+  webhookLogs,
+  type WebhookLog,
+  type InsertWebhookLog,
+} from "./schema-webhooks";

@@ -12,6 +12,8 @@ const AlexRamozyPage = lazy(() => import('./components/AlexRamozyPage').then(m =
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
 const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
+const TermsOfService = lazy(() => import('./pages/TermsOfService').then(m => ({ default: m.TermsOfService })));
 
 // Loading spinner component
 const LoadingSpinner = () => (
@@ -23,7 +25,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY';
+type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY' | 'PRIVACY' | 'TERMS';
 type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 
 function App() {
@@ -106,6 +108,14 @@ function App() {
 
               {currentView === 'DASHBOARD' && (
                 <Dashboard userTier={userTier} credits={credits} />
+              )}
+
+              {currentView === 'PRIVACY' && (
+                <PrivacyPolicy onBack={() => setCurrentView('LANDING')} />
+              )}
+
+              {currentView === 'TERMS' && (
+                <TermsOfService onBack={() => setCurrentView('LANDING')} />
               )}
             </Suspense>
           </TourProvider>

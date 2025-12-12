@@ -7,8 +7,17 @@
  *
  * Documentation: https://docs.vapi.ai
  *
- * TODO: Implement actual Vapi API integration
+ * Includes:
+ * - Retry logic with exponential backoff
+ * - Circuit breaker pattern for service protection
+ * - Comprehensive error handling
  */
+
+import { withRetry, DEFAULT_RETRY_OPTIONS } from '../lib/retry';
+import { circuitBreakers } from '../lib/circuitBreaker';
+import { serviceLoggers } from '../lib/logger';
+
+const logger = serviceLoggers.vapi;
 
 export interface VapiCallSettings {
   voice?: "male" | "female" | "neutral";
@@ -49,7 +58,7 @@ export class VapiService {
     this.baseUrl = process.env.VAPI_API_URL || "https://api.vapi.ai";
 
     if (!this.apiKey) {
-      console.warn("VAPI_API_KEY not configured - Vapi service will return mock data");
+      logger.warn("VAPI_API_KEY not configured - Vapi service will return mock data");
     }
   }
 
@@ -78,50 +87,54 @@ export class VapiService {
       throw new Error(`Invalid phone number format: ${phoneNumber}. Expected E.164 format (e.g., +1234567890)`);
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/call`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phoneNumber: formattedPhone,
-          assistant: {
-            firstMessage: script,
-            model: {
-              provider: "openai",
-              model: settings?.model || "gpt-4",
-              temperature: settings?.temperature || 0.7,
-            },
-            voice: {
-              provider: "11labs",
-              voiceId: settings?.voice === "female" ? "rachel" : settings?.voice === "neutral" ? "adam" : "josh",
-            },
+    return await circuitBreakers.vapi.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/call`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
           },
-          maxDurationSeconds: settings?.maxDuration || 600,
-          recordingEnabled: settings?.recordCall !== false,
-          transcribeEnabled: settings?.transcribeCall !== false,
-          voicemailDetectionEnabled: settings?.detectVoicemail !== false,
-        }),
+          body: JSON.stringify({
+            phoneNumber: formattedPhone,
+            assistant: {
+              firstMessage: script,
+              model: {
+                provider: "openai",
+                model: settings?.model || "gpt-4",
+                temperature: settings?.temperature || 0.7,
+              },
+              voice: {
+                provider: "11labs",
+                voiceId: settings?.voice === "female" ? "rachel" : settings?.voice === "neutral" ? "adam" : "josh",
+              },
+            },
+            maxDurationSeconds: settings?.maxDuration || 600,
+            recordingEnabled: settings?.recordCall !== false,
+            transcribeEnabled: settings?.transcribeCall !== false,
+            voicemailDetectionEnabled: settings?.detectVoicemail !== false,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
+
+        const data = await response.json();
+
+        return {
+          callId: data.id,
+          status: data.status,
+          message: "Call initiated successfully",
+        };
+      }, {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxAttempts: 3,
+        initialDelayMs: 1000,
+        maxDelayMs: 10000,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      }
-
-      const data = await response.json();
-
-      return {
-        callId: data.id,
-        status: data.status,
-        message: "Call initiated successfully",
-      };
-    } catch (error: any) {
-      console.error("Error creating Vapi call:", error);
-      throw new Error(`Failed to create call: ${error.message}`);
-    }
+    });
   }
 
   /**
@@ -137,36 +150,38 @@ export class VapiService {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
+    return await circuitBreakers.vapi.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
+
+        const data = await response.json();
+
+        return {
+          callId: data.id,
+          status: this.mapVapiStatus(data.status),
+          duration: data.durationSeconds,
+          outcome: data.endedReason,
+          transcript: data.transcript,
+          recordingUrl: data.recordingUrl,
+          error: data.error,
+          metadata: data.metadata,
+        };
+      }, {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxAttempts: 2,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      }
-
-      const data = await response.json();
-
-      return {
-        callId: data.id,
-        status: this.mapVapiStatus(data.status),
-        duration: data.durationSeconds,
-        outcome: data.endedReason,
-        transcript: data.transcript,
-        recordingUrl: data.recordingUrl,
-        error: data.error,
-        metadata: data.metadata,
-      };
-    } catch (error: any) {
-      console.error("Error getting Vapi call status:", error);
-      throw new Error(`Failed to get call status: ${error.message}`);
-    }
+    });
   }
 
   /**
@@ -200,37 +215,36 @@ export class VapiService {
       return [];
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/call?limit=${limit}&offset=${offset}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
+    return await circuitBreakers.vapi.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/call?limit=${limit}&offset=${offset}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
 
-      const data = await response.json();
-      const calls = Array.isArray(data) ? data : data.calls || [];
+        const data = await response.json();
+        const calls = Array.isArray(data) ? data : data.calls || [];
 
-      return calls.map((call: any) => ({
-        callId: call.id,
-        status: this.mapVapiStatus(call.status),
-        duration: call.durationSeconds,
-        outcome: call.endedReason,
-        transcript: call.transcript,
-        recordingUrl: call.recordingUrl,
-        error: call.error,
-        metadata: call.metadata,
-      }));
-    } catch (error: any) {
-      console.error("Error listing Vapi calls:", error);
-      throw new Error(`Failed to list calls: ${error.message}`);
-    }
+        return calls.map((call: any) => ({
+          callId: call.id,
+          status: this.mapVapiStatus(call.status),
+          duration: call.durationSeconds,
+          outcome: call.endedReason,
+          transcript: call.transcript,
+          recordingUrl: call.recordingUrl,
+          error: call.error,
+          metadata: call.metadata,
+        }));
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**
@@ -244,28 +258,27 @@ export class VapiService {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-      });
+    return await circuitBreakers.vapi.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
 
-      return {
-        success: true,
-        message: "Call ended successfully",
-      };
-    } catch (error: any) {
-      console.error("Error ending Vapi call:", error);
-      throw new Error(`Failed to end call: ${error.message}`);
-    }
+        return {
+          success: true,
+          message: "Call ended successfully",
+        };
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**
@@ -282,7 +295,7 @@ export class VapiService {
       const callStatus = await this.getCallStatus(vapiCallId);
       return callStatus.transcript || "";
     } catch (error: any) {
-      console.error("Error getting Vapi call transcript:", error);
+      logger.error({ error: error.message, vapiCallId }, 'Error getting Vapi call transcript');
       throw new Error(`Failed to get transcript: ${error.message}`);
     }
   }
@@ -302,29 +315,28 @@ export class VapiService {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
+    return await circuitBreakers.vapi.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updates),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+        }
 
-      return {
-        success: true,
-        message: "Call updated successfully",
-      };
-    } catch (error: any) {
-      console.error("Error updating Vapi call:", error);
-      throw new Error(`Failed to update call: ${error.message}`);
-    }
+        return {
+          success: true,
+          message: "Call updated successfully",
+        };
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**

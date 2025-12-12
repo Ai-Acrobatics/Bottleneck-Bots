@@ -11,6 +11,8 @@
  * - AI-powered sentiment analysis
  * - AI-powered draft response generation
  * - Email sending via provider APIs
+ * - Retry logic with exponential backoff
+ * - Circuit breaker pattern for service protection
  */
 
 import { google } from "googleapis";
@@ -20,6 +22,11 @@ import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { withRetry, DEFAULT_RETRY_OPTIONS } from '../lib/retry';
+import { circuitBreakers } from '../lib/circuitBreaker';
+import { serviceLoggers } from '../lib/logger';
+
+const logger = serviceLoggers.email;
 
 /**
  * Email provider type
@@ -288,110 +295,118 @@ export class EmailService {
   }
 
   private async handleGmailCallback(code: string) {
-    const oauth2Client = new OAuth2Client(
-      this.gmailConfig.clientId,
-      this.gmailConfig.clientSecret,
-      this.gmailConfig.redirectUri
-    );
+    return await circuitBreakers.gmail.execute(async () => {
+      return await withRetry(async () => {
+        const oauth2Client = new OAuth2Client(
+          this.gmailConfig.clientId,
+          this.gmailConfig.clientSecret,
+          this.gmailConfig.redirectUri
+        );
 
-    // Exchange code for tokens
-    const { tokens } = await oauth2Client.getToken(code);
+        // Exchange code for tokens
+        const { tokens } = await oauth2Client.getToken(code);
 
-    if (!tokens.access_token || !tokens.refresh_token) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to obtain tokens from Gmail",
-      });
-    }
+        if (!tokens.access_token || !tokens.refresh_token) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to obtain tokens from Gmail",
+          });
+        }
 
-    oauth2Client.setCredentials(tokens);
+        oauth2Client.setCredentials(tokens);
 
-    // Get user info
-    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
+        // Get user info
+        const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+        const userInfo = await oauth2.userinfo.get();
 
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expiry_date || 3600));
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expiry_date || 3600));
 
-    return {
-      accessToken: this.encrypt(tokens.access_token),
-      refreshToken: this.encrypt(tokens.refresh_token),
-      expiresAt,
-      scope: tokens.scope || "",
-      accountInfo: {
-        email: userInfo.data.email || "",
-        name: userInfo.data.name || undefined,
-        provider: "gmail" as EmailProvider,
-        metadata: {
-          picture: userInfo.data.picture,
-          locale: userInfo.data.locale,
-        },
-      },
-    };
+        return {
+          accessToken: this.encrypt(tokens.access_token),
+          refreshToken: this.encrypt(tokens.refresh_token),
+          expiresAt,
+          scope: tokens.scope || "",
+          accountInfo: {
+            email: userInfo.data.email || "",
+            name: userInfo.data.name || undefined,
+            provider: "gmail" as EmailProvider,
+            metadata: {
+              picture: userInfo.data.picture,
+              locale: userInfo.data.locale,
+            },
+          },
+        };
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   private async handleOutlookCallback(code: string) {
-    // Exchange code for tokens
-    const tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-    const params = new URLSearchParams({
-      client_id: this.outlookConfig.clientId,
-      client_secret: this.outlookConfig.clientSecret,
-      code: code,
-      redirect_uri: this.outlookConfig.redirectUri,
-      grant_type: "authorization_code",
+    return await circuitBreakers.outlook.execute(async () => {
+      return await withRetry(async () => {
+        // Exchange code for tokens
+        const tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+        const params = new URLSearchParams({
+          client_id: this.outlookConfig.clientId,
+          client_secret: this.outlookConfig.clientSecret,
+          code: code,
+          redirect_uri: this.outlookConfig.redirectUri,
+          grant_type: "authorization_code",
+        });
+
+        const response = await fetch(tokenUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        });
+
+        if (!response.ok) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to obtain tokens from Outlook",
+          });
+        }
+
+        const tokens = await response.json();
+
+        if (!tokens.access_token || !tokens.refresh_token) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Invalid token response from Outlook",
+          });
+        }
+
+        // Get user info using Microsoft Graph
+        const client = Client.init({
+          authProvider: (done) => {
+            done(null, tokens.access_token);
+          },
+        });
+
+        const user = await client.api("/me").get();
+
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
+
+        return {
+          accessToken: this.encrypt(tokens.access_token),
+          refreshToken: this.encrypt(tokens.refresh_token),
+          expiresAt,
+          scope: tokens.scope || "",
+          accountInfo: {
+            email: user.mail || user.userPrincipalName || "",
+            name: user.displayName || undefined,
+            provider: "outlook" as EmailProvider,
+            metadata: {
+              jobTitle: user.jobTitle,
+              officeLocation: user.officeLocation,
+            },
+          },
+        };
+      }, DEFAULT_RETRY_OPTIONS);
     });
-
-    const response = await fetch(tokenUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to obtain tokens from Outlook",
-      });
-    }
-
-    const tokens = await response.json();
-
-    if (!tokens.access_token || !tokens.refresh_token) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Invalid token response from Outlook",
-      });
-    }
-
-    // Get user info using Microsoft Graph
-    const client = Client.init({
-      authProvider: (done) => {
-        done(null, tokens.access_token);
-      },
-    });
-
-    const user = await client.api("/me").get();
-
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
-
-    return {
-      accessToken: this.encrypt(tokens.access_token),
-      refreshToken: this.encrypt(tokens.refresh_token),
-      expiresAt,
-      scope: tokens.scope || "",
-      accountInfo: {
-        email: user.mail || user.userPrincipalName || "",
-        name: user.displayName || undefined,
-        provider: "outlook" as EmailProvider,
-        metadata: {
-          jobTitle: user.jobTitle,
-          officeLocation: user.officeLocation,
-        },
-      },
-    };
   }
 
   /**
@@ -407,69 +422,77 @@ export class EmailService {
     const refreshToken = this.decrypt(encryptedRefreshToken);
 
     if (provider === "gmail") {
-      const oauth2Client = new OAuth2Client(
-        this.gmailConfig.clientId,
-        this.gmailConfig.clientSecret,
-        this.gmailConfig.redirectUri
-      );
+      return await circuitBreakers.gmail.execute(async () => {
+        return await withRetry(async () => {
+          const oauth2Client = new OAuth2Client(
+            this.gmailConfig.clientId,
+            this.gmailConfig.clientSecret,
+            this.gmailConfig.redirectUri
+          );
 
-      oauth2Client.setCredentials({ refresh_token: refreshToken });
-      const { credentials } = await oauth2Client.refreshAccessToken();
+          oauth2Client.setCredentials({ refresh_token: refreshToken });
+          const { credentials } = await oauth2Client.refreshAccessToken();
 
-      if (!credentials.access_token) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to refresh Gmail token",
-        });
-      }
+          if (!credentials.access_token) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to refresh Gmail token",
+            });
+          }
 
-      const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + (credentials.expiry_date || 3600));
+          const expiresAt = new Date();
+          expiresAt.setSeconds(expiresAt.getSeconds() + (credentials.expiry_date || 3600));
 
-      return {
-        accessToken: this.encrypt(credentials.access_token),
-        expiresAt,
-      };
+          return {
+            accessToken: this.encrypt(credentials.access_token),
+            expiresAt,
+          };
+        }, DEFAULT_RETRY_OPTIONS);
+      });
     } else if (provider === "outlook") {
-      const tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-      const params = new URLSearchParams({
-        client_id: this.outlookConfig.clientId,
-        client_secret: this.outlookConfig.clientSecret,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
+      return await circuitBreakers.outlook.execute(async () => {
+        return await withRetry(async () => {
+          const tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+          const params = new URLSearchParams({
+            client_id: this.outlookConfig.clientId,
+            client_secret: this.outlookConfig.clientSecret,
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+          });
+
+          const response = await fetch(tokenUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: params.toString(),
+          });
+
+          if (!response.ok) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to refresh Outlook token",
+            });
+          }
+
+          const tokens = await response.json();
+
+          if (!tokens.access_token) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Invalid token response from Outlook",
+            });
+          }
+
+          const expiresAt = new Date();
+          expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
+
+          return {
+            accessToken: this.encrypt(tokens.access_token),
+            expiresAt,
+          };
+        }, DEFAULT_RETRY_OPTIONS);
       });
-
-      const response = await fetch(tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-      });
-
-      if (!response.ok) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to refresh Outlook token",
-        });
-      }
-
-      const tokens = await response.json();
-
-      if (!tokens.access_token) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Invalid token response from Outlook",
-        });
-      }
-
-      const expiresAt = new Date();
-      expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
-
-      return {
-        accessToken: this.encrypt(tokens.access_token),
-        expiresAt,
-      };
     }
 
     throw new TRPCError({
@@ -878,31 +901,44 @@ ${emailContent.body || ""}
 
 Respond in JSON format: { "sentiment": "...", "score": 0, "importance": "...", "requiresResponse": true/false, "category": "..." }`;
 
-    try {
+    const executeAnalysis = async () => {
       let result: any;
 
       if (this.anthropicClient) {
-        const response = await this.anthropicClient.messages.create({
-          model: "claude-3-sonnet-20240229",
-          max_tokens: 500,
-          messages: [{ role: "user", content: prompt }],
-        });
+        return await circuitBreakers.anthropic.execute(async () => {
+          return await withRetry(async () => {
+            const response = await this.anthropicClient!.messages.create({
+              model: "claude-3-sonnet-20240229",
+              max_tokens: 500,
+              messages: [{ role: "user", content: prompt }],
+            });
 
-        const content = response.content[0];
-        if (content.type === "text") {
-          result = JSON.parse(content.text);
-        }
+            const content = response.content[0];
+            if (content.type === "text") {
+              return JSON.parse(content.text);
+            }
+            throw new Error("Invalid response from Anthropic");
+          }, DEFAULT_RETRY_OPTIONS);
+        });
       } else if (this.openaiClient) {
-        const response = await this.openaiClient.chat.completions.create({
-          model: "gpt-4-turbo-preview",
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-        });
+        return await circuitBreakers.openai.execute(async () => {
+          return await withRetry(async () => {
+            const response = await this.openaiClient!.chat.completions.create({
+              model: "gpt-4-turbo-preview",
+              messages: [{ role: "user", content: prompt }],
+              response_format: { type: "json_object" },
+            });
 
-        result = JSON.parse(response.choices[0].message.content || "{}");
+            return JSON.parse(response.choices[0].message.content || "{}");
+          }, DEFAULT_RETRY_OPTIONS);
+        });
       } else {
         throw new Error("No AI client configured");
       }
+    };
+
+    try {
+      const result = await executeAnalysis();
 
       return {
         sentiment: result.sentiment || "neutral",
@@ -912,7 +948,7 @@ Respond in JSON format: { "sentiment": "...", "score": 0, "importance": "...", "
         category: result.category,
       };
     } catch (error) {
-      console.error("Sentiment analysis failed:", error);
+      logger.error({ error }, 'Sentiment analysis failed');
       // Return default values on error
       return {
         sentiment: "neutral",
@@ -954,31 +990,42 @@ Generate a response with:
 
 Respond in JSON format: { "subject": "...", "body": "...", "bodyType": "html" }`;
 
-    try {
-      let result: any;
-
+    const executeGeneration = async () => {
       if (model.startsWith("claude") && this.anthropicClient) {
-        const response = await this.anthropicClient.messages.create({
-          model: model.includes("opus") ? "claude-3-opus-20240229" : "claude-3-sonnet-20240229",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: prompt }],
-        });
+        return await circuitBreakers.anthropic.execute(async () => {
+          return await withRetry(async () => {
+            const response = await this.anthropicClient!.messages.create({
+              model: model.includes("opus") ? "claude-3-opus-20240229" : "claude-3-sonnet-20240229",
+              max_tokens: 2000,
+              messages: [{ role: "user", content: prompt }],
+            });
 
-        const content = response.content[0];
-        if (content.type === "text") {
-          result = JSON.parse(content.text);
-        }
+            const content = response.content[0];
+            if (content.type === "text") {
+              return JSON.parse(content.text);
+            }
+            throw new Error("Invalid response from Anthropic");
+          }, DEFAULT_RETRY_OPTIONS);
+        });
       } else if (model.startsWith("gpt") && this.openaiClient) {
-        const response = await this.openaiClient.chat.completions.create({
-          model: model === "gpt-4" ? "gpt-4-turbo-preview" : "gpt-4-turbo-preview",
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-        });
+        return await circuitBreakers.openai.execute(async () => {
+          return await withRetry(async () => {
+            const response = await this.openaiClient!.chat.completions.create({
+              model: model === "gpt-4" ? "gpt-4-turbo-preview" : "gpt-4-turbo-preview",
+              messages: [{ role: "user", content: prompt }],
+              response_format: { type: "json_object" },
+            });
 
-        result = JSON.parse(response.choices[0].message.content || "{}");
+            return JSON.parse(response.choices[0].message.content || "{}");
+          }, DEFAULT_RETRY_OPTIONS);
+        });
       } else {
         throw new Error("No compatible AI client configured");
       }
+    };
+
+    try {
+      const result = await executeGeneration();
 
       return {
         subject: result.subject || `Re: ${emailContent.subject || ""}`,
@@ -986,7 +1033,7 @@ Respond in JSON format: { "subject": "...", "body": "...", "bodyType": "html" }`
         bodyType: result.bodyType || "html",
       };
     } catch (error) {
-      console.error("Draft generation failed:", error);
+      logger.error({ error }, 'Draft generation failed');
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to generate email draft",

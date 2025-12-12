@@ -50,7 +50,7 @@ export const EmailAgentPanel: React.FC = () => {
 
                 <div className="flex gap-2">
                     {!isConnected ? (
-                        <Button onClick={handleConnect} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20">
+                        <Button onClick={handleConnect} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20">
                             <Mail className="w-4 h-4 mr-2" />
                             Connect Gmail / Outlook
                         </Button>
@@ -64,15 +64,15 @@ export const EmailAgentPanel: React.FC = () => {
 
             {!isConnected ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                    <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
-                        <Mail className="w-10 h-10 text-indigo-600" />
+                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+                        <Mail className="w-10 h-10 text-emerald-600" />
                     </div>
                     <h3 className="text-xl font-bold text-slate-800 mb-2">Connect Your Inbox</h3>
                     <p className="text-slate-500 max-w-md mb-8">
                         Grant the AI agent access to read and draft emails on your behalf.
                         It will analyze incoming messages, categorize them, and prepare draft responses for your review.
                     </p>
-                    <Button onClick={handleConnect} size="lg" className="bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50">
+                    <Button onClick={handleConnect} size="lg" className="bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50">
                         Authorize with OAuth
                     </Button>
                 </div>
@@ -83,9 +83,9 @@ export const EmailAgentPanel: React.FC = () => {
                     <div className="flex flex-col gap-6">
                         <GlassPane title="Inbox Analytics" className="p-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                                    <p className="text-xs text-indigo-500 font-bold uppercase">Unread</p>
-                                    <p className="text-2xl font-bold text-indigo-900">-</p>
+                                <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
+                                    <p className="text-xs text-teal-500 font-bold uppercase">Unread</p>
+                                    <p className="text-2xl font-bold text-teal-900">-</p>
                                 </div>
                                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                                     <p className="text-xs text-emerald-500 font-bold uppercase">Drafted</p>

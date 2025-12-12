@@ -1,8 +1,15 @@
 import Browserbase from "@browserbasehq/sdk";
+import { withRetry, DEFAULT_RETRY_OPTIONS } from '../lib/retry';
+import { circuitBreakers } from '../lib/circuitBreaker';
 
 /**
  * Browserbase SDK Service
  * Handles all Browserbase session management operations
+ *
+ * Includes:
+ * - Retry logic with exponential backoff
+ * - Circuit breaker pattern for service protection
+ * - Comprehensive error handling
  */
 
 // Types for Browserbase operations
@@ -178,33 +185,42 @@ class BrowserbaseSDKService {
   ): Promise<SessionCreateResponse> {
     const client = this.ensureClient();
 
-    try {
-      const projectId = this.getProjectId(options.projectId);
+    return await circuitBreakers.browserbase.execute(async () => {
+      return await withRetry(async () => {
+        try {
+          const projectId = this.getProjectId(options.projectId);
 
-      console.log('[BrowserbaseSDK] Creating session with options:', {
-        projectId,
-        ...options,
+          console.log('[BrowserbaseSDK] Creating session with options:', {
+            projectId,
+            ...options,
+          });
+
+          // Fix type error for proxies
+          const createOptions: any = {
+            projectId,
+            ...options,
+          };
+
+          const session = await client.sessions.create(createOptions);
+
+          console.log('[BrowserbaseSDK] Session created successfully:', session.id);
+
+          return session as unknown as SessionCreateResponse;
+        } catch (error) {
+          console.error('[BrowserbaseSDK] Failed to create session:', error);
+          throw new BrowserbaseSDKError(
+            `Failed to create Browserbase session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'CREATE_SESSION_ERROR',
+            error
+          );
+        }
+      }, {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxAttempts: 3,
+        initialDelayMs: 2000,
+        maxDelayMs: 15000,
       });
-
-      // Fix type error for proxies
-      const createOptions: any = {
-        projectId,
-        ...options,
-      };
-
-      const session = await client.sessions.create(createOptions);
-
-      console.log('[BrowserbaseSDK] Session created successfully:', session.id);
-
-      return session as unknown as SessionCreateResponse;
-    } catch (error) {
-      console.error('[BrowserbaseSDK] Failed to create session:', error);
-      throw new BrowserbaseSDKError(
-        `Failed to create Browserbase session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'CREATE_SESSION_ERROR',
-        error
-      );
-    }
+    });
   }
 
   /**
@@ -229,22 +245,26 @@ class BrowserbaseSDKService {
       );
     }
 
-    try {
-      console.log('[BrowserbaseSDK] Getting debug info for session:', sessionId);
+    return await circuitBreakers.browserbase.execute(async () => {
+      return await withRetry(async () => {
+        try {
+          console.log('[BrowserbaseSDK] Getting debug info for session:', sessionId);
 
-      const debugInfo = await client.sessions.debug(sessionId);
+          const debugInfo = await client.sessions.debug(sessionId);
 
-      console.log('[BrowserbaseSDK] Debug info retrieved successfully');
+          console.log('[BrowserbaseSDK] Debug info retrieved successfully');
 
-      return debugInfo as SessionDebugResponse;
-    } catch (error) {
-      console.error('[BrowserbaseSDK] Failed to get session debug info:', error);
-      throw new BrowserbaseSDKError(
-        `Failed to get session debug info: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'GET_DEBUG_ERROR',
-        error
-      );
-    }
+          return debugInfo as SessionDebugResponse;
+        } catch (error) {
+          console.error('[BrowserbaseSDK] Failed to get session debug info:', error);
+          throw new BrowserbaseSDKError(
+            `Failed to get session debug info: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'GET_DEBUG_ERROR',
+            error
+          );
+        }
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**
@@ -273,22 +293,26 @@ class BrowserbaseSDKService {
       );
     }
 
-    try {
-      console.log('[BrowserbaseSDK] Getting recording for session:', sessionId);
+    return await circuitBreakers.browserbase.execute(async () => {
+      return await withRetry(async () => {
+        try {
+          console.log('[BrowserbaseSDK] Getting recording for session:', sessionId);
 
-      const recording = await client.sessions.recording.retrieve(sessionId);
+          const recording = await client.sessions.recording.retrieve(sessionId);
 
-      console.log('[BrowserbaseSDK] Recording retrieved successfully');
+          console.log('[BrowserbaseSDK] Recording retrieved successfully');
 
-      return recording as unknown as SessionRecordingResponse;
-    } catch (error) {
-      console.error('[BrowserbaseSDK] Failed to get session recording:', error);
-      throw new BrowserbaseSDKError(
-        `Failed to get session recording: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'GET_RECORDING_ERROR',
-        error
-      );
-    }
+          return recording as unknown as SessionRecordingResponse;
+        } catch (error) {
+          console.error('[BrowserbaseSDK] Failed to get session recording:', error);
+          throw new BrowserbaseSDKError(
+            `Failed to get session recording: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'GET_RECORDING_ERROR',
+            error
+          );
+        }
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**
@@ -384,27 +408,31 @@ class BrowserbaseSDKService {
       );
     }
 
-    try {
-      console.log('[BrowserbaseSDK] Terminating session:', sessionId);
+    return await circuitBreakers.browserbase.execute(async () => {
+      return await withRetry(async () => {
+        try {
+          console.log('[BrowserbaseSDK] Terminating session:', sessionId);
 
-      // Update session status to REQUEST_RELEASE to gracefully close it
-      const resolvedProjectId = this.getProjectId(projectId);
-      await client.sessions.update(sessionId, {
-        projectId: resolvedProjectId,
-        status: 'REQUEST_RELEASE'
-      });
+          // Update session status to REQUEST_RELEASE to gracefully close it
+          const resolvedProjectId = this.getProjectId(projectId);
+          await client.sessions.update(sessionId, {
+            projectId: resolvedProjectId,
+            status: 'REQUEST_RELEASE'
+          });
 
-      console.log('[BrowserbaseSDK] Session terminated successfully:', sessionId);
+          console.log('[BrowserbaseSDK] Session terminated successfully:', sessionId);
 
-      return { success: true, sessionId };
-    } catch (error) {
-      console.error('[BrowserbaseSDK] Failed to terminate session:', error);
-      throw new BrowserbaseSDKError(
-        `Failed to terminate session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'TERMINATE_SESSION_ERROR',
-        error
-      );
-    }
+          return { success: true, sessionId };
+        } catch (error) {
+          console.error('[BrowserbaseSDK] Failed to terminate session:', error);
+          throw new BrowserbaseSDKError(
+            `Failed to terminate session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'TERMINATE_SESSION_ERROR',
+            error
+          );
+        }
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**
@@ -423,22 +451,26 @@ class BrowserbaseSDKService {
       );
     }
 
-    try {
-      console.log('[BrowserbaseSDK] Getting session:', sessionId);
+    return await circuitBreakers.browserbase.execute(async () => {
+      return await withRetry(async () => {
+        try {
+          console.log('[BrowserbaseSDK] Getting session:', sessionId);
 
-      const session = await client.sessions.retrieve(sessionId);
+          const session = await client.sessions.retrieve(sessionId);
 
-      console.log('[BrowserbaseSDK] Session retrieved successfully');
+          console.log('[BrowserbaseSDK] Session retrieved successfully');
 
-      return session;
-    } catch (error) {
-      console.error('[BrowserbaseSDK] Failed to get session:', error);
-      throw new BrowserbaseSDKError(
-        `Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'GET_SESSION_ERROR',
-        error
-      );
-    }
+          return session;
+        } catch (error) {
+          console.error('[BrowserbaseSDK] Failed to get session:', error);
+          throw new BrowserbaseSDKError(
+            `Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'GET_SESSION_ERROR',
+            error
+          );
+        }
+      }, DEFAULT_RETRY_OPTIONS);
+    });
   }
 
   /**

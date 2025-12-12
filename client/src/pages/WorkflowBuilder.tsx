@@ -39,6 +39,7 @@ import { CustomNode } from '@/components/workflow/CustomNode';
 import { NodePalette } from '@/components/workflow/NodePalette';
 import { NodeConfigPanel } from '@/components/workflow/NodeConfigPanel';
 import { TemplateDialog } from '@/components/workflow/TemplateDialog';
+import { TestRunDialog } from '@/components/workflow/TestRunDialog';
 import type { NodeTemplate } from '@/types/workflow';
 import { TourPrompt } from '@/components/tour';
 
@@ -75,6 +76,7 @@ const WorkflowCanvas: React.FC = () => {
   const [newWorkflowName, setNewWorkflowName] = React.useState('');
   const [newWorkflowDescription, setNewWorkflowDescription] = React.useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const [isTestRunDialogOpen, setIsTestRunDialogOpen] = React.useState(false);
 
   // Handle node selection
   const handleNodeClick = useCallback(
@@ -178,9 +180,12 @@ const WorkflowCanvas: React.FC = () => {
 
   // Test run workflow
   const handleTestRun = useCallback(() => {
-    toast.info('Test run feature coming soon!');
-    // TODO: Implement test run
-  }, []);
+    if (nodes.length === 0) {
+      toast.error('Add some nodes to test the workflow');
+      return;
+    }
+    setIsTestRunDialogOpen(true);
+  }, [nodes]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -324,6 +329,14 @@ const WorkflowCanvas: React.FC = () => {
             <Play className="h-4 w-4 mr-2" />
             Test Run
           </Button>
+
+          {/* Test Run Dialog */}
+          <TestRunDialog
+            nodes={nodes}
+            edges={edges}
+            open={isTestRunDialogOpen}
+            onOpenChange={setIsTestRunDialogOpen}
+          />
 
           {/* Save */}
           <Button size="sm" onClick={handleSave} disabled={!isDirty || isSaving} data-tour="workflow-save">

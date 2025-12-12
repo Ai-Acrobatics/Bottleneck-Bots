@@ -459,6 +459,59 @@ export const outboundMessages = pgTable("outbound_messages", {
 }));
 
 // ========================================
+// WEBHOOK DELIVERY LOGS
+// ========================================
+
+/**
+ * Webhook delivery logs
+ * Comprehensive logging for webhook delivery attempts with retry tracking
+ */
+export const webhookLogs = pgTable("webhook_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  webhookId: text("webhookId").notNull(), // References webhook ID from userPreferences
+  userId: integer("userId").references(() => users.id, { onDelete: "cascade" }).notNull(),
+
+  // Event details
+  event: varchar("event", { length: 100 }).notNull(), // Event type that triggered webhook
+
+  // Request details
+  url: text("url").notNull(), // Webhook endpoint URL
+  method: varchar("method", { length: 10 }).default("POST").notNull(), // HTTP method
+  requestHeaders: jsonb("requestHeaders"), // Request headers sent
+  requestBody: jsonb("requestBody"), // Payload sent to webhook
+
+  // Response details
+  responseStatus: integer("responseStatus"), // HTTP status code
+  responseBody: text("responseBody"), // Response body from webhook
+  responseTime: integer("responseTime"), // Response time in milliseconds
+
+  // Status and retry tracking
+  status: varchar("status", { length: 50 }).notNull(), // pending, success, failed, retrying, permanently_failed
+  attempts: integer("attempts").default(1).notNull(), // Number of delivery attempts
+  nextRetryAt: timestamp("nextRetryAt"), // When to retry next (null if not retrying)
+
+  // Error tracking
+  error: text("error"), // Error message if failed
+  errorCode: varchar("errorCode", { length: 100 }), // Error code for categorization
+
+  // Timestamps
+  createdAt: timestamp("createdAt").defaultNow().notNull(), // When webhook was triggered
+  completedAt: timestamp("completedAt"), // When delivery completed (success or permanent failure)
+}, (table) => ({
+  // Indexes for common queries
+  webhookIdIdx: index("webhook_logs_webhook_id_idx").on(table.webhookId),
+  userIdIdx: index("webhook_logs_user_id_idx").on(table.userId),
+  statusIdx: index("webhook_logs_status_idx").on(table.status),
+  eventIdx: index("webhook_logs_event_idx").on(table.event),
+  createdAtIdx: index("webhook_logs_created_at_idx").on(table.createdAt),
+  nextRetryAtIdx: index("webhook_logs_next_retry_at_idx").on(table.nextRetryAt),
+  // Composite indexes for common query patterns
+  userWebhookIdx: index("webhook_logs_user_webhook_idx").on(table.userId, table.webhookId),
+  statusRetryIdx: index("webhook_logs_status_retry_idx").on(table.status, table.nextRetryAt),
+  userStatusIdx: index("webhook_logs_user_status_idx").on(table.userId, table.status),
+}));
+
+// ========================================
 // TYPE EXPORTS
 // ========================================
 
@@ -479,3 +532,6 @@ export type InsertTaskExecution = typeof taskExecutions.$inferInsert;
 
 export type OutboundMessage = typeof outboundMessages.$inferSelect;
 export type InsertOutboundMessage = typeof outboundMessages.$inferInsert;
+
+export type WebhookLog = typeof webhookLogs.$inferSelect;
+export type InsertWebhookLog = typeof webhookLogs.$inferInsert;
