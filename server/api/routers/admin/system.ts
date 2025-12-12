@@ -12,9 +12,6 @@ import {
 } from "../../../../drizzle/schema";
 import { eq, and, desc, sql, count, gte } from "drizzle-orm";
 import os from "os";
-import OpenAI from "openai";
-import Anthropic from "@anthropic-ai/sdk";
-import { browserbaseSDK } from "../../../_core/browserbaseSDK";
 
 /**
  * Admin System Router
@@ -29,29 +26,6 @@ import { browserbaseSDK } from "../../../_core/browserbaseSDK";
  */
 
 // ========================================
-// TYPES
-// ========================================
-
-type ServiceStatus = {
-  status: "online" | "configured" | "offline" | "not_configured";
-  message: string;
-  responseTime?: number;
-};
-
-type ServiceStatusResult = {
-  status: "operational" | "degraded";
-  services: {
-    database: ServiceStatus;
-    browserbase: ServiceStatus;
-    openai: ServiceStatus;
-    anthropic: ServiceStatus;
-    stripe: ServiceStatus;
-    email: ServiceStatus;
-  };
-  timestamp: Date;
-};
-
-// ========================================
 // VALIDATION SCHEMAS
 // ========================================
 
@@ -63,185 +37,6 @@ const getRecentActivitySchema = z.object({
 // ========================================
 // HELPER FUNCTIONS
 // ========================================
-
-/**
- * Simple in-memory cache for service status (30 second TTL)
- */
-class ServiceStatusCache {
-  private cachedResult: ServiceStatusResult | null = null;
-  private cachedAt: number = 0;
-  private readonly TTL_MS = 30000; // 30 seconds
-
-  get(): ServiceStatusResult | null {
-    if (!this.cachedResult || Date.now() - this.cachedAt > this.TTL_MS) {
-      return null;
-    }
-    return this.cachedResult;
-  }
-
-  set(result: ServiceStatusResult): void {
-    this.cachedResult = result;
-    this.cachedAt = Date.now();
-  }
-}
-
-const serviceStatusCache = new ServiceStatusCache();
-
-/**
- * Check Browserbase API connectivity
- */
-async function checkBrowserbaseStatus(): Promise<ServiceStatus> {
-  if (!process.env.BROWSERBASE_API_KEY || !process.env.BROWSERBASE_PROJECT_ID) {
-    return {
-      status: "not_configured",
-      message: "API key or project ID not configured",
-    };
-  }
-
-  try {
-    const startTime = Date.now();
-
-    // Check if SDK is initialized
-    if (!browserbaseSDK.isInitialized()) {
-      return {
-        status: "offline",
-        message: "SDK initialization failed",
-      };
-    }
-
-    // Try to list sessions as a lightweight connectivity check
-    await browserbaseSDK.listSessions();
-    const responseTime = Date.now() - startTime;
-
-    return {
-      status: "configured",
-      message: `Connected (${responseTime}ms)`,
-      responseTime,
-    };
-  } catch (error) {
-    console.error("[Admin] Browserbase check failed:", error);
-    return {
-      status: "offline",
-      message: error instanceof Error ? error.message : "Connection failed",
-    };
-  }
-}
-
-/**
- * Check OpenAI API connectivity
- */
-async function checkOpenAIStatus(): Promise<ServiceStatus> {
-  if (!process.env.OPENAI_API_KEY) {
-    return {
-      status: "not_configured",
-      message: "API key not configured",
-    };
-  }
-
-  try {
-    const startTime = Date.now();
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    // Make a lightweight API call to check connectivity
-    // List models is a cheap operation that verifies the key works
-    await openai.models.list();
-    const responseTime = Date.now() - startTime;
-
-    return {
-      status: "configured",
-      message: `Connected (${responseTime}ms)`,
-      responseTime,
-    };
-  } catch (error) {
-    console.error("[Admin] OpenAI check failed:", error);
-    return {
-      status: "offline",
-      message: error instanceof Error ? error.message : "Connection failed",
-    };
-  }
-}
-
-/**
- * Check Anthropic API connectivity
- */
-async function checkAnthropicStatus(): Promise<ServiceStatus> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return {
-      status: "not_configured",
-      message: "API key not configured",
-    };
-  }
-
-  try {
-    const startTime = Date.now();
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-
-    // Make a minimal API call to verify connectivity
-    // Creating a very short completion is the lightest way to verify the key
-    await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 1,
-      messages: [{ role: "user", content: "ping" }],
-    });
-    const responseTime = Date.now() - startTime;
-
-    return {
-      status: "configured",
-      message: `Connected (${responseTime}ms)`,
-      responseTime,
-    };
-  } catch (error) {
-    console.error("[Admin] Anthropic check failed:", error);
-    return {
-      status: "offline",
-      message: error instanceof Error ? error.message : "Connection failed",
-    };
-  }
-}
-
-/**
- * Check Stripe API configuration
- * Note: Stripe is optional - we only check if API key is configured
- */
-async function checkStripeStatus(): Promise<ServiceStatus> {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return {
-      status: "not_configured",
-      message: "API key not configured",
-    };
-  }
-
-  // If key is configured, we assume it's valid
-  // Actual connectivity would require the stripe package to be installed
-  return {
-    status: "configured",
-    message: "API key configured",
-  };
-}
-
-/**
- * Check Email service configuration
- * Note: Resend doesn't provide a simple ping endpoint, so we just check if configured
- */
-async function checkEmailStatus(): Promise<ServiceStatus> {
-  if (!process.env.RESEND_API_KEY) {
-    return {
-      status: "not_configured",
-      message: "Resend API key not configured",
-    };
-  }
-
-  // For email, we only verify the key is configured
-  // We don't want to send test emails on every health check
-  return {
-    status: "configured",
-    message: "Resend API key configured",
-  };
-}
 
 /**
  * Get system memory information
@@ -660,72 +455,60 @@ export const systemRouter = router({
 
   /**
    * Get service status overview
-   *
-   * Performs actual connectivity tests for each configured service.
-   * Results are cached for 30 seconds to avoid excessive API calls.
    */
   getServiceStatus: adminProcedure
     .query(async () => {
       try {
-        // Use cached results if available (30 second TTL)
-        const cached = serviceStatusCache.get();
-        if (cached) {
-          return cached;
-        }
-
         const db = await getDb();
 
-        // Check database connection with response time
-        let databaseStatus: ServiceStatus;
+        // Check database connection
+        let databaseOnline = false;
         try {
           if (db) {
-            const startTime = Date.now();
             await db.select({ count: count() }).from(users).limit(1);
-            const responseTime = Date.now() - startTime;
-            databaseStatus = {
-              status: "online",
-              message: `Connected (${responseTime}ms)`,
-              responseTime,
-            };
-          } else {
-            databaseStatus = {
-              status: "offline",
-              message: "Database connection not available",
-            };
+            databaseOnline = true;
           }
         } catch (e) {
           console.error("[Admin] Database check failed:", e);
-          databaseStatus = {
-            status: "offline",
-            message: e instanceof Error ? e.message : "Connection failed",
-          };
         }
 
-        // Check each service with actual connectivity tests
-        // These run with proper error handling and timeouts
+        // Check environment variables for key services
         const services = {
-          database: databaseStatus,
-          browserbase: await checkBrowserbaseStatus(),
-          openai: await checkOpenAIStatus(),
-          anthropic: await checkAnthropicStatus(),
-          stripe: await checkStripeStatus(),
-          email: await checkEmailStatus(),
+          database: {
+            status: databaseOnline ? "online" : "offline",
+            message: databaseOnline ? "Connected" : "Connection failed",
+          },
+          browserbase: {
+            status: process.env.BROWSERBASE_API_KEY && process.env.BROWSERBASE_PROJECT_ID ? "configured" : "not_configured",
+            message: process.env.BROWSERBASE_API_KEY ? "API key configured" : "API key missing",
+          },
+          openai: {
+            status: process.env.OPENAI_API_KEY ? "configured" : "not_configured",
+            message: process.env.OPENAI_API_KEY ? "API key configured" : "API key missing",
+          },
+          anthropic: {
+            status: process.env.ANTHROPIC_API_KEY ? "configured" : "not_configured",
+            message: process.env.ANTHROPIC_API_KEY ? "API key configured" : "API key missing",
+          },
+          stripe: {
+            status: process.env.STRIPE_SECRET_KEY ? "configured" : "not_configured",
+            message: process.env.STRIPE_SECRET_KEY ? "API key configured" : "API key missing",
+          },
+          email: {
+            status: process.env.RESEND_API_KEY ? "configured" : "not_configured",
+            message: process.env.RESEND_API_KEY ? "Resend API key configured" : "Email service not configured",
+          },
         };
 
         // Calculate overall status
-        const criticalServicesOnline = databaseStatus.status === "online";
+        const criticalServicesOnline = databaseOnline;
         const overallStatus = criticalServicesOnline ? "operational" : "degraded";
 
-        const result: ServiceStatusResult = {
+        return {
           status: overallStatus,
           services,
           timestamp: new Date(),
         };
-
-        // Cache the result for 30 seconds
-        serviceStatusCache.set(result);
-
-        return result;
       } catch (error) {
         console.error("[Admin] Failed to get service status:", error);
         throw new TRPCError({

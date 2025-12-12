@@ -9,8 +9,7 @@ import {
   browserSessions,
   jobs,
 } from "../../../../drizzle/schema";
-import { auditLogs } from "../../../../drizzle/schema-admin";
-import { eq, and, desc, sql, count, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, sql, count, gte, lte } from "drizzle-orm";
 
 /**
  * Admin Audit Router
@@ -72,19 +71,6 @@ const getApiRequestLogsSchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
-const getAdminActionsSchema = z.object({
-  limit: z.number().int().min(1).max(100).default(50),
-  offset: z.number().int().min(0).default(0),
-  adminId: z.number().int().positive().optional(), // Filter by admin user
-  action: z.string().optional(), // Filter by action type (e.g., 'user.suspend', 'flag.toggle')
-  targetType: z.string().optional(), // Filter by target entity type
-  targetId: z.string().optional(), // Filter by specific target ID
-  search: z.string().optional(), // Search in action, entityType, or entityId
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("desc"),
-});
-
 // ========================================
 // HELPER TYPES
 // ========================================
@@ -123,57 +109,13 @@ export const auditRouter = router({
 
         const auditEntries: AuditEntry[] = [];
 
-        // Parse and validate date filters
-        let startDate: Date | null = null;
-        let endDate: Date | null = null;
-
-        if (input.startDate) {
-          startDate = new Date(input.startDate);
-          // Validate date is not invalid
-          if (isNaN(startDate.getTime())) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Invalid startDate format",
-            });
-          }
-        }
-
-        if (input.endDate) {
-          endDate = new Date(input.endDate);
-          // Validate date is not invalid
-          if (isNaN(endDate.getTime())) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Invalid endDate format",
-            });
-          }
-        }
-
-        // Validate date range logic
-        if (startDate && endDate && startDate > endDate) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "startDate cannot be after endDate",
-          });
-        }
+        // Parse date filters
+        const startDate = input.startDate ? new Date(input.startDate) : null;
+        const endDate = input.endDate ? new Date(input.endDate) : null;
 
         // Fetch different event types based on filter
         const shouldFetch = (type: string) =>
           input.eventType === "all" || input.eventType === type;
-
-        // PERFORMANCE NOTE: This approach fetches from multiple tables and merges results.
-        // For production scale (10k+ entries per table), consider:
-        // 1. Creating a dedicated audit_logs table with triggers/event sourcing
-        // 2. Using database views or materialized views
-        // 3. Implementing cursor-based pagination instead of offset
-        // Current approach works well for <50k total audit entries across all tables
-
-        // Calculate per-source limit when fetching all event types
-        // If filtering by specific type, use full limit
-        const eventTypesToFetch = input.eventType === "all"
-          ? ["api_request", "workflow", "browser_session", "job", "user_signin"]
-          : [input.eventType];
-        const perSourceLimit = Math.ceil(input.limit * 1.5 / eventTypesToFetch.length); // Fetch 50% extra to ensure we have enough after merge
 
         // 1. API Request Logs
         if (shouldFetch("api_request")) {
@@ -200,7 +142,7 @@ export const auditRouter = router({
               .leftJoin(users, eq(apiRequestLogs.userId, users.id))
               .where(conditions.length > 0 ? and(...conditions) : undefined)
               .orderBy(input.sortOrder === "asc" ? apiRequestLogs.createdAt : desc(apiRequestLogs.createdAt))
-              .limit(perSourceLimit);
+              .limit(Math.floor(input.limit / 4)); // Distribute limit across sources
 
             apiLogs.forEach(log => {
               auditEntries.push({
@@ -250,7 +192,7 @@ export const auditRouter = router({
             .leftJoin(users, eq(workflowExecutions.userId, users.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? workflowExecutions.createdAt : desc(workflowExecutions.createdAt))
-            .limit(perSourceLimit);
+            .limit(Math.floor(input.limit / 4));
 
           workflows.forEach(workflow => {
             auditEntries.push({
@@ -295,7 +237,7 @@ export const auditRouter = router({
             .leftJoin(users, eq(browserSessions.userId, users.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? browserSessions.createdAt : desc(browserSessions.createdAt))
-            .limit(perSourceLimit);
+            .limit(Math.floor(input.limit / 4));
 
           sessions.forEach(session => {
             auditEntries.push({
@@ -332,7 +274,7 @@ export const auditRouter = router({
             .from(jobs)
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? jobs.createdAt : desc(jobs.createdAt))
-            .limit(perSourceLimit);
+            .limit(Math.floor(input.limit / 4));
 
           jobsList.forEach(job => {
             auditEntries.push({
@@ -369,7 +311,7 @@ export const auditRouter = router({
             .from(users)
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? users.lastSignedIn : desc(users.lastSignedIn))
-            .limit(perSourceLimit);
+            .limit(Math.floor(input.limit / 4));
 
           signins.forEach(signin => {
             auditEntries.push({
@@ -393,19 +335,16 @@ export const auditRouter = router({
           return input.sortOrder === "asc" ? timeA - timeB : timeB - timeA;
         });
 
-        // CRITICAL FIX: Get total count BEFORE pagination
-        const totalEntries = auditEntries.length;
-
         // Apply pagination
         const paginatedEntries = auditEntries.slice(input.offset, input.offset + input.limit);
 
         return {
           entries: paginatedEntries,
           pagination: {
-            total: totalEntries,
+            total: auditEntries.length,
             limit: input.limit,
             offset: input.offset,
-            hasMore: input.offset + input.limit < totalEntries,
+            hasMore: input.offset + input.limit < auditEntries.length,
           },
           filters: {
             eventType: input.eventType,
@@ -816,176 +755,6 @@ export const auditRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to get audit statistics",
-          cause: error,
-        });
-      }
-    }),
-
-  /**
-   * Get admin actions from audit logs
-   * Provides detailed tracking of all administrative actions
-   */
-  getAdminActions: adminProcedure
-    .input(getAdminActionsSchema)
-    .query(async ({ input }) => {
-      try {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
-        // Build WHERE conditions
-        const conditions = [];
-
-        // Filter by admin user
-        if (input.adminId) {
-          conditions.push(eq(auditLogs.userId, input.adminId));
-        }
-
-        // Filter by action
-        if (input.action) {
-          conditions.push(eq(auditLogs.action, input.action));
-        }
-
-        // Filter by target type
-        if (input.targetType) {
-          conditions.push(eq(auditLogs.entityType, input.targetType));
-        }
-
-        // Filter by target ID
-        if (input.targetId) {
-          conditions.push(eq(auditLogs.entityId, input.targetId));
-        }
-
-        // Search across action, entityType, or entityId
-        if (input.search) {
-          conditions.push(
-            or(
-              ilike(auditLogs.action, `%${input.search}%`),
-              ilike(auditLogs.entityType, `%${input.search}%`),
-              ilike(auditLogs.entityId, `%${input.search}%`)
-            )
-          );
-        }
-
-        // Date range filters
-        if (input.startDate) {
-          const startDate = new Date(input.startDate);
-          if (isNaN(startDate.getTime())) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Invalid startDate format",
-            });
-          }
-          conditions.push(gte(auditLogs.createdAt, startDate));
-        }
-
-        if (input.endDate) {
-          const endDate = new Date(input.endDate);
-          if (isNaN(endDate.getTime())) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Invalid endDate format",
-            });
-          }
-          conditions.push(lte(auditLogs.createdAt, endDate));
-        }
-
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-        // Get total count
-        const [totalResult] = await db
-          .select({ count: count() })
-          .from(auditLogs)
-          .where(whereClause);
-
-        const total = totalResult?.count || 0;
-
-        // Get paginated audit logs with admin user details
-        const logs = await db
-          .select({
-            id: auditLogs.id,
-            userId: auditLogs.userId,
-            action: auditLogs.action,
-            entityType: auditLogs.entityType,
-            entityId: auditLogs.entityId,
-            oldValues: auditLogs.oldValues,
-            newValues: auditLogs.newValues,
-            ipAddress: auditLogs.ipAddress,
-            userAgent: auditLogs.userAgent,
-            createdAt: auditLogs.createdAt,
-            adminName: users.name,
-            adminEmail: users.email,
-            adminRole: users.role,
-          })
-          .from(auditLogs)
-          .leftJoin(users, eq(auditLogs.userId, users.id))
-          .where(whereClause)
-          .orderBy(input.sortOrder === "asc" ? auditLogs.createdAt : desc(auditLogs.createdAt))
-          .limit(input.limit)
-          .offset(input.offset);
-
-        // Get action type breakdown for the current filters
-        const actionBreakdown = await db
-          .select({
-            action: auditLogs.action,
-            count: count(),
-          })
-          .from(auditLogs)
-          .where(whereClause)
-          .groupBy(auditLogs.action)
-          .orderBy(desc(count()))
-          .limit(10);
-
-        // Get entity type breakdown for the current filters
-        const entityBreakdown = await db
-          .select({
-            entityType: auditLogs.entityType,
-            count: count(),
-          })
-          .from(auditLogs)
-          .where(whereClause)
-          .groupBy(auditLogs.entityType)
-          .orderBy(desc(count()));
-
-        return {
-          logs,
-          pagination: {
-            total,
-            limit: input.limit,
-            offset: input.offset,
-            hasMore: input.offset + input.limit < total,
-          },
-          filters: {
-            adminId: input.adminId,
-            action: input.action,
-            targetType: input.targetType,
-            targetId: input.targetId,
-            search: input.search,
-            startDate: input.startDate,
-            endDate: input.endDate,
-          },
-          breakdown: {
-            byAction: actionBreakdown.map(item => ({
-              action: item.action,
-              count: item.count,
-            })),
-            byEntityType: entityBreakdown.map(item => ({
-              entityType: item.entityType,
-              count: item.count,
-            })),
-          },
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-
-        console.error("[Admin] Failed to get admin actions:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to get admin actions",
           cause: error,
         });
       }
