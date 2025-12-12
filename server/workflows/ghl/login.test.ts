@@ -28,6 +28,17 @@ describe("GHL Login Workflow", () => {
       url: vi.fn().mockReturnValue("https://app.gohighlevel.com/"),
       content: vi.fn().mockResolvedValue(""),
       title: vi.fn().mockResolvedValue("GoHighLevel"),
+      locator: vi.fn((selector) => ({
+        fill: vi.fn().mockResolvedValue(undefined),
+        click: vi.fn().mockResolvedValue(undefined),
+        waitFor: vi.fn().mockResolvedValue(undefined),
+        textContent: vi.fn().mockResolvedValue(""),
+        isVisible: vi.fn().mockResolvedValue(true),
+        first: vi.fn(function() { return this; }),
+        last: vi.fn(function() { return this; }),
+        nth: vi.fn(function() { return this; }),
+        count: vi.fn().mockResolvedValue(1),
+      })),
     };
 
     // Setup mock Stagehand

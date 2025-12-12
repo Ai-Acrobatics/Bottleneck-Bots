@@ -10,11 +10,11 @@ import { z } from "zod";
 import type { Request, Response } from "express";
 
 // Mock dependencies
-vi.mock("@/server/db", () => ({
+vi.mock("../../../db", () => ({
   getDb: vi.fn(),
 }));
 
-vi.mock("@/server/workflows/ghl", () => ({
+vi.mock("../../../workflows/ghl", () => ({
   ghlLogin: vi.fn(),
   extractContacts: vi.fn(),
   extractWorkflows: vi.fn(),
@@ -32,7 +32,7 @@ describe("Webhooks REST API Routes", () => {
   let mockDb: any;
   let mockGHLFunctions: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
     // Setup mock request
@@ -63,16 +63,19 @@ describe("Webhooks REST API Routes", () => {
       }),
     };
 
-    const { getDb } = require("@/server/db");
-    getDb.mockResolvedValue(mockDb);
+    // Import mocked modules
+    const dbModule = await import("../../../db");
+    const ghlModule = await import("../../../workflows/ghl");
+
+    vi.mocked(dbModule.getDb).mockResolvedValue(mockDb);
 
     // Setup mock GHL functions
     mockGHLFunctions = {
-      ghlLogin: require("@/server/workflows/ghl").ghlLogin,
-      extractContacts: require("@/server/workflows/ghl").extractContacts,
-      extractWorkflows: require("@/server/workflows/ghl").extractWorkflows,
-      extractPipelines: require("@/server/workflows/ghl").extractPipelines,
-      extractDashboardMetrics: require("@/server/workflows/ghl").extractDashboardMetrics,
+      ghlLogin: vi.mocked(ghlModule.ghlLogin),
+      extractContacts: vi.mocked(ghlModule.extractContacts),
+      extractWorkflows: vi.mocked(ghlModule.extractWorkflows),
+      extractPipelines: vi.mocked(ghlModule.extractPipelines),
+      extractDashboardMetrics: vi.mocked(ghlModule.extractDashboardMetrics),
     };
 
     // Set environment

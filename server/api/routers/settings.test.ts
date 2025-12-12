@@ -18,7 +18,7 @@ import {
 import { createTestDb } from "@/__tests__/helpers/test-db";
 
 // Mock dependencies
-vi.mock("@/server/db");
+vi.mock("../../db");
 vi.mock("crypto");
 
 describe("Settings Router", () => {
@@ -57,7 +57,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -74,7 +74,7 @@ describe("Settings Router", () => {
           selectResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -86,7 +86,7 @@ describe("Settings Router", () => {
       });
 
       it("should handle database error", async () => {
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(null)
         );
@@ -104,7 +104,7 @@ describe("Settings Router", () => {
           insertResponse: [{ id: 1, userId: 1, apiKeys: "{}" }],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -131,7 +131,7 @@ describe("Settings Router", () => {
           updateResponse: [existingPrefs],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -147,7 +147,7 @@ describe("Settings Router", () => {
 
       it("should validate service enum", async () => {
         const db = createTestDb();
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -168,7 +168,7 @@ describe("Settings Router", () => {
           insertResponse: [{ id: 1 }],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -196,7 +196,7 @@ describe("Settings Router", () => {
           updateResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -212,7 +212,7 @@ describe("Settings Router", () => {
           selectResponse: [{ userId: 1, apiKeys: "{}" }],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -237,7 +237,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -253,7 +253,7 @@ describe("Settings Router", () => {
           selectResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -287,7 +287,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -315,7 +315,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -381,7 +381,7 @@ describe("Settings Router", () => {
           insertResponse: [createMockIntegration()],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -419,7 +419,7 @@ describe("Settings Router", () => {
           updateResponse: [existingIntegration],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -447,7 +447,7 @@ describe("Settings Router", () => {
         global.fetch = mockFetchFn as any;
 
         const db = createTestDb();
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -486,7 +486,7 @@ describe("Settings Router", () => {
           updateResponse: [integration],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -508,7 +508,7 @@ describe("Settings Router", () => {
           selectResponse: [integration],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -525,7 +525,7 @@ describe("Settings Router", () => {
           selectResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -547,7 +547,7 @@ describe("Settings Router", () => {
           updateResponse: [{ ...integration, isActive: "false" }],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -565,7 +565,7 @@ describe("Settings Router", () => {
           selectResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -586,7 +586,7 @@ describe("Settings Router", () => {
           selectResponse: [integration],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -609,7 +609,7 @@ describe("Settings Router", () => {
           selectResponse: [expiredIntegration],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -641,7 +641,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -659,7 +659,7 @@ describe("Settings Router", () => {
           selectResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -678,7 +678,7 @@ describe("Settings Router", () => {
           updateResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -708,7 +708,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -730,7 +730,7 @@ describe("Settings Router", () => {
           insertResponse: [],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -758,7 +758,7 @@ describe("Settings Router", () => {
           updateResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -778,7 +778,7 @@ describe("Settings Router", () => {
           selectResponse: [{ defaultWorkflowSettings: JSON.stringify({ webhooks: [] }) }],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -806,7 +806,7 @@ describe("Settings Router", () => {
           updateResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -831,7 +831,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -864,7 +864,7 @@ describe("Settings Router", () => {
           selectResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -899,7 +899,7 @@ describe("Settings Router", () => {
           updateResponse: [preferences],
         });
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -938,7 +938,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -962,7 +962,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -1007,7 +1007,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -1046,7 +1046,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
@@ -1079,7 +1079,7 @@ describe("Settings Router", () => {
           })),
         })) as any;
 
-        const dbModule = await import("@/server/db");
+        const dbModule = await import("../../db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
           Promise.resolve(db as any)
         );
