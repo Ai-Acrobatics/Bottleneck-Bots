@@ -721,7 +721,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
         </div>
       </section>
 
-      {/* Pricing Section - 3-Tier Structure */}
+      {/* Pricing Section - 4-Tier Structure */}
       <section id="pricing" className="py-12 sm:py-24 bg-gray-50 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>
 
@@ -740,28 +740,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             </p>
           </div>
 
-          {/* 3-Tier Pricing Grid */}
-          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 sm:gap-8 mb-12">
+          {/* 4-Tier Pricing Grid */}
+          <div className="max-w-7xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
 
             {/* Starter Tier */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="text-center mb-6">
                 <div className="inline-block bg-gray-100 text-gray-700 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide mb-4">
                   Starter
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">For Growing Agencies</h3>
-                <p className="text-sm text-gray-600 mb-4">5-15 GHL sub-accounts</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">For Growing Agencies</h3>
+                <p className="text-sm text-gray-600 mb-4">2-3 concurrent browsers</p>
                 <div className="mb-2">
-                  <span className="text-3xl sm:text-4xl font-black text-gray-900">$244</span>
+                  <span className="text-3xl sm:text-4xl font-black text-gray-900">$997</span>
                   <span className="text-lg text-gray-600">/mo</span>
                 </div>
-                <p className="text-xs text-gray-500">per client • billed monthly</p>
+                <p className="text-xs text-gray-500">$997 one-time setup fee</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">or $274/week (+10%)</p>
               </div>
 
               <div className="space-y-3 mb-6">
                 {[
                   "AI Email & Voice Agents",
-                  "Basic Browser Automation",
+                  "2-3 Concurrent Browsers",
                   "500 Monthly Credits",
                   "Operations Dashboard",
                   "Email Support (< 24hr)",
@@ -780,12 +781,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 variant="outline"
                 className="w-full rounded-full h-12 font-bold border-2 border-gray-300 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
               >
-                Start Free Trial
+                Get Started
               </Button>
             </div>
 
             {/* Growth Tier - Most Popular */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border-2 border-emerald-500 shadow-xl relative transform md:-translate-y-4">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 border-2 border-emerald-500 shadow-xl relative transform lg:-translate-y-4">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                 <span className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wide shadow-lg">
                   Most Popular
@@ -796,27 +797,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <div className="inline-block bg-emerald-100 text-emerald-700 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide mb-4">
                   Growth
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">For Scaling Agencies</h3>
-                <p className="text-sm text-gray-600 mb-4">20-50 GHL sub-accounts</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">For Scaling Agencies</h3>
+                <p className="text-sm text-gray-600 mb-4">5 concurrent browsers</p>
                 <div className="mb-2">
-                  <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">$189</span>
+                  <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">$1,697</span>
                   <span className="text-lg text-gray-600">/mo</span>
                 </div>
-                <p className="text-xs text-gray-500">per client • billed monthly</p>
-                <p className="text-xs text-emerald-600 font-semibold mt-1">Save 22% vs Starter</p>
+                <p className="text-xs text-gray-500">$697 one-time setup fee</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">or $467/week (+10%)</p>
               </div>
 
               <div className="space-y-3 mb-6">
                 {[
                   "Everything in Starter, plus:",
-                  "Advanced Browser Automation",
+                  "5 Concurrent Browsers",
                   "1,500 Monthly Credits",
                   "AI Ad Manager & Optimizer",
                   "Multi-Tab Workflow Builder",
                   "Priority Support (< 2hr)",
                   "Session Replay & Debugging",
-                  "Zapier & Make Integration",
-                  "Weekly Office Hours"
+                  "Zapier & Make Integration"
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -830,37 +830,79 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 className="w-full bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white rounded-full h-12 font-black shadow-lg hover:shadow-xl transition-shadow"
               >
                 <Rocket className="w-4 h-4 mr-2" />
-                Start Free Trial
+                Get Started
               </Button>
             </div>
 
-            {/* Enterprise Tier */}
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
+            {/* Professional Tier */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
               <div className="text-center mb-6">
-                <div className="inline-block bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide mb-4">
-                  Enterprise
+                <div className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide mb-4">
+                  Professional
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">For Industry Leaders</h3>
-                <p className="text-sm text-gray-600 mb-4">100+ GHL sub-accounts</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">For Established Agencies</h3>
+                <p className="text-sm text-gray-600 mb-4">7-8 concurrent browsers</p>
                 <div className="mb-2">
-                  <span className="text-3xl sm:text-4xl font-black text-gray-900">$104</span>
+                  <span className="text-3xl sm:text-4xl font-black text-gray-900">$3,197</span>
                   <span className="text-lg text-gray-600">/mo</span>
                 </div>
-                <p className="text-xs text-gray-500">per client • billed monthly</p>
-                <p className="text-xs text-amber-600 font-semibold mt-1">Save 57% vs Starter</p>
+                <p className="text-xs text-gray-500">$497 one-time setup fee</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">or $879/week (+10%)</p>
               </div>
 
               <div className="space-y-3 mb-6">
                 {[
                   "Everything in Growth, plus:",
-                  "Unlimited AI Agents",
-                  "5,000+ Monthly Credits",
-                  "White-Label Branding",
+                  "7-8 Concurrent Browsers",
+                  "3,000 Monthly Credits",
+                  "White-Label Option",
                   "Dedicated Account Manager",
-                  "Priority Support (< 30min)",
-                  "Custom Integrations",
+                  "Priority Support (< 1hr)",
+                  "Weekly Strategy Calls",
+                  "Custom Integrations"
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    <span className={i === 0 ? "font-semibold text-blue-700" : ""}>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                onClick={onLogin}
+                variant="outline"
+                className="w-full rounded-full h-12 font-bold border-2 border-blue-400 hover:border-blue-500 hover:bg-blue-50 text-blue-700 transition-colors"
+              >
+                Get Started
+              </Button>
+            </div>
+
+            {/* Enterprise Tier */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-6 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
+              <div className="text-center mb-6">
+                <div className="inline-block bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-700 text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide mb-4">
+                  Enterprise
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">For Industry Leaders</h3>
+                <p className="text-sm text-gray-600 mb-4">15+ concurrent browsers</p>
+                <div className="mb-2">
+                  <span className="text-3xl sm:text-4xl font-black text-gray-900">$4,997</span>
+                  <span className="text-lg text-gray-600">/mo</span>
+                </div>
+                <p className="text-xs text-gray-500">$297 one-time setup fee</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">or $1,374/week (+10%)</p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                {[
+                  "Everything in Professional, plus:",
+                  "15+ Concurrent Browsers",
+                  "5,000+ Monthly Credits",
+                  "Full White-Label Branding",
+                  "VIP Support (< 30min)",
                   "SLA & Uptime Guarantee",
-                  "Enterprise Security"
+                  "Enterprise Security",
+                  "Custom Development"
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle2 className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -878,6 +920,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 Contact Sales
               </Button>
             </div>
+          </div>
+
+          {/* Weekly Payment Note */}
+          <div className="max-w-3xl mx-auto text-center mb-8">
+            <p className="text-sm text-gray-600 bg-emerald-50 border border-emerald-200 rounded-xl px-6 py-3">
+              <span className="font-bold text-emerald-700">Cash flow tight?</span> We offer weekly payments at just 10% above monthly rates. Same great service, easier on your budget.
+            </p>
           </div>
 
           {/* Credit Packages Section */}
@@ -912,7 +961,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <Zap className="w-5 h-5 text-emerald-500" />
-                <span className="font-medium">No Credit Card for Trial</span>
+                <span className="font-medium">Free Demo Available</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <Clock className="w-5 h-5 text-emerald-500" />
@@ -933,12 +982,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               </div>
               <div className="bg-white/80 p-4 rounded-xl">
                 <div className="text-emerald-700 font-bold text-xs sm:text-sm mb-2">With GHL Agency AI</div>
-                <div className="text-2xl sm:text-3xl font-black text-emerald-600">$6,615</div>
-                <div className="text-xs text-gray-500">Growth tier × 35 clients × 12</div>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-600">$20,364</div>
+                <div className="text-xs text-gray-500">Growth tier × 12 months</div>
               </div>
               <div className="bg-white/80 p-4 rounded-xl">
                 <div className="text-amber-700 font-bold text-xs sm:text-sm mb-2">Your Annual Savings</div>
-                <div className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-green-600">$137,385</div>
+                <div className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-green-600">$123,636</div>
                 <div className="text-xs text-gray-500">+ your time back</div>
               </div>
             </div>
