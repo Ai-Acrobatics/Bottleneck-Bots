@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../../../db";
 import { users, userProfiles, sessions } from "../../../../drizzle/schema";
 import { eq, ilike, or, and, desc, sql, count } from "drizzle-orm";
+import { logAdminAction, getIpAddress, getUserAgent } from "../../../utils/auditLogger";
 
 /**
  * Admin Users Router
@@ -252,7 +253,7 @@ export const usersRouter = router({
    */
   update: adminProcedure
     .input(updateUserSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const db = await getDb();
         if (!db) {
@@ -304,12 +305,44 @@ export const usersRouter = router({
           updateData.onboardingCompleted = input.onboardingCompleted;
         }
 
+        // Capture old values for audit log
+        const oldValues: Record<string, any> = {};
+        const newValues: Record<string, any> = {};
+        if (input.name !== undefined && input.name !== existingUser.name) {
+          oldValues.name = existingUser.name;
+          newValues.name = input.name;
+        }
+        if (input.email !== undefined && input.email !== existingUser.email) {
+          oldValues.email = existingUser.email;
+          newValues.email = input.email;
+        }
+        if (input.role !== undefined && input.role !== existingUser.role) {
+          oldValues.role = existingUser.role;
+          newValues.role = input.role;
+        }
+        if (input.onboardingCompleted !== undefined && input.onboardingCompleted !== existingUser.onboardingCompleted) {
+          oldValues.onboardingCompleted = existingUser.onboardingCompleted;
+          newValues.onboardingCompleted = input.onboardingCompleted;
+        }
+
         // Update user
         const [updatedUser] = await db
           .update(users)
           .set(updateData)
           .where(eq(users.id, input.userId))
           .returning();
+
+        // Log admin action
+        await logAdminAction({
+          adminId: ctx.user.id,
+          action: "user.update",
+          targetType: "user",
+          targetId: input.userId,
+          oldValue: oldValues,
+          newValue: newValues,
+          ipAddress: getIpAddress(ctx.req),
+          userAgent: getUserAgent(ctx.req),
+        });
 
         // Remove password from response
         const { password, ...userWithoutPassword } = updatedUser;
@@ -378,10 +411,11 @@ export const usersRouter = router({
         }
 
         // Update user to set suspended status
+        const suspendedAt = new Date();
         await db
           .update(users)
           .set({
-            suspendedAt: new Date(),
+            suspendedAt,
             suspensionReason: input.reason || null,
             updatedAt: new Date(),
           })
@@ -391,6 +425,28 @@ export const usersRouter = router({
         await db
           .delete(sessions)
           .where(eq(sessions.userId, input.userId));
+
+        // Log admin action
+        await logAdminAction({
+          adminId: ctx.user.id,
+          action: "user.suspend",
+          targetType: "user",
+          targetId: input.userId,
+          oldValue: {
+            suspendedAt: user.suspendedAt,
+            suspensionReason: user.suspensionReason,
+          },
+          newValue: {
+            suspendedAt,
+            suspensionReason: input.reason || null,
+          },
+          ipAddress: getIpAddress(ctx.req),
+          userAgent: getUserAgent(ctx.req),
+          metadata: {
+            reason: input.reason || "No reason provided",
+            sessionsTerminated: true,
+          },
+        });
 
         console.log(`[Admin] User ${input.userId} suspended by admin ${ctx.user.id}. Reason: ${input.reason || "No reason provided"}`);
 
@@ -459,6 +515,24 @@ export const usersRouter = router({
           })
           .where(eq(users.id, input.userId));
 
+        // Log admin action
+        await logAdminAction({
+          adminId: ctx.user.id,
+          action: "user.unsuspend",
+          targetType: "user",
+          targetId: input.userId,
+          oldValue: {
+            suspendedAt: user.suspendedAt,
+            suspensionReason: user.suspensionReason,
+          },
+          newValue: {
+            suspendedAt: null,
+            suspensionReason: null,
+          },
+          ipAddress: getIpAddress(ctx.req),
+          userAgent: getUserAgent(ctx.req),
+        });
+
         console.log(`[Admin] User ${input.userId} unsuspended by admin ${ctx.user.id}`);
 
         return {
@@ -524,6 +598,18 @@ export const usersRouter = router({
           })
           .where(eq(users.id, input.userId))
           .returning();
+
+        // Log admin action
+        await logAdminAction({
+          adminId: ctx.user.id,
+          action: "user.updateRole",
+          targetType: "user",
+          targetId: input.userId,
+          oldValue: { role: user.role },
+          newValue: { role: input.role },
+          ipAddress: getIpAddress(ctx.req),
+          userAgent: getUserAgent(ctx.req),
+        });
 
         console.log(`[Admin] User ${input.userId} role changed to ${input.role} by admin ${ctx.user.id}`);
 

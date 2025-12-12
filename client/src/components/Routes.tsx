@@ -18,6 +18,7 @@ import CreditPurchase from '@/pages/CreditPurchase';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { UserManagement } from '@/pages/admin/UserManagement';
 import { SystemHealth } from '@/pages/admin/SystemHealth';
+import { SecurityEvents } from '@/pages/admin/SecurityEvents';
 import { AuditLog } from '@/pages/admin/AuditLog';
 import { ConfigCenter } from '@/pages/admin/ConfigCenter';
 import DashboardLayout from './DashboardLayout';
@@ -49,6 +50,7 @@ export function Routes() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />
           <Route path="/admin/system" component={SystemHealth} />
+          <Route path="/admin/security" component={SecurityEvents} />
           <Route path="/admin/audit" component={AuditLog} />
           <Route path="/admin/config" component={ConfigCenter} />
 {/* Team management route - redirects to settings for now */}

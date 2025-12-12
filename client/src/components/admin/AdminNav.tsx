@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, Users, Settings, FileText, Activity, ToggleLeft } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, FileText, Activity, ToggleLeft, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -24,6 +24,11 @@ const navItems: NavItem[] = [
     label: 'System Health',
     href: '/admin/system',
     icon: Activity,
+  },
+  {
+    label: 'Security Events',
+    href: '/admin/security',
+    icon: Shield,
   },
   {
     label: 'Audit Log',
