@@ -242,18 +242,24 @@ export const ConfigCenter: React.FC = () => {
   };
 
   const handleSaveFlag = () => {
+    // Validate name is not just whitespace
+    if (!newFlag.name.trim()) {
+      toast.error('Feature flag name cannot be empty');
+      return;
+    }
+
     if (editingFlag) {
       updateFlagMutation.mutate({
         id: editingFlag.id,
-        name: newFlag.name,
-        description: newFlag.description || undefined,
+        name: newFlag.name.trim(),
+        description: newFlag.description?.trim() || undefined,
         enabled: newFlag.enabled,
         rolloutPercentage: newFlag.rolloutPercentage,
       });
     } else {
       createFlagMutation.mutate({
-        name: newFlag.name,
-        description: newFlag.description || undefined,
+        name: newFlag.name.trim(),
+        description: newFlag.description?.trim() || undefined,
         enabled: newFlag.enabled,
         rolloutPercentage: newFlag.rolloutPercentage,
       });
@@ -279,9 +285,14 @@ export const ConfigCenter: React.FC = () => {
     deleteFlagMutation.mutate({ id });
   };
 
-  const handleCopyFlagKey = (key: string) => {
-    navigator.clipboard.writeText(key);
-    toast.success('Flag key copied to clipboard');
+  const handleCopyFlagKey = async (key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      toast.success('Flag key copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   // Handlers - System Config
@@ -326,30 +337,56 @@ export const ConfigCenter: React.FC = () => {
   };
 
   const handleSaveConfig = () => {
+    // Validate key is not just whitespace
+    if (!newConfig.key.trim()) {
+      toast.error('Configuration key cannot be empty');
+      return;
+    }
+
     // Parse value based on type
     let parsedValue: any = newConfig.value;
 
     try {
       if (newConfig.type === 'json') {
+        if (!newConfig.value.trim()) {
+          toast.error('JSON value cannot be empty');
+          return;
+        }
         parsedValue = JSON.parse(newConfig.value);
       } else if (newConfig.type === 'number') {
+        if (!newConfig.value.trim()) {
+          toast.error('Number value cannot be empty');
+          return;
+        }
         parsedValue = Number(newConfig.value);
         if (isNaN(parsedValue)) {
           toast.error('Invalid number format');
           return;
         }
       } else if (newConfig.type === 'boolean') {
-        parsedValue = newConfig.value === 'true';
+        const normalizedValue = newConfig.value.trim().toLowerCase();
+        if (normalizedValue !== 'true' && normalizedValue !== 'false') {
+          toast.error('Boolean value must be "true" or "false"');
+          return;
+        }
+        parsedValue = normalizedValue === 'true';
+      } else {
+        // String type - just check not empty
+        if (!newConfig.value.trim()) {
+          toast.error('String value cannot be empty');
+          return;
+        }
       }
     } catch (e) {
-      toast.error('Invalid value format');
+      const errorMessage = e instanceof Error ? e.message : 'Invalid value format';
+      toast.error(`Invalid JSON: ${errorMessage}`);
       return;
     }
 
     upsertConfigMutation.mutate({
-      key: newConfig.key,
+      key: newConfig.key.trim(),
       value: parsedValue,
-      description: newConfig.description || undefined,
+      description: newConfig.description?.trim() || undefined,
     });
   };
 

@@ -109,13 +109,57 @@ export const auditRouter = router({
 
         const auditEntries: AuditEntry[] = [];
 
-        // Parse date filters
-        const startDate = input.startDate ? new Date(input.startDate) : null;
-        const endDate = input.endDate ? new Date(input.endDate) : null;
+        // Parse and validate date filters
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+
+        if (input.startDate) {
+          startDate = new Date(input.startDate);
+          // Validate date is not invalid
+          if (isNaN(startDate.getTime())) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Invalid startDate format",
+            });
+          }
+        }
+
+        if (input.endDate) {
+          endDate = new Date(input.endDate);
+          // Validate date is not invalid
+          if (isNaN(endDate.getTime())) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Invalid endDate format",
+            });
+          }
+        }
+
+        // Validate date range logic
+        if (startDate && endDate && startDate > endDate) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "startDate cannot be after endDate",
+          });
+        }
 
         // Fetch different event types based on filter
         const shouldFetch = (type: string) =>
           input.eventType === "all" || input.eventType === type;
+
+        // PERFORMANCE NOTE: This approach fetches from multiple tables and merges results.
+        // For production scale (10k+ entries per table), consider:
+        // 1. Creating a dedicated audit_logs table with triggers/event sourcing
+        // 2. Using database views or materialized views
+        // 3. Implementing cursor-based pagination instead of offset
+        // Current approach works well for <50k total audit entries across all tables
+
+        // Calculate per-source limit when fetching all event types
+        // If filtering by specific type, use full limit
+        const eventTypesToFetch = input.eventType === "all"
+          ? ["api_request", "workflow", "browser_session", "job", "user_signin"]
+          : [input.eventType];
+        const perSourceLimit = Math.ceil(input.limit * 1.5 / eventTypesToFetch.length); // Fetch 50% extra to ensure we have enough after merge
 
         // 1. API Request Logs
         if (shouldFetch("api_request")) {
@@ -142,7 +186,7 @@ export const auditRouter = router({
               .leftJoin(users, eq(apiRequestLogs.userId, users.id))
               .where(conditions.length > 0 ? and(...conditions) : undefined)
               .orderBy(input.sortOrder === "asc" ? apiRequestLogs.createdAt : desc(apiRequestLogs.createdAt))
-              .limit(Math.floor(input.limit / 4)); // Distribute limit across sources
+              .limit(perSourceLimit);
 
             apiLogs.forEach(log => {
               auditEntries.push({
@@ -192,7 +236,7 @@ export const auditRouter = router({
             .leftJoin(users, eq(workflowExecutions.userId, users.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? workflowExecutions.createdAt : desc(workflowExecutions.createdAt))
-            .limit(Math.floor(input.limit / 4));
+            .limit(perSourceLimit);
 
           workflows.forEach(workflow => {
             auditEntries.push({
@@ -237,7 +281,7 @@ export const auditRouter = router({
             .leftJoin(users, eq(browserSessions.userId, users.id))
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? browserSessions.createdAt : desc(browserSessions.createdAt))
-            .limit(Math.floor(input.limit / 4));
+            .limit(perSourceLimit);
 
           sessions.forEach(session => {
             auditEntries.push({
@@ -274,7 +318,7 @@ export const auditRouter = router({
             .from(jobs)
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? jobs.createdAt : desc(jobs.createdAt))
-            .limit(Math.floor(input.limit / 4));
+            .limit(perSourceLimit);
 
           jobsList.forEach(job => {
             auditEntries.push({
@@ -311,7 +355,7 @@ export const auditRouter = router({
             .from(users)
             .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(input.sortOrder === "asc" ? users.lastSignedIn : desc(users.lastSignedIn))
-            .limit(Math.floor(input.limit / 4));
+            .limit(perSourceLimit);
 
           signins.forEach(signin => {
             auditEntries.push({
@@ -335,16 +379,19 @@ export const auditRouter = router({
           return input.sortOrder === "asc" ? timeA - timeB : timeB - timeA;
         });
 
+        // CRITICAL FIX: Get total count BEFORE pagination
+        const totalEntries = auditEntries.length;
+
         // Apply pagination
         const paginatedEntries = auditEntries.slice(input.offset, input.offset + input.limit);
 
         return {
           entries: paginatedEntries,
           pagination: {
-            total: auditEntries.length,
+            total: totalEntries,
             limit: input.limit,
             offset: input.offset,
-            hasMore: input.offset + input.limit < auditEntries.length,
+            hasMore: input.offset + input.limit < totalEntries,
           },
           filters: {
             eventType: input.eventType,

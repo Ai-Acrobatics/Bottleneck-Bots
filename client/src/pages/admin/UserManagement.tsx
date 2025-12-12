@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { trpc } from '@/lib/trpc';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,7 +77,15 @@ const getRoleBadge = (role: string) => {
   );
 };
 
-const getOnboardingBadge = (completed: boolean) => {
+const getStatusBadge = (completed: boolean, suspendedAt: Date | null) => {
+  if (suspendedAt) {
+    return (
+      <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+        <Ban className="mr-1 h-3 w-3" />
+        Suspended
+      </Badge>
+    );
+  }
   if (completed) {
     return (
       <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -96,6 +104,7 @@ const getOnboardingBadge = (completed: boolean) => {
 
 export const UserManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [onboardingFilter, setOnboardingFilter] = useState<string>('all');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -107,11 +116,20 @@ export const UserManagement: React.FC = () => {
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
+  // Debounce search query for performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Build query parameters
   const queryParams = {
     limit: pageSize,
     offset: page * pageSize,
-    search: searchQuery || undefined,
+    search: debouncedSearchQuery || undefined,
     role: roleFilter !== 'all' ? (roleFilter as 'user' | 'admin') : undefined,
     onboardingCompleted: onboardingFilter === 'completed' ? true : onboardingFilter === 'pending' ? false : undefined,
     sortBy: 'createdAt' as const,
@@ -260,7 +278,7 @@ export const UserManagement: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                 <Input
                   placeholder="Search by name or email..."
                   value={searchQuery}
@@ -269,6 +287,7 @@ export const UserManagement: React.FC = () => {
                     setPage(0); // Reset to first page on search
                   }}
                   className="pl-10 bg-slate-800 border-slate-700 text-white"
+                  aria-label="Search users by name or email"
                 />
               </div>
               <Select
@@ -278,7 +297,7 @@ export const UserManagement: React.FC = () => {
                   setPage(0);
                 }}
               >
-                <SelectTrigger className="w-full md:w-[180px] bg-slate-800 border-slate-700 text-white">
+                <SelectTrigger className="w-full md:w-[180px] bg-slate-800 border-slate-700 text-white" aria-label="Filter by role">
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -294,7 +313,7 @@ export const UserManagement: React.FC = () => {
                   setPage(0);
                 }}
               >
-                <SelectTrigger className="w-full md:w-[180px] bg-slate-800 border-slate-700 text-white">
+                <SelectTrigger className="w-full md:w-[180px] bg-slate-800 border-slate-700 text-white" aria-label="Filter by status">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -357,11 +376,11 @@ export const UserManagement: React.FC = () => {
                       users.map((user) => (
                         <TableRow key={user.id} className="border-slate-800">
                           <TableCell className="font-medium text-white">
-                            {user.name}
+                            {user.name || 'N/A'}
                           </TableCell>
-                          <TableCell className="text-slate-300">{user.email}</TableCell>
+                          <TableCell className="text-slate-300">{user.email || 'N/A'}</TableCell>
                           <TableCell>{getRoleBadge(user.role)}</TableCell>
-                          <TableCell>{getOnboardingBadge(user.onboardingCompleted)}</TableCell>
+                          <TableCell>{getStatusBadge(user.onboardingCompleted, user.suspendedAt)}</TableCell>
                           <TableCell className="text-slate-400 text-sm">
                             {user.lastSignedIn
                               ? new Date(user.lastSignedIn).toLocaleString()
@@ -398,20 +417,23 @@ export const UserManagement: React.FC = () => {
                                     <Shield className="mr-2 h-4 w-4" />
                                     Change Role
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-slate-300 hover:bg-slate-800 hover:text-white"
-                                    onClick={() => handleSuspendUser(user.id)}
-                                  >
-                                    <Ban className="mr-2 h-4 w-4" />
-                                    Suspend User
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-slate-300 hover:bg-slate-800 hover:text-white"
-                                    onClick={() => handleUnsuspendUser(user.id)}
-                                  >
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Unsuspend User
-                                  </DropdownMenuItem>
+                                  {!user.suspendedAt ? (
+                                    <DropdownMenuItem
+                                      className="text-slate-300 hover:bg-slate-800 hover:text-white"
+                                      onClick={() => handleSuspendUser(user.id)}
+                                    >
+                                      <Ban className="mr-2 h-4 w-4" />
+                                      Suspend User
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      className="text-slate-300 hover:bg-slate-800 hover:text-white"
+                                      onClick={() => handleUnsuspendUser(user.id)}
+                                    >
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Unsuspend User
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -506,6 +528,16 @@ export const UserManagement: React.FC = () => {
               Are you sure you want to unsuspend {selectedUser?.name}? They will be able to log in again.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {selectedUser?.suspensionReason && (
+            <div className="py-2">
+              <label className="text-sm text-slate-400 mb-1 block">
+                Original Suspension Reason:
+              </label>
+              <p className="text-sm text-slate-300 bg-slate-800/50 p-3 rounded border border-slate-700">
+                {selectedUser.suspensionReason}
+              </p>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel className="border-slate-700">Cancel</AlertDialogCancel>
             <AlertDialogAction

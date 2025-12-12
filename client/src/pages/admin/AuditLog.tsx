@@ -201,9 +201,11 @@ export const AuditLog: React.FC = () => {
     setExpandedRows(new Set());
   }, [eventTypeFilter, startDate, endDate, validUserId]);
 
-  const formatTimestamp = (timestamp: Date) => {
+  const formatTimestamp = (timestamp: Date | string | null | undefined) => {
     try {
+      if (!timestamp) return 'N/A';
       const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return 'Invalid date';
       return format(date, 'MMM d, yyyy h:mm:ss a');
     } catch {
       return String(timestamp);
