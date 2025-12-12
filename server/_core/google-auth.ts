@@ -12,12 +12,7 @@ const GOOGLE_USER_INFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 
 // Helper to get the correct redirect URI based on the request
 function getRedirectUri(req: Request): string {
-    // If explicitly set in env, use that
-    if (process.env.GOOGLE_REDIRECT_URI) {
-        return process.env.GOOGLE_REDIRECT_URI;
-    }
-
-    // Auto-detect from request
+    // Auto-detect from request - always use the actual host to avoid redirect_uri_mismatch
     const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
     const host = req.headers.host || "ghl-agency-ai.vercel.app";
     return `${protocol}://${host}/api/oauth/google/callback`;
