@@ -28,31 +28,30 @@ export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "httpOnly" | "path" | "sameSite" | "secure" | "domain"> {
   const hostname = req.hostname || req.headers.host?.split(":")[0] || "";
+
+  // Remove 'www.' prefix to get the base domain
+  const baseDomain = hostname.startsWith('www.') ? hostname.substring(4) : hostname;
+
+  const shouldSetDomain =
+    baseDomain &&
+    !LOCAL_HOSTS.has(baseDomain) &&
+    !isIpAddress(baseDomain) &&
+    baseDomain !== "127.0.0.1" &&
+    baseDomain !== "::1" &&
+    !baseDomain.endsWith(".localhost");
+
+  // Set domain with leading dot to work across subdomains (e.g., .ghlagencyai.com)
+  const domain = shouldSetDomain ? `.${baseDomain}` : undefined;
+
   const isLocal = LOCAL_HOSTS.has(hostname) || hostname.endsWith(".localhost");
   const secure = isSecureRequest(req);
 
-  // On Vercel production, we need to be explicit about cookie settings
-  const isVercel = process.env.VERCEL === "1";
-
-  // Debug logging for cookie issues
-  console.log("[Cookies] Setting cookie options:", {
-    hostname,
-    isLocal,
-    secure,
-    isVercel,
-    protocol: req.protocol,
-    forwardedProto: req.headers["x-forwarded-proto"],
-  });
-
-  // For Vercel deployments, use 'lax' sameSite for better compatibility
-  // 'none' requires third-party cookie support which some browsers block
   return {
     httpOnly: true,
     path: "/",
-    // Use 'lax' for same-site requests (better browser compatibility)
-    // 'lax' allows cookies on top-level navigations (redirects after OAuth)
+    // Use 'lax' for better compatibility - OAuth redirect is same-site
     sameSite: "lax",
     secure: secure,
-    // Don't set domain - let browser use the current domain
+    ...(domain && { domain }),
   };
 }
