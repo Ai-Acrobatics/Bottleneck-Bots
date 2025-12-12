@@ -22,6 +22,36 @@ export function registerGoogleAuthRoutes(app: Express) {
         });
     });
 
+    // Debug endpoint for cookie/auth troubleshooting
+    app.get("/api/auth/debug", (req: Request, res: Response) => {
+        const cookieHeader = req.headers.cookie;
+        const hasSessionCookie = cookieHeader?.includes(COOKIE_NAME);
+        const cookieOptions = getSessionCookieOptions(req);
+
+        res.json({
+            timestamp: new Date().toISOString(),
+            environment: {
+                isVercel: process.env.VERCEL === "1",
+                nodeEnv: process.env.NODE_ENV,
+            },
+            request: {
+                hostname: req.hostname,
+                protocol: req.protocol,
+                secure: req.secure,
+                forwardedProto: req.headers["x-forwarded-proto"],
+                host: req.headers.host,
+            },
+            cookies: {
+                hasCookieHeader: !!cookieHeader,
+                hasSessionCookie,
+                cookieHeaderLength: cookieHeader?.length || 0,
+                // Don't expose actual cookie value for security
+            },
+            cookieConfig: cookieOptions,
+            expectedCookieName: COOKIE_NAME,
+        });
+    });
+
     app.get("/api/oauth/google", (req: Request, res: Response) => {
         const clientId = process.env.GOOGLE_CLIENT_ID;
         const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3006/api/oauth/google/callback";
@@ -145,6 +175,13 @@ export function registerGoogleAuthRoutes(app: Express) {
             console.log('[Google Auth] Session token created');
 
             const cookieOptions = getSessionCookieOptions(req);
+
+            console.log('[Google Auth] Setting session cookie with options:', {
+              cookieName: COOKIE_NAME,
+              tokenLength: sessionToken.length,
+              options: { ...cookieOptions, maxAge: ONE_YEAR_MS },
+            });
+
             res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
             console.log('[Google Auth] Authentication successful, redirecting to /');
