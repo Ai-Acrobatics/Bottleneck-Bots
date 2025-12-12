@@ -24,6 +24,33 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor chunks - split large libraries
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'ui-vendor';
+            }
+            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+              return 'forms';
+            }
+            if (id.includes('recharts')) {
+              return 'charts';
+            }
+            if (id.includes('@tanstack/react-query')) {
+              return 'query';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons';
+            }
+          }
+        },
+      },
+    },
   },
   server: {
     host: true,

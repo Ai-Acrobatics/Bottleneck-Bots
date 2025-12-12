@@ -1,15 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { TourProvider } from "./components/tour/TourProvider";
-import { Dashboard } from './components/Dashboard';
-import { AlexRamozyPage } from './components/AlexRamozyPage';
-import { LandingPage } from './components/LandingPage';
-import { LoginScreen } from './components/LoginScreen';
-import { OnboardingFlow } from './components/OnboardingFlow';
 import { trpc } from "@/lib/trpc";
+
+// Lazy load heavy components for better initial bundle size
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const AlexRamozyPage = lazy(() => import('./components/AlexRamozyPage').then(m => ({ default: m.AlexRamozyPage })));
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
+const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
+
+// Loading spinner component
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-accent/10">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sm text-slate-600">Loading...</p>
+    </div>
+  </div>
+);
 
 type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY';
 type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
@@ -66,31 +78,33 @@ function App() {
         <TooltipProvider>
           <TourProvider>
             <Toaster />
-            {currentView === 'ALEX_RAMOZY' && (
-              <AlexRamozyPage onDemoClick={() => setCurrentView('LOGIN')} />
-            )}
-            {currentView === 'LANDING' && (
-              <LandingPage onLogin={() => setCurrentView('LOGIN')} />
-            )}
+            <Suspense fallback={<LoadingSpinner />}>
+              {currentView === 'ALEX_RAMOZY' && (
+                <AlexRamozyPage onDemoClick={() => setCurrentView('LOGIN')} />
+              )}
+              {currentView === 'LANDING' && (
+                <LandingPage onLogin={() => setCurrentView('LOGIN')} />
+              )}
 
-            {currentView === 'LOGIN' && (
-              <LoginScreen
-                onAuthenticated={handleLogin}
-                onBack={() => setCurrentView('LANDING')}
-              />
-            )}
+              {currentView === 'LOGIN' && (
+                <LoginScreen
+                  onAuthenticated={handleLogin}
+                  onBack={() => setCurrentView('LANDING')}
+                />
+              )}
 
-            {currentView === 'ONBOARDING' && (
-              <OnboardingFlow onComplete={async () => {
-                // Refetch user data to get updated onboardingCompleted status
-                await refetchUser();
-                setCurrentView('DASHBOARD');
-              }} />
-            )}
+              {currentView === 'ONBOARDING' && (
+                <OnboardingFlow onComplete={async () => {
+                  // Refetch user data to get updated onboardingCompleted status
+                  await refetchUser();
+                  setCurrentView('DASHBOARD');
+                }} />
+              )}
 
-            {currentView === 'DASHBOARD' && (
-              <Dashboard userTier={userTier} credits={credits} />
-            )}
+              {currentView === 'DASHBOARD' && (
+                <Dashboard userTier={userTier} credits={credits} />
+              )}
+            </Suspense>
           </TourProvider>
         </TooltipProvider>
       </ThemeProvider>
