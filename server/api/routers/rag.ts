@@ -378,6 +378,111 @@ export const ragRouter = router({
     }),
 
   /**
+   * Ingest a URL by crawling and processing its content
+   */
+  ingestUrl: protectedProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+        platform: z.string().optional(),
+        category: z.string().optional(),
+        title: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const result = await ragService.ingestUrl(input.url, ctx.user.id, {
+          platform: input.platform,
+          category: input.category,
+          title: input.title,
+        });
+
+        return {
+          success: true,
+          sourceId: result.sourceId,
+          chunkCount: result.chunkCount,
+          totalTokens: result.totalTokens,
+          message: `Successfully ingested URL with ${result.chunkCount} chunks`,
+        };
+      } catch (error) {
+        console.error("[RAG Router] URL ingestion failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to ingest URL: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
+   * Search similar documents using RAG
+   */
+  searchSimilar: publicProcedure
+    .input(
+      z.object({
+        query: z.string().min(1),
+        topK: z.number().min(1).max(20).optional(),
+        platforms: z.array(z.string()).optional(),
+        categories: z.array(z.string()).optional(),
+        minSimilarity: z.number().min(0).max(1).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const chunks = await ragService.retrieve(input.query, {
+          topK: input.topK,
+          platforms: input.platforms,
+          categories: input.categories,
+          minSimilarity: input.minSimilarity,
+        });
+
+        return {
+          success: true,
+          chunks,
+          count: chunks.length,
+        };
+      } catch (error) {
+        console.error("[RAG Router] Search similar failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to search documents: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
+   * Build context from relevant chunks
+   */
+  buildContext: publicProcedure
+    .input(
+      z.object({
+        query: z.string().min(1),
+        topK: z.number().min(1).max(20).optional(),
+        platforms: z.array(z.string()).optional(),
+        categories: z.array(z.string()).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const context = await ragService.buildContext(input.query, {
+          topK: input.topK,
+          platforms: input.platforms,
+          categories: input.categories,
+        });
+
+        return {
+          success: true,
+          context,
+        };
+      } catch (error) {
+        console.error("[RAG Router] Build context failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to build context: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
    * Seed platform keywords (admin operation)
    * This should be called once during initial setup
    */

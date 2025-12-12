@@ -7,6 +7,7 @@ import { voiceRouter } from "./api/routers/voice";
 import { seoRouter } from "./api/routers/seo";
 import { adsRouter } from "./api/routers/ads";
 import { marketplaceRouter } from "./api/routers/marketplace";
+import { stripeWebhookRouter } from "./api/routers/stripe-webhook";
 import { tasksRouter } from "./api/routers/tasks";
 import { templatesRouter } from "./api/routers/templates";
 import { workflowsRouter } from "./api/routers/workflows";
@@ -48,6 +49,7 @@ export const appRouter = router({
   seo: seoRouter,
   ads: adsRouter,
   marketplace: marketplaceRouter,
+  stripeWebhook: stripeWebhookRouter,
   tasks: tasksRouter,
   templates: templatesRouter,
   workflows: workflowsRouter,

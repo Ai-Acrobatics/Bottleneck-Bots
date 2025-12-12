@@ -514,7 +514,10 @@ export const leadEnrichmentRouter = router({
       const appifyService = new AppifyService();
       const results = await appifyService.batchEnrichLeads(
         pendingLeads.map((l) => l.rawData as any),
-        input.batchSize
+        {
+          concurrency: input.batchSize,
+          delay: 2000, // 2 second delay between batches
+        }
       );
 
       let enrichedCount = 0;
@@ -668,4 +671,324 @@ export const leadEnrichmentRouter = router({
         })),
       };
     }),
+
+  /**
+   * Get batch enrichment status for a list
+   */
+  getEnrichmentStatus: publicProcedure
+    .input(z.object({ listId: z.number().int() }))
+    .query(async ({ input }) => {
+      // PLACEHOLDER: Replace with actual userId from auth context
+      const userId = 1;
+
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not available",
+        });
+      }
+
+      // Get list
+      const listResult = await db
+        .select()
+        .from(lead_lists)
+        .where(and(eq(lead_lists.id, input.listId), eq(lead_lists.userId, userId)))
+        .limit(1);
+
+      if (listResult.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead list not found",
+        });
+      }
+
+      const list = listResult[0];
+
+      // Get lead counts by status
+      const statusCounts = await db
+        .select({
+          enrichmentStatus: leads.enrichmentStatus,
+          count: count(),
+        })
+        .from(leads)
+        .where(eq(leads.listId, input.listId))
+        .groupBy(leads.enrichmentStatus);
+
+      const statusMap = statusCounts.reduce((acc, row) => {
+        acc[row.enrichmentStatus] = row.count;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Calculate progress percentage
+      const total = list.totalLeads;
+      const enriched = list.enrichedLeads;
+      const progress = total > 0 ? Math.round((enriched / total) * 100) : 0;
+
+      return {
+        listId: list.id,
+        listName: list.name,
+        status: list.status,
+        totalLeads: total,
+        enrichedLeads: enriched,
+        failedLeads: list.failedLeads,
+        pendingLeads: statusMap.pending || 0,
+        skippedLeads: statusMap.skipped || 0,
+        progress,
+        costInCredits: list.costInCredits,
+        uploadedAt: list.uploadedAt,
+        processingStartedAt: list.processingStartedAt,
+        processedAt: list.processedAt,
+      };
+    }),
+
+  /**
+   * Get enrichment history for all lists
+   */
+  getEnrichmentHistory: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().int().positive().default(20),
+        offset: z.number().int().nonnegative().default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      // PLACEHOLDER: Replace with actual userId from auth context
+      const userId = 1;
+
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not available",
+        });
+      }
+
+      // Get all lists with enrichment data
+      const lists = await db
+        .select({
+          id: lead_lists.id,
+          name: lead_lists.name,
+          totalLeads: lead_lists.totalLeads,
+          enrichedLeads: lead_lists.enrichedLeads,
+          failedLeads: lead_lists.failedLeads,
+          costInCredits: lead_lists.costInCredits,
+          status: lead_lists.status,
+          uploadedAt: lead_lists.uploadedAt,
+          processedAt: lead_lists.processedAt,
+        })
+        .from(lead_lists)
+        .where(eq(lead_lists.userId, userId))
+        .orderBy(desc(lead_lists.uploadedAt))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      // Get total count
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(lead_lists)
+        .where(eq(lead_lists.userId, userId));
+
+      // Calculate summary stats
+      const summary = lists.reduce(
+        (acc, list) => {
+          acc.totalLeads += list.totalLeads;
+          acc.totalEnriched += list.enrichedLeads;
+          acc.totalFailed += list.failedLeads;
+          acc.totalCreditsUsed += list.costInCredits;
+          return acc;
+        },
+        {
+          totalLeads: 0,
+          totalEnriched: 0,
+          totalFailed: 0,
+          totalCreditsUsed: 0,
+        }
+      );
+
+      return {
+        history: lists,
+        summary,
+        total,
+        hasMore: input.offset + input.limit < total,
+      };
+    }),
+
+  /**
+   * Re-enrich failed leads in a list
+   */
+  reEnrichFailed: publicProcedure
+    .input(z.object({ listId: z.number().int() }))
+    .mutation(async ({ input }) => {
+      // PLACEHOLDER: Replace with actual userId from auth context
+      const userId = 1;
+
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not available",
+        });
+      }
+
+      // Get failed leads
+      const failedLeads = await db
+        .select()
+        .from(leads)
+        .where(and(eq(leads.listId, input.listId), eq(leads.enrichmentStatus, "failed")));
+
+      if (failedLeads.length === 0) {
+        return {
+          success: true,
+          message: "No failed leads to re-enrich",
+          count: 0,
+        };
+      }
+
+      // Check credits
+      const creditService = new CreditService();
+      const hasCredits = await creditService.checkBalance(userId, "enrichment", failedLeads.length);
+
+      if (!hasCredits) {
+        const balance = await creditService.getBalance(userId, "enrichment");
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `Insufficient credits. Need ${failedLeads.length}, have ${balance}`,
+        });
+      }
+
+      // Reset failed leads to pending
+      const leadIds = failedLeads.map(l => l.id);
+      await db
+        .update(leads)
+        .set({
+          enrichmentStatus: "pending",
+          error: null,
+          updatedAt: new Date(),
+        })
+        .where(inArray(leads.id, leadIds));
+
+      // Update list counts
+      await db
+        .update(lead_lists)
+        .set({
+          failedLeads: 0,
+        })
+        .where(eq(lead_lists.id, input.listId));
+
+      return {
+        success: true,
+        message: `Reset ${failedLeads.length} failed leads to pending`,
+        count: failedLeads.length,
+      };
+    }),
+
+  /**
+   * Get enrichment statistics
+   */
+  getEnrichmentStats: publicProcedure.query(async () => {
+    // PLACEHOLDER: Replace with actual userId from auth context
+    const userId = 1;
+
+    const db = await getDb();
+    if (!db) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Database not available",
+      });
+    }
+
+    const creditService = new CreditService();
+
+    // Get credit balance
+    const balance = await creditService.getBalance(userId, "enrichment");
+
+    // Get total stats from all lists
+    const [stats] = await db
+      .select({
+        totalLists: count(),
+        totalLeads: sql<number>`COALESCE(SUM(${lead_lists.totalLeads}), 0)`,
+        totalEnriched: sql<number>`COALESCE(SUM(${lead_lists.enrichedLeads}), 0)`,
+        totalFailed: sql<number>`COALESCE(SUM(${lead_lists.failedLeads}), 0)`,
+        totalCreditsUsed: sql<number>`COALESCE(SUM(${lead_lists.costInCredits}), 0)`,
+      })
+      .from(lead_lists)
+      .where(eq(lead_lists.userId, userId));
+
+    // Get active enrichment jobs
+    const activeJobs = await db
+      .select({ count: count() })
+      .from(lead_lists)
+      .where(and(eq(lead_lists.userId, userId), eq(lead_lists.status, "processing")));
+
+    return {
+      creditsAvailable: balance,
+      totalLists: stats.totalLists,
+      totalLeads: Number(stats.totalLeads),
+      totalEnriched: Number(stats.totalEnriched),
+      totalFailed: Number(stats.totalFailed),
+      totalCreditsUsed: Number(stats.totalCreditsUsed),
+      activeEnrichmentJobs: activeJobs[0].count,
+      successRate:
+        Number(stats.totalLeads) > 0
+          ? Math.round((Number(stats.totalEnriched) / Number(stats.totalLeads)) * 100)
+          : 0,
+    };
+  }),
+
+  /**
+   * Estimate enrichment cost
+   */
+  estimateEnrichmentCost: publicProcedure
+    .input(z.object({ leadCount: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const appifyService = new AppifyService();
+      const estimatedCost = await appifyService.estimateEnrichmentCost(input.leadCount);
+
+      return {
+        leadCount: input.leadCount,
+        estimatedCredits: estimatedCost,
+        costPerLead: estimatedCost / input.leadCount,
+      };
+    }),
+
+  /**
+   * Validate Apify configuration
+   */
+  validateApifyConfig: publicProcedure.query(async () => {
+    const appifyService = new AppifyService();
+
+    try {
+      const isValid = await appifyService.validateApiKey();
+
+      if (!isValid) {
+        return {
+          configured: false,
+          valid: false,
+          message: "Apify API key is not configured or invalid",
+        };
+      }
+
+      // Try to get credits balance
+      let creditsBalance = 0;
+      try {
+        creditsBalance = await appifyService.getCreditsBalance();
+      } catch (error) {
+        // Ignore errors for credits balance
+      }
+
+      return {
+        configured: true,
+        valid: true,
+        message: "Apify API is configured and valid",
+        creditsBalance,
+      };
+    } catch (error: any) {
+      return {
+        configured: false,
+        valid: false,
+        message: error.message,
+      };
+    }
+  }),
 });

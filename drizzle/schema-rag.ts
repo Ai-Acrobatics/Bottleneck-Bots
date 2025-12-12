@@ -68,8 +68,9 @@ export const documentationChunks = pgTable("documentation_chunks", {
   content: text("content").notNull(), // Chunk text
   tokenCount: integer("tokenCount").notNull(), // Number of tokens
 
-  // Embedding
-  // TODO: Add vector column when pgvector extension is configured
+  // Embedding - uncomment when pgvector extension is enabled
+  // Note: The embedding column needs to be added via raw SQL since drizzle-orm
+  // doesn't fully support pgvector syntax. See migration 0001_rag_system.sql
   // embedding: vector("embedding", { dimensions: 1536 }), // OpenAI embedding vector
 
   // Metadata

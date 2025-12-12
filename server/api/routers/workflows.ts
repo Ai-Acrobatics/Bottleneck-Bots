@@ -5,49 +5,31 @@ import { getDb } from "../../db";
 import { eq, and, desc } from "drizzle-orm";
 import { Stagehand } from "@browserbasehq/stagehand";
 import { getBrowserbaseService } from "../../_core/browserbase";
-import { TRPCError } from "@trpc/server";
 
 import { automationWorkflows, workflowExecutions, browserSessions } from "../../../drizzle/schema";
+import {
+  executeWorkflow,
+  getExecutionStatus,
+  cancelExecution,
+} from "../../services/workflowExecution.service";
 
-/**
- * Resolve the correct LLM API key for a given model name.
- * Shared with aiRouter semantics: Anthropic (Claude), Google (Gemini), OpenAI.
- */
-const resolveModelApiKey = (modelName: string): string => {
-    const isGoogleModel = modelName.includes("google") || modelName.includes("gemini");
-    const isAnthropicModel = modelName.includes("anthropic") || modelName.includes("claude");
-
-    let modelApiKey: string | undefined;
-    if (isAnthropicModel) {
-        modelApiKey = process.env.ANTHROPIC_API_KEY;
-    } else if (isGoogleModel) {
-        modelApiKey = process.env.GEMINI_API_KEY;
-    } else {
-        modelApiKey = process.env.OPENAI_API_KEY;
-    }
-
-    if (!modelApiKey) {
-        const keyName = isAnthropicModel
-            ? "ANTHROPIC_API_KEY"
-            : isGoogleModel
-            ? "GEMINI_API_KEY"
-            : "OPENAI_API_KEY";
-        throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Missing API key for model ${modelName}. Please set ${keyName} in your environment.`,
-        });
-    }
-
-    return modelApiKey;
-};
-
-// PLACEHOLDER: Define Zod schemas for validation
+// Define Zod schemas for validation
 const workflowStepSchema = z.object({
-    type: z.enum(["navigate", "act", "observe", "extract", "wait", "condition"]),
+    type: z.enum([
+        "navigate",
+        "act",
+        "observe",
+        "extract",
+        "wait",
+        "condition",
+        "loop",
+        "apiCall",
+        "notification"
+    ]),
     order: z.number().int().min(0),
     config: z.object({
         // Navigation step
-        url: z.string().url().optional(),
+        url: z.string().optional(),
 
         // Action step (act)
         instruction: z.string().optional(),
@@ -61,9 +43,23 @@ const workflowStepSchema = z.object({
 
         // Wait step
         waitMs: z.number().int().min(0).max(60000).optional(), // Max 60 seconds
+        selector: z.string().optional(), // CSS selector to wait for
 
         // Condition step
         condition: z.string().optional(),
+
+        // Loop step
+        items: z.array(z.any()).optional(), // Array to iterate over
+
+        // API Call step
+        method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        body: z.any().optional(),
+        saveAs: z.string().optional(), // Variable name to save result
+
+        // Notification step
+        message: z.string().optional(),
+        type: z.enum(["info", "success", "warning", "error"]).optional(),
 
         // Common config
         modelName: z.string().optional(),
@@ -363,274 +359,24 @@ export const workflowsRouter = router({
         .mutation(async ({ input, ctx }) => {
             const userId = ctx.user.id;
 
-            const db = await getDb();
-            if (!db) {
-                throw new TRPCError({
-                    code: "INTERNAL_SERVER_ERROR",
-                    message: "Database not initialized",
-                });
-            }
-
-            let sessionId: string | undefined;
-            let executionId: number | undefined;
-
             try {
-                // Fetch workflow
-                const [workflow] = await db
-                    .select()
-                    .from(automationWorkflows)
-                    .where(and(
-                        eq(automationWorkflows.id, input.workflowId),
-                        eq(automationWorkflows.userId, userId)
-                    ))
-                    .limit(1);
-
-                if (!workflow) {
-                    throw new TRPCError({
-                        code: "NOT_FOUND",
-                        message: "Workflow not found",
-                    });
-                }
-
-                if (!workflow.isActive) {
-                    throw new TRPCError({
-                        code: "BAD_REQUEST",
-                        message: "Workflow is not active",
-                    });
-                }
-
-                const steps = workflow.steps as any[]; // Cast JSONB to array
-
-                if (!Array.isArray(steps) || steps.length === 0) {
-                    throw new TRPCError({
-                        code: "BAD_REQUEST",
-                        message: "Workflow has no steps",
-                    });
-                }
-
-                // Create execution record
-                const [execution] = await db
-                    .insert(workflowExecutions)
-                    .values({
-                        workflowId: input.workflowId,
-                        userId,
-                        status: "running",
-                        startedAt: new Date(),
-                        input: input.variables,
-                    })
-                    .returning();
-
-                executionId = execution.id;
-
-                // Create Browserbase session
-                const browserbaseService = getBrowserbaseService();
-                const session = input.geolocation
-                    ? await browserbaseService.createSessionWithGeoLocation(input.geolocation)
-                    : await browserbaseService.createSession();
-
-                sessionId = session.id;
-                console.log(`Workflow execution session created: ${session.url}`);
-
-                // Update execution with sessionId
-                await db
-                    .update(workflowExecutions)
-                    .set({ sessionId: session.id as any }) // Cast if type mismatch
-                    .where(eq(workflowExecutions.id, executionId));
-
-                // Initialize Stagehand
-                const modelName = "google/gemini-2.0-flash";
-                const modelApiKey = resolveModelApiKey(modelName);
-
-                const stagehand = new Stagehand({
-                    env: "BROWSERBASE",
-                    verbose: 1,
-                    disablePino: true,
-                    modelApiKey,
-                    apiKey: process.env.BROWSERBASE_API_KEY,
-                    projectId: process.env.BROWSERBASE_PROJECT_ID,
-                    browserbaseSessionCreateParams: {
-                        projectId: process.env.BROWSERBASE_PROJECT_ID!,
-                        proxies: true,
-                        region: "us-west-2",
-                        timeout: 3600,
-                        keepAlive: true,
-                        browserSettings: {
-                            advancedStealth: false,
-                            blockAds: true,
-                            solveCaptchas: true,
-                            recordSession: true,
-                            viewport: { width: 1920, height: 1080 },
-                        },
-                        userMetadata: {
-                            userId: `user-${userId}`,
-                            workflowId: `workflow-${input.workflowId}`,
-                            environment: process.env.NODE_ENV || "development",
-                        },
-                    },
+                const result = await executeWorkflow({
+                    workflowId: input.workflowId,
+                    userId,
+                    variables: input.variables,
+                    geolocation: input.geolocation,
                 });
-
-                await stagehand.init();
-                const page = stagehand.context.pages()[0];
-
-                // Execute workflow steps
-                const stepResults: Array<{
-                    stepId?: number;
-                    type: string;
-                    success: boolean;
-                    result?: any;
-                    error?: string;
-                }> = [];
-
-                for (const step of steps) {
-                    const stepConfig = step.config;
-
-                    try {
-                        let result: any = null;
-
-                        switch (step.type) {
-                            case "navigate":
-                                if (!stepConfig.url) {
-                                    throw new Error("Navigate step requires URL");
-                                }
-                                await page.goto(stepConfig.url);
-                                result = { url: stepConfig.url };
-                                break;
-
-                            case "act":
-                                if (!stepConfig.instruction) {
-                                    throw new Error("Act step requires instruction");
-                                }
-                                await stagehand.act(stepConfig.instruction);
-                                result = { instruction: stepConfig.instruction };
-                                break;
-
-                            case "observe":
-                                if (!stepConfig.observeInstruction) {
-                                    throw new Error("Observe step requires instruction");
-                                }
-                                const actions = await stagehand.observe(stepConfig.observeInstruction);
-                                result = { actions };
-                                break;
-
-                            case "extract":
-                                if (!stepConfig.extractInstruction) {
-                                    throw new Error("Extract step requires instruction");
-                                }
-
-                                let extractedData: any;
-                                if (stepConfig.schemaType === "contactInfo") {
-                                    extractedData = await stagehand.extract(
-                                        stepConfig.extractInstruction,
-                                        z.object({
-                                            contactInfo: z.object({
-                                                email: z.string().optional(),
-                                                phone: z.string().optional(),
-                                                address: z.string().optional(),
-                                            })
-                                        }) as any
-                                    );
-                                } else if (stepConfig.schemaType === "productInfo") {
-                                    extractedData = await stagehand.extract(
-                                        stepConfig.extractInstruction,
-                                        z.object({
-                                            productInfo: z.object({
-                                                name: z.string().optional(),
-                                                price: z.string().optional(),
-                                                description: z.string().optional(),
-                                                availability: z.string().optional(),
-                                            })
-                                        }) as any
-                                    );
-                                } else {
-                                    extractedData = await stagehand.extract(stepConfig.extractInstruction);
-                                }
-                                result = extractedData;
-                                break;
-
-                            case "wait":
-                                const waitTime = stepConfig.waitMs || 1000;
-                                await new Promise(resolve => setTimeout(resolve, waitTime));
-                                result = { waitedMs: waitTime };
-                                break;
-
-                            case "condition":
-                                // PLACEHOLDER: Implement condition evaluation
-                                result = { condition: stepConfig.condition, passed: true };
-                                break;
-
-                            default:
-                                throw new Error(`Unknown step type: ${step.type}`);
-                        }
-
-                        stepResults.push({
-                            type: step.type,
-                            success: true,
-                            result,
-                        });
-
-                    } catch (stepError) {
-                        const errorMessage = stepError instanceof Error ? stepError.message : "Unknown error";
-
-                        stepResults.push({
-                            type: step.type,
-                            success: false,
-                            error: errorMessage,
-                        });
-
-                        // Stop execution if continueOnError is false
-                        if (!stepConfig.continueOnError) {
-                            throw new Error(`Step failed: ${errorMessage}`);
-                        }
-                    }
-                }
-
-                await stagehand.close();
-
-                // Update execution record
-                await db
-                    .update(workflowExecutions)
-                    .set({
-                        status: "completed",
-                        completedAt: new Date(),
-                        output: stepResults,
-                        stepResults: stepResults,
-                    })
-                    .where(eq(workflowExecutions.id, executionId));
-
-                // Update workflow execution count
-                await db
-                    .update(automationWorkflows)
-                    .set({
-                        executionCount: (workflow.executionCount || 0) + 1,
-                        lastExecutedAt: new Date(),
-                    })
-                    .where(eq(automationWorkflows.id, input.workflowId));
 
                 return {
                     success: true,
-                    workflowId: input.workflowId,
-                    executionId: executionId,
-                    sessionId,
-                    sessionUrl: session.url,
-                    stepsExecuted: stepResults.length,
-                    stepResults,
+                    executionId: result.executionId,
+                    workflowId: result.workflowId,
+                    status: result.status,
+                    stepResults: result.stepResults,
+                    output: result.output,
                 };
-
             } catch (error) {
                 console.error("Workflow execution failed:", error);
-
-                // Update execution record with error
-                if (executionId) {
-                    await db
-                        .update(workflowExecutions)
-                        .set({
-                            status: "failed",
-                            completedAt: new Date(),
-                            error: error instanceof Error ? error.message : "Unknown error",
-                        })
-                        .where(eq(workflowExecutions.id, executionId));
-                }
-
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `Workflow execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -642,19 +388,17 @@ export const workflowsRouter = router({
      * Get execution history for a workflow
      * Returns paginated list of executions with results
      */
-    getExecutions: publicProcedure // PLACEHOLDER: Change to protectedProcedure when auth is implemented
+    getExecutions: protectedProcedure
         .input(
             z.object({
                 workflowId: z.number().int().positive(),
-                status: z.enum(["running", "completed", "failed"]).optional(),
+                status: z.enum(["pending", "running", "completed", "failed", "cancelled"]).optional(),
                 limit: z.number().int().min(1).max(100).default(20),
                 offset: z.number().int().min(0).default(0),
             })
         )
         .query(async ({ input, ctx }) => {
-            // PLACEHOLDER: Get userId from authenticated context
-            // const userId = ctx.user.id;
-            const userId = 1; // PLACEHOLDER: Replace with actual authenticated user ID
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {
@@ -665,14 +409,13 @@ export const workflowsRouter = router({
             }
 
             try {
-                // PLACEHOLDER: Verify workflow ownership
-                /*
+                // Verify workflow ownership
                 const [workflow] = await db
                     .select()
-                    .from(workflows)
+                    .from(automationWorkflows)
                     .where(and(
-                        eq(workflows.id, input.workflowId),
-                        eq(workflows.userId, userId)
+                        eq(automationWorkflows.id, input.workflowId),
+                        eq(automationWorkflows.userId, userId)
                     ))
                     .limit(1);
 
@@ -697,35 +440,108 @@ export const workflowsRouter = router({
                     .limit(input.limit)
                     .offset(input.offset);
 
-                return executions.map(execution => ({
-                    ...execution,
-                    result: execution.result ? JSON.parse(execution.result) : null,
-                }));
-                */
-
-                // PLACEHOLDER: Return mock response
-                return [
-                    {
-                        id: 1,
-                        workflowId: input.workflowId,
-                        sessionId: "mock-session-id",
-                        status: "completed" as const,
-                        startedAt: new Date(),
-                        completedAt: new Date(),
-                        result: {
-                            stepsExecuted: 3,
-                            success: true,
-                        },
-                        error: null,
-                        _placeholder: "PLACEHOLDER: Add workflowExecutions table to drizzle/schema.ts",
-                    },
-                ];
+                return executions;
             } catch (error) {
                 console.error("Failed to get executions:", error);
                 if (error instanceof TRPCError) throw error;
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `Failed to get executions: ${error instanceof Error ? error.message : "Unknown error"}`,
+                });
+            }
+        }),
+
+    /**
+     * Get a single execution by ID
+     * Returns detailed execution information including step results
+     */
+    getExecution: protectedProcedure
+        .input(z.object({ executionId: z.number().int().positive() }))
+        .query(async ({ input, ctx }) => {
+            const userId = ctx.user.id;
+
+            try {
+                const status = await getExecutionStatus(input.executionId);
+
+                // Verify ownership
+                const db = await getDb();
+                if (!db) {
+                    throw new TRPCError({
+                        code: "INTERNAL_SERVER_ERROR",
+                        message: "Database not initialized",
+                    });
+                }
+
+                const [execution] = await db
+                    .select()
+                    .from(workflowExecutions)
+                    .where(and(
+                        eq(workflowExecutions.id, input.executionId),
+                        eq(workflowExecutions.userId, userId)
+                    ))
+                    .limit(1);
+
+                if (!execution) {
+                    throw new TRPCError({
+                        code: "NOT_FOUND",
+                        message: "Execution not found",
+                    });
+                }
+
+                return status;
+            } catch (error) {
+                console.error("Failed to get execution:", error);
+                if (error instanceof TRPCError) throw error;
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Failed to get execution: ${error instanceof Error ? error.message : "Unknown error"}`,
+                });
+            }
+        }),
+
+    /**
+     * Cancel a running workflow execution
+     */
+    cancelExecution: protectedProcedure
+        .input(z.object({ executionId: z.number().int().positive() }))
+        .mutation(async ({ input, ctx }) => {
+            const userId = ctx.user.id;
+
+            const db = await getDb();
+            if (!db) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "Database not initialized",
+                });
+            }
+
+            try {
+                // Verify ownership
+                const [execution] = await db
+                    .select()
+                    .from(workflowExecutions)
+                    .where(and(
+                        eq(workflowExecutions.id, input.executionId),
+                        eq(workflowExecutions.userId, userId)
+                    ))
+                    .limit(1);
+
+                if (!execution) {
+                    throw new TRPCError({
+                        code: "NOT_FOUND",
+                        message: "Execution not found",
+                    });
+                }
+
+                await cancelExecution(input.executionId);
+
+                return { success: true, executionId: input.executionId };
+            } catch (error) {
+                console.error("Failed to cancel execution:", error);
+                if (error instanceof TRPCError) throw error;
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Failed to cancel execution: ${error instanceof Error ? error.message : "Unknown error"}`,
                 });
             }
         }),

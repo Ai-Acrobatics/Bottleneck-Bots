@@ -243,6 +243,7 @@ export function BrowserSessionCard({
                   size="sm"
                   onClick={() => onLiveView(session)}
                   className="gap-1 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600"
+                  data-tour="browser-live-view"
                 >
                   <ExternalLink className="h-3 w-3" />
                   <span className="hidden sm:inline">Live</span>
@@ -255,6 +256,7 @@ export function BrowserSessionCard({
                   size="sm"
                   onClick={() => onViewRecording(session)}
                   className="gap-1 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600"
+                  data-tour="browser-replay"
                 >
                   <Video className="h-3 w-3" />
                   <span className="hidden sm:inline">Recording</span>

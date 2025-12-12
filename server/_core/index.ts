@@ -12,6 +12,11 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { webhookEndpointsRouter } from "../api/webhookEndpoints";
+import { schedulerRunnerService } from "../services/schedulerRunner.service";
+import { getDb } from "../db";
+import { scheduledBrowserTasks } from "../../drizzle/schema-scheduled-tasks";
+import { eq } from "drizzle-orm";
+import { cronSchedulerService } from "../services/cronScheduler.service";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -82,6 +87,65 @@ export async function createApp() {
   return app;
 }
 
+/**
+ * Initialize scheduled tasks on startup
+ */
+async function initializeScheduledTasks() {
+  try {
+    console.log("Initializing scheduled tasks...");
+
+    const db = await getDb();
+    if (!db) {
+      console.log("Database not available, skipping scheduled tasks initialization");
+      return;
+    }
+
+    // Get all active scheduled tasks
+    const tasks = await db
+      .select()
+      .from(scheduledBrowserTasks)
+      .where(eq(scheduledBrowserTasks.isActive, true));
+
+    console.log(`Found ${tasks.length} active scheduled tasks`);
+
+    // Update next run times for all active tasks
+    for (const task of tasks) {
+      try {
+        if (task.status === "active") {
+          const nextRun = cronSchedulerService.getNextRunTime(
+            task.cronExpression,
+            task.timezone
+          );
+
+          if (nextRun) {
+            await db
+              .update(scheduledBrowserTasks)
+              .set({
+                nextRun,
+                updatedAt: new Date(),
+              })
+              .where(eq(scheduledBrowserTasks.id, task.id));
+
+            const description = cronSchedulerService.describeCronExpression(task.cronExpression);
+            console.log(`  - Task ${task.id} (${task.name}): ${description}`);
+            console.log(`    Next run: ${nextRun.toISOString()}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Error initializing task ${task.id}:`, error);
+      }
+    }
+
+    // Start the scheduler runner
+    const checkInterval = parseInt(process.env.SCHEDULER_CHECK_INTERVAL || "60000");
+    schedulerRunnerService.start(checkInterval);
+
+    console.log("Scheduled tasks initialized successfully");
+  } catch (error) {
+    console.error("Error initializing scheduled tasks:", error);
+  }
+}
+
 async function startServer() {
   const app = await createApp();
   const server = createServer(app);
@@ -95,6 +159,41 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+
+    // Initialize scheduled tasks after server starts
+    initializeScheduledTasks().catch(console.error);
+
+    // Optionally start workers in development mode
+    if (process.env.NODE_ENV === "development" && process.env.START_WORKERS === "true") {
+      console.log("\nStarting workers in development mode...");
+      console.log("Note: In production, run workers separately using: tsx server/workers/index.ts\n");
+
+      import("../workers/dev")
+        .then(({ startDevelopmentWorkers }) => startDevelopmentWorkers())
+        .catch((error) => {
+          console.error("Failed to start development workers:", error);
+          console.log("Workers will not be available. Set REDIS_URL to enable background jobs.");
+        });
+    }
+  });
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log("SIGTERM received, shutting down gracefully...");
+    schedulerRunnerService.stop();
+    server.close(() => {
+      console.log("Server closed");
+      process.exit(0);
+    });
+  });
+
+  process.on("SIGINT", () => {
+    console.log("SIGINT received, shutting down gracefully...");
+    schedulerRunnerService.stop();
+    server.close(() => {
+      console.log("Server closed");
+      process.exit(0);
+    });
   });
 }
 

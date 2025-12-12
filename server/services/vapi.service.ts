@@ -60,7 +60,6 @@ export class VapiService {
    * @param settings - Optional call configuration settings
    * @returns Call creation response with callId
    *
-   * TODO: Implement actual Vapi API call
    * API Endpoint: POST /call
    * Documentation: https://docs.vapi.ai/api-reference/calls/create-phone-call
    */
@@ -73,9 +72,56 @@ export class VapiService {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
 
-    // TODO: Implement actual Vapi API call
-    // API endpoint: POST https://api.vapi.ai/call
-    throw new Error("Vapi integration not yet implemented. Configure VAPI_API_KEY and implement the API call.");
+    // Validate and format phone number
+    const formattedPhone = this.formatPhoneNumber(phoneNumber);
+    if (!this.validatePhoneNumber(formattedPhone)) {
+      throw new Error(`Invalid phone number format: ${phoneNumber}. Expected E.164 format (e.g., +1234567890)`);
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/call`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phoneNumber: formattedPhone,
+          assistant: {
+            firstMessage: script,
+            model: {
+              provider: "openai",
+              model: settings?.model || "gpt-4",
+              temperature: settings?.temperature || 0.7,
+            },
+            voice: {
+              provider: "11labs",
+              voiceId: settings?.voice === "female" ? "rachel" : settings?.voice === "neutral" ? "adam" : "josh",
+            },
+          },
+          maxDurationSeconds: settings?.maxDuration || 600,
+          recordingEnabled: settings?.recordCall !== false,
+          transcribeEnabled: settings?.transcribeCall !== false,
+          voicemailDetectionEnabled: settings?.detectVoicemail !== false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        callId: data.id,
+        status: data.status,
+        message: "Call initiated successfully",
+      };
+    } catch (error: any) {
+      console.error("Error creating Vapi call:", error);
+      throw new Error(`Failed to create call: ${error.message}`);
+    }
   }
 
   /**
@@ -83,7 +129,6 @@ export class VapiService {
    * @param vapiCallId - The Vapi call ID returned from createCall
    * @returns Current call status with details
    *
-   * TODO: Implement actual Vapi API call
    * API Endpoint: GET /call/{id}
    * Documentation: https://docs.vapi.ai/api-reference/calls/get-call
    */
@@ -92,40 +137,154 @@ export class VapiService {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
 
-    // TODO: Implement actual Vapi API call
-    // API endpoint: GET https://api.vapi.ai/call/{id}
-    throw new Error("Vapi integration not yet implemented. Configure VAPI_API_KEY and implement the API call.");
+    try {
+      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        callId: data.id,
+        status: this.mapVapiStatus(data.status),
+        duration: data.durationSeconds,
+        outcome: data.endedReason,
+        transcript: data.transcript,
+        recordingUrl: data.recordingUrl,
+        error: data.error,
+        metadata: data.metadata,
+      };
+    } catch (error: any) {
+      console.error("Error getting Vapi call status:", error);
+      throw new Error(`Failed to get call status: ${error.message}`);
+    }
   }
 
   /**
-   * List all calls (optional, for future use)
+   * Map Vapi status to our internal status format
+   */
+  private mapVapiStatus(vapiStatus: string): VapiCallStatus["status"] {
+    const statusMap: Record<string, VapiCallStatus["status"]> = {
+      "queued": "pending",
+      "ringing": "calling",
+      "in-progress": "answered",
+      "forwarding": "answered",
+      "ended": "completed",
+      "busy": "no_answer",
+      "no-answer": "no_answer",
+      "failed": "failed",
+      "canceled": "failed",
+    };
+
+    return statusMap[vapiStatus] || "failed";
+  }
+
+  /**
+   * List all calls
    * @param limit - Maximum number of calls to return
    * @param offset - Number of calls to skip
    *
-   * TODO: Implement if needed for call management
    * API Endpoint: GET /call
    */
   async listCalls(limit: number = 50, offset: number = 0): Promise<VapiCallStatus[]> {
     if (!this.apiKey) {
       return [];
     }
-    // TODO: Implement actual API call
-    throw new Error("Vapi listCalls not yet implemented.");
+
+    try {
+      const response = await fetch(`${this.baseUrl}/call?limit=${limit}&offset=${offset}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      const calls = Array.isArray(data) ? data : data.calls || [];
+
+      return calls.map((call: any) => ({
+        callId: call.id,
+        status: this.mapVapiStatus(call.status),
+        duration: call.durationSeconds,
+        outcome: call.endedReason,
+        transcript: call.transcript,
+        recordingUrl: call.recordingUrl,
+        error: call.error,
+        metadata: call.metadata,
+      }));
+    } catch (error: any) {
+      console.error("Error listing Vapi calls:", error);
+      throw new Error(`Failed to list calls: ${error.message}`);
+    }
   }
 
   /**
    * End an ongoing call
    * @param vapiCallId - The Vapi call ID to end
    *
-   * TODO: Implement if needed for call control
    * API Endpoint: DELETE /call/{id}
    */
   async endCall(vapiCallId: string): Promise<{ success: boolean; message?: string }> {
     if (!this.apiKey) {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
-    // TODO: Implement actual API call
-    throw new Error("Vapi endCall not yet implemented.");
+
+    try {
+      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      return {
+        success: true,
+        message: "Call ended successfully",
+      };
+    } catch (error: any) {
+      console.error("Error ending Vapi call:", error);
+      throw new Error(`Failed to end call: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get call transcript
+   * @param vapiCallId - The Vapi call ID
+   * @returns Call transcript
+   */
+  async getTranscript(vapiCallId: string): Promise<string> {
+    if (!this.apiKey) {
+      throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
+    }
+
+    try {
+      const callStatus = await this.getCallStatus(vapiCallId);
+      return callStatus.transcript || "";
+    } catch (error: any) {
+      console.error("Error getting Vapi call transcript:", error);
+      throw new Error(`Failed to get transcript: ${error.message}`);
+    }
   }
 
   /**
@@ -133,7 +292,6 @@ export class VapiService {
    * @param vapiCallId - The Vapi call ID to update
    * @param updates - Fields to update
    *
-   * TODO: Implement if needed for dynamic call control
    * API Endpoint: PATCH /call/{id}
    */
   async updateCall(
@@ -143,8 +301,30 @@ export class VapiService {
     if (!this.apiKey) {
       throw new Error("VAPI_API_KEY not configured. Please set the environment variable.");
     }
-    // TODO: Implement actual API call
-    throw new Error("Vapi updateCall not yet implemented.");
+
+    try {
+      const response = await fetch(`${this.baseUrl}/call/${vapiCallId}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(`Vapi API error: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      return {
+        success: true,
+        message: "Call updated successfully",
+      };
+    } catch (error: any) {
+      console.error("Error updating Vapi call:", error);
+      throw new Error(`Failed to update call: ${error.message}`);
+    }
   }
 
   /**

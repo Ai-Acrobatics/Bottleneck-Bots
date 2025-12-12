@@ -12,6 +12,8 @@ import {
   userWebhooks,
 } from "../../../drizzle/schema-webhooks";
 
+import { taskExecutionService } from "../../services/taskExecution.service";
+
 // ========================================
 // VALIDATION SCHEMAS
 // ========================================
@@ -148,6 +150,21 @@ export const agencyTasksRouter = router({
             notifyOnFailure: true,
           })
           .returning();
+
+        // Auto-execute if conditions are met
+        if (
+          input.executionType === "automatic" &&
+          input.assignedToBot &&
+          !input.requiresHumanReview &&
+          !input.scheduledFor
+        ) {
+          // Execute task asynchronously (don't await to avoid blocking the response)
+          taskExecutionService
+            .executeTask(task.id, "automatic")
+            .catch((error) => {
+              console.error("Auto-execution failed:", error);
+            });
+        }
 
         return task;
       } catch (error) {
@@ -513,6 +530,15 @@ export const agencyTasksRouter = router({
           })
           .where(eq(agencyTasks.id, input.id));
 
+        // Auto-execute approved task if it's assigned to bot and not scheduled
+        if (task.assignedToBot && !task.scheduledFor) {
+          taskExecutionService
+            .executeTask(input.id, "automatic")
+            .catch((error) => {
+              console.error("Post-approval execution failed:", error);
+            });
+        }
+
         return { success: true, id: input.id };
       } catch (error) {
         console.error("Failed to approve task:", error);
@@ -638,35 +664,17 @@ export const agencyTasksRouter = router({
           });
         }
 
-        // Create execution record
-        const [execution] = await db
-          .insert(taskExecutions)
-          .values({
-            taskId: input.id,
-            triggeredBy: "manual",
-            triggeredByUserId: userId,
-            status: "started",
-            attemptNumber: (task.errorCount || 0) + 1,
-          })
-          .returning();
-
-        // Update task status
-        await db
-          .update(agencyTasks)
-          .set({
-            status: "in_progress",
-            startedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(agencyTasks.id, input.id));
-
-        // TODO: Actually trigger the task execution service here
-        // For now, just return the execution record
+        // Execute the task using the execution service
+        // Execute asynchronously to avoid blocking the API response
+        taskExecutionService
+          .executeTask(input.id, "manual")
+          .catch((error) => {
+            console.error("Manual execution failed:", error);
+          });
 
         return {
           success: true,
           taskId: input.id,
-          executionId: execution.id,
           message: "Task execution started",
         };
       } catch (error) {

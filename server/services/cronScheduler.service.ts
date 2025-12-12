@@ -1,120 +1,359 @@
 /**
  * Cron Scheduler Service
- * Handles cron expression parsing and next run time calculation
- *
- * TODO: Implement actual cron-parser integration
+ * Handles cron expression parsing, validation, and next run time calculation
  */
+
+import cronParser from "cron-parser";
+import cronstrue from "cronstrue";
+
+// ========================================
+// TYPES
+// ========================================
+
+export interface CronValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+export interface ParsedCronExpression {
+  minute: string;
+  hour: string;
+  dayOfMonth: string;
+  month: string;
+  dayOfWeek: string;
+  expression: string;
+}
+
+export interface ScheduleConfig {
+  hour?: number;
+  minute?: number;
+  dayOfWeek?: number; // 0-6 (Sunday-Saturday)
+  dayOfMonth?: number; // 1-31
+}
+
+export type ScheduleType = "daily" | "weekly" | "monthly" | "custom";
+
+// ========================================
+// CRON SCHEDULER SERVICE
+// ========================================
 
 class CronSchedulerService {
   /**
-   * Get the next run time for a cron expression
-   * TODO: Implement using cron-parser library
+   * Validate a cron expression
    */
-  getNextRunTime(cronExpression: string, timezone: string = "UTC"): Date {
-    // TODO:
-    // 1. Parse cron expression using cron-parser
-    // 2. Calculate next occurrence based on timezone
-    // 3. Handle edge cases and invalid expressions
-    // 4. Return next run Date
+  validateCronExpression(cronExpression: string): CronValidationResult {
+    try {
+      // Try to parse the expression
+      cronParser.parseExpression(cronExpression, {
+        currentDate: new Date(),
+        utc: false,
+      });
 
-    console.log(`TODO: Calculate next run time for cron: "${cronExpression}" in timezone ${timezone}`);
-
-    // Placeholder: return current time + 1 hour
-    const nextRun = new Date();
-    nextRun.setHours(nextRun.getHours() + 1);
-    return nextRun;
+      return { valid: true };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : "Invalid cron expression",
+      };
+    }
   }
 
   /**
-   * Validate a cron expression
-   * TODO: Implement cron expression validation
+   * Parse a cron expression into its component parts
    */
-  validateCronExpression(cronExpression: string): { valid: boolean; error?: string } {
-    // TODO:
-    // 1. Parse expression
-    // 2. Check for valid syntax
-    // 3. Return validation result
+  parseCronExpression(cronExpression: string): ParsedCronExpression | null {
+    try {
+      const interval = cronParser.parseExpression(cronExpression, {
+        currentDate: new Date(),
+        utc: false,
+      });
 
-    console.log(`TODO: Validate cron expression: "${cronExpression}"`);
+      // Get the fields from the parsed expression
+      const fields = interval.fields;
 
-    return { valid: true };
+      return {
+        minute: this.formatCronField(fields.minute),
+        hour: this.formatCronField(fields.hour),
+        dayOfMonth: this.formatCronField(fields.dayOfMonth),
+        month: this.formatCronField(fields.month),
+        dayOfWeek: this.formatCronField(fields.dayOfWeek),
+        expression: cronExpression,
+      };
+    } catch (error) {
+      console.error("Failed to parse cron expression:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Format a cron field array into a string
+   */
+  private formatCronField(field: number[]): string {
+    if (!field || field.length === 0) return "*";
+
+    // If all values are sequential, use range notation
+    const sorted = [...field].sort((a, b) => a - b);
+    if (sorted.length > 2) {
+      const isSequential = sorted.every((val, idx) =>
+        idx === 0 || val === sorted[idx - 1] + 1
+      );
+      if (isSequential) {
+        return `${sorted[0]}-${sorted[sorted.length - 1]}`;
+      }
+    }
+
+    return field.join(",");
   }
 
   /**
    * Get human-readable description of cron expression
-   * TODO: Implement cron expression description using cronstrue
    */
   describeCronExpression(cronExpression: string): string {
-    // TODO: Use cronstrue library to generate human-readable description
-    console.log(`TODO: Describe cron expression: "${cronExpression}"`);
+    try {
+      return cronstrue.toString(cronExpression, {
+        use24HourTimeFormat: true,
+        verbose: false,
+      });
+    } catch (error) {
+      console.error("Failed to describe cron expression:", error);
+      return cronExpression; // Fallback to raw expression
+    }
+  }
 
-    return cronExpression; // Fallback to raw expression
+  /**
+   * Get the next run time for a cron expression
+   */
+  getNextRunTime(cronExpression: string, timezone: string = "UTC"): Date | null {
+    try {
+      const interval = cronParser.parseExpression(cronExpression, {
+        currentDate: new Date(),
+        tz: timezone,
+      });
+
+      const next = interval.next();
+      return next.toDate();
+    } catch (error) {
+      console.error("Failed to calculate next run time:", error);
+      return null;
+    }
   }
 
   /**
    * Get next N run times for a cron expression
-   * TODO: Implement multiple run times calculation
    */
-  getNextNRunTimes(cronExpression: string, count: number, timezone: string = "UTC"): Date[] {
-    // TODO:
-    // 1. Parse cron expression
-    // 2. Calculate next N occurrences
-    // 3. Return array of Dates
+  getNextNRunTimes(
+    cronExpression: string,
+    count: number,
+    timezone: string = "UTC"
+  ): Date[] {
+    try {
+      const interval = cronParser.parseExpression(cronExpression, {
+        currentDate: new Date(),
+        tz: timezone,
+      });
 
-    console.log(`TODO: Get next ${count} run times for cron: "${cronExpression}"`);
+      const runTimes: Date[] = [];
+      for (let i = 0; i < count; i++) {
+        const next = interval.next();
+        runTimes.push(next.toDate());
+      }
 
-    const runTimes: Date[] = [];
-    const baseTime = new Date();
-
-    for (let i = 0; i < count; i++) {
-      const nextRun = new Date(baseTime);
-      nextRun.setHours(nextRun.getHours() + i + 1);
-      runTimes.push(nextRun);
+      return runTimes;
+    } catch (error) {
+      console.error("Failed to calculate next run times:", error);
+      return [];
     }
-
-    return runTimes;
   }
 
   /**
    * Convert simple schedule type to cron expression
-   * TODO: Implement schedule type to cron conversion
    */
   scheduleTypeToCron(
-    scheduleType: "daily" | "weekly" | "monthly" | "once",
-    options?: {
-      hour?: number;
-      minute?: number;
-      dayOfWeek?: number;
-      dayOfMonth?: number;
-    }
+    scheduleType: ScheduleType,
+    config?: ScheduleConfig
   ): string {
-    // TODO: Convert schedule types to cron expressions
-    // - daily: Run at specific time every day
-    // - weekly: Run at specific time on specific day of week
-    // - monthly: Run at specific time on specific day of month
-    // - once: Run once at specific time
-
-    console.log(`TODO: Convert ${scheduleType} to cron expression`, options);
-
-    const hour = options?.hour || 0;
-    const minute = options?.minute || 0;
+    const hour = config?.hour ?? 0;
+    const minute = config?.minute ?? 0;
 
     switch (scheduleType) {
       case "daily":
+        // Run at specific time every day
         return `${minute} ${hour} * * *`;
+
       case "weekly":
-        const dayOfWeek = options?.dayOfWeek || 0;
+        // Run at specific time on specific day of week
+        const dayOfWeek = config?.dayOfWeek ?? 0;
         return `${minute} ${hour} * * ${dayOfWeek}`;
+
       case "monthly":
-        const dayOfMonth = options?.dayOfMonth || 1;
+        // Run at specific time on specific day of month
+        const dayOfMonth = config?.dayOfMonth ?? 1;
         return `${minute} ${hour} ${dayOfMonth} * *`;
-      case "once":
-        // For "once", this would need a specific date/time
-        // Return a placeholder that won't repeat
-        return `${minute} ${hour} 31 2 *`; // Feb 31 (never)
+
+      case "custom":
+        // For custom, config should include a custom expression
+        // This is a fallback
+        return `${minute} ${hour} * * *`;
+
       default:
-        return "0 0 * * *"; // Default to midnight daily
+        // Default to midnight daily
+        return "0 0 * * *";
     }
+  }
+
+  /**
+   * Check if a task should run now based on cron expression and last run time
+   */
+  isTimeToRun(
+    cronExpression: string,
+    lastRun: Date | null,
+    timezone: string = "UTC"
+  ): boolean {
+    try {
+      const now = new Date();
+
+      // If never run before, check if there's a valid next run time
+      if (!lastRun) {
+        const nextRun = this.getNextRunTime(cronExpression, timezone);
+        return nextRun !== null && nextRun <= now;
+      }
+
+      // Get the next scheduled run after the last run
+      const interval = cronParser.parseExpression(cronExpression, {
+        currentDate: lastRun,
+        tz: timezone,
+      });
+
+      const nextRun = interval.next().toDate();
+
+      // Task should run if next scheduled time has passed
+      return nextRun <= now;
+    } catch (error) {
+      console.error("Failed to check if time to run:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Get human-readable schedule description from schedule type and config
+   */
+  getScheduleDescription(
+    scheduleType: ScheduleType,
+    config?: ScheduleConfig
+  ): string {
+    const hour = config?.hour ?? 0;
+    const minute = config?.minute ?? 0;
+    const timeStr = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+
+    switch (scheduleType) {
+      case "daily":
+        return `Daily at ${timeStr}`;
+
+      case "weekly":
+        const dayOfWeek = config?.dayOfWeek ?? 0;
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        return `Every ${days[dayOfWeek]} at ${timeStr}`;
+
+      case "monthly":
+        const dayOfMonth = config?.dayOfMonth ?? 1;
+        const suffix = this.getOrdinalSuffix(dayOfMonth);
+        return `Monthly on the ${dayOfMonth}${suffix} at ${timeStr}`;
+
+      case "custom":
+        return "Custom schedule";
+
+      default:
+        return "Unknown schedule";
+    }
+  }
+
+  /**
+   * Get ordinal suffix for day of month (1st, 2nd, 3rd, etc.)
+   */
+  private getOrdinalSuffix(day: number): string {
+    if (day > 3 && day < 21) return "th";
+    switch (day % 10) {
+      case 1: return "st";
+      case 2: return "nd";
+      case 3: return "rd";
+      default: return "th";
+    }
+  }
+
+  /**
+   * Check if a cron expression would ever trigger
+   * (e.g., Feb 31st would never occur)
+   */
+  willEverRun(cronExpression: string, timezone: string = "UTC"): boolean {
+    try {
+      const interval = cronParser.parseExpression(cronExpression, {
+        currentDate: new Date(),
+        tz: timezone,
+      });
+
+      // Try to get next run - if this throws, expression will never run
+      interval.next();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get time until next run in milliseconds
+   */
+  getTimeUntilNextRun(
+    cronExpression: string,
+    timezone: string = "UTC"
+  ): number | null {
+    const nextRun = this.getNextRunTime(cronExpression, timezone);
+    if (!nextRun) return null;
+
+    const now = new Date();
+    return nextRun.getTime() - now.getTime();
+  }
+
+  /**
+   * Convert timezone-aware date to another timezone
+   */
+  convertTimezone(date: Date, fromTz: string, toTz: string): Date {
+    // Create formatter for source timezone
+    const sourceFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: fromTz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+
+    // Parse the date in source timezone
+    const parts = sourceFormatter.formatToParts(date);
+    const values: Record<string, string> = {};
+    parts.forEach((part) => {
+      if (part.type !== "literal") {
+        values[part.type] = part.value;
+      }
+    });
+
+    // Create new date string
+    const dateStr = `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}:${values.second}`;
+
+    // Create formatter for target timezone
+    const targetFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: toTz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+
+    return new Date(dateStr);
   }
 }
 
