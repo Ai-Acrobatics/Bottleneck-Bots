@@ -107,3 +107,5 @@ temp/
 *.sqlite3
 .vercel
 .env*.local
+mcp-server-browserbase/
+stagehand-nextjs-quickstart/

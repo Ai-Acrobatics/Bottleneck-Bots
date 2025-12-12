@@ -4,6 +4,9 @@
  */
 
 import Redis from 'ioredis';
+import { serviceLoggers } from '../lib/logger';
+
+const logger = serviceLoggers.cache;
 
 // Cache configuration
 export const CACHE_TTL = {
@@ -28,7 +31,7 @@ function initializeRedis(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
 
   if (!redisUrl) {
-    console.warn('[Cache] REDIS_URL not configured. Cache will operate in no-cache mode.');
+    logger.warn('REDIS_URL not configured. Cache will operate in no-cache mode.');
     return null;
   }
 
@@ -37,14 +40,14 @@ function initializeRedis(): Redis | null {
       maxRetriesPerRequest: 3,
       retryStrategy(times) {
         if (times > MAX_RECONNECT_ATTEMPTS) {
-          console.error('[Cache] Max reconnection attempts reached. Disabling cache.');
+          logger.error('Max reconnection attempts reached. Disabling cache.');
           isRedisAvailable = false;
           return null; // Stop retrying
         }
 
         reconnectAttempts = times;
         const delay = Math.min(times * 100, 3000);
-        console.log(`[Cache] Reconnecting to Redis (attempt ${times})... Retry in ${delay}ms`);
+        logger.info({ attempt: times, delayMs: delay }, 'Reconnecting to Redis');
         return delay;
       },
       lazyConnect: true,
@@ -53,39 +56,39 @@ function initializeRedis(): Redis | null {
 
     // Connection event handlers
     client.on('connect', () => {
-      console.log('[Cache] Redis connection established');
+      logger.info('Redis connection established');
       isRedisAvailable = true;
       reconnectAttempts = 0;
     });
 
     client.on('ready', () => {
-      console.log('[Cache] Redis is ready to accept commands');
+      logger.info('Redis is ready to accept commands');
       isRedisAvailable = true;
     });
 
     client.on('error', (error) => {
-      console.error('[Cache] Redis connection error:', error.message);
+      logger.error({ error: error.message }, 'Redis connection error');
       isRedisAvailable = false;
     });
 
     client.on('close', () => {
-      console.warn('[Cache] Redis connection closed');
+      logger.warn('Redis connection closed');
       isRedisAvailable = false;
     });
 
     client.on('reconnecting', () => {
-      console.log('[Cache] Attempting to reconnect to Redis...');
+      logger.info('Attempting to reconnect to Redis');
     });
 
     // Attempt initial connection
     client.connect().catch((error) => {
-      console.error('[Cache] Failed to connect to Redis:', error.message);
+      logger.error({ error: error.message }, 'Failed to connect to Redis');
       isRedisAvailable = false;
     });
 
     return client;
   } catch (error) {
-    console.error('[Cache] Failed to initialize Redis client:', error);
+    logger.error({ error }, 'Failed to initialize Redis client');
     return null;
   }
 }
@@ -135,7 +138,7 @@ export const cacheService = {
    */
   async get<T>(key: string): Promise<T | null> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] GET ${getFullKey(key)} - Redis unavailable`);
+      logger.debug({ key: getFullKey(key) }, 'GET - Redis unavailable');
       return null;
     }
 
@@ -144,14 +147,14 @@ export const cacheService = {
       const value = await redisClient.get(fullKey);
 
       if (value !== null) {
-        console.debug(`[Cache] HIT ${fullKey}`);
+        logger.debug({ key: fullKey }, 'Cache HIT');
         return deserialize<T>(value);
       }
 
-      console.debug(`[Cache] MISS ${fullKey}`);
+      logger.debug({ key: fullKey }, 'Cache MISS');
       return null;
     } catch (error) {
-      console.error(`[Cache] Error getting key ${key}:`, error);
+      logger.error({ key, error }, 'Error getting key from cache');
       return null;
     }
   },
@@ -161,7 +164,7 @@ export const cacheService = {
    */
   async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] SET ${getFullKey(key)} - Redis unavailable`);
+      logger.debug({ key: getFullKey(key) }, 'SET - Redis unavailable');
       return;
     }
 
@@ -171,13 +174,13 @@ export const cacheService = {
 
       if (ttlSeconds && ttlSeconds > 0) {
         await redisClient.setex(fullKey, ttlSeconds, serialized);
-        console.debug(`[Cache] SET ${fullKey} (TTL: ${ttlSeconds}s)`);
+        logger.debug({ key: fullKey, ttl: ttlSeconds }, 'Cache SET with TTL');
       } else {
         await redisClient.set(fullKey, serialized);
-        console.debug(`[Cache] SET ${fullKey} (no TTL)`);
+        logger.debug({ key: fullKey }, 'Cache SET without TTL');
       }
     } catch (error) {
-      console.error(`[Cache] Error setting key ${key}:`, error);
+      logger.error({ key, error }, 'Error setting key in cache');
     }
   },
 
@@ -186,16 +189,16 @@ export const cacheService = {
    */
   async delete(key: string): Promise<void> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] DELETE ${getFullKey(key)} - Redis unavailable`);
+      logger.debug({ key: getFullKey(key) }, 'DELETE - Redis unavailable');
       return;
     }
 
     try {
       const fullKey = getFullKey(key);
       await redisClient.del(fullKey);
-      console.debug(`[Cache] DELETE ${fullKey}`);
+      logger.debug({ key: fullKey }, 'Cache DELETE');
     } catch (error) {
-      console.error(`[Cache] Error deleting key ${key}:`, error);
+      logger.error({ key, error }, 'Error deleting key from cache');
     }
   },
 
@@ -204,7 +207,7 @@ export const cacheService = {
    */
   async deletePattern(pattern: string): Promise<number> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] DELETE_PATTERN ${getFullKey(pattern)}* - Redis unavailable`);
+      logger.debug({ pattern: getFullKey(pattern) + '*' }, 'DELETE_PATTERN - Redis unavailable');
       return 0;
     }
 
@@ -229,7 +232,7 @@ export const cacheService = {
           try {
             if (keysToDelete.length > 0) {
               deletedCount = await redisClient!.del(...keysToDelete);
-              console.debug(`[Cache] DELETE_PATTERN ${fullPattern} - deleted ${deletedCount} keys`);
+              logger.debug({ pattern: fullPattern, deletedCount }, 'Cache DELETE_PATTERN completed');
             }
             resolve(deletedCount);
           } catch (error) {
@@ -242,7 +245,7 @@ export const cacheService = {
         });
       });
     } catch (error) {
-      console.error(`[Cache] Error deleting pattern ${pattern}:`, error);
+      logger.error({ pattern, error }, 'Error deleting pattern from cache');
       return 0;
     }
   },
@@ -260,7 +263,7 @@ export const cacheService = {
       const result = await redisClient.exists(fullKey);
       return result === 1;
     } catch (error) {
-      console.error(`[Cache] Error checking existence of key ${key}:`, error);
+      logger.error({ key, error }, 'Error checking key existence in cache');
       return false;
     }
   },
@@ -277,7 +280,7 @@ export const cacheService = {
       const fullKey = getFullKey(key);
       return await redisClient.ttl(fullKey);
     } catch (error) {
-      console.error(`[Cache] Error getting TTL for key ${key}:`, error);
+      logger.error({ key, error }, 'Error getting TTL for key');
       return -2;
     }
   },
@@ -310,17 +313,17 @@ export const cacheService = {
    */
   async increment(key: string, amount: number = 1): Promise<number> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] INCREMENT ${getFullKey(key)} - Redis unavailable`);
+      logger.debug({ key: getFullKey(key) }, 'INCREMENT - Redis unavailable');
       return 0;
     }
 
     try {
       const fullKey = getFullKey(key);
       const result = await redisClient.incrby(fullKey, amount);
-      console.debug(`[Cache] INCREMENT ${fullKey} by ${amount} -> ${result}`);
+      logger.debug({ key: fullKey, amount, result }, 'Cache INCREMENT');
       return result;
     } catch (error) {
-      console.error(`[Cache] Error incrementing key ${key}:`, error);
+      logger.error({ key, error }, 'Error incrementing key in cache');
       return 0;
     }
   },
@@ -330,17 +333,17 @@ export const cacheService = {
    */
   async decrement(key: string, amount: number = 1): Promise<number> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug(`[Cache] DECREMENT ${getFullKey(key)} - Redis unavailable`);
+      logger.debug({ key: getFullKey(key) }, 'DECREMENT - Redis unavailable');
       return 0;
     }
 
     try {
       const fullKey = getFullKey(key);
       const result = await redisClient.decrby(fullKey, amount);
-      console.debug(`[Cache] DECREMENT ${fullKey} by ${amount} -> ${result}`);
+      logger.debug({ key: fullKey, amount, result }, 'Cache DECREMENT');
       return result;
     } catch (error) {
-      console.error(`[Cache] Error decrementing key ${key}:`, error);
+      logger.error({ key, error }, 'Error decrementing key in cache');
       return 0;
     }
   },
@@ -350,16 +353,16 @@ export const cacheService = {
    */
   async flush(): Promise<void> {
     if (!redisClient || !isRedisAvailable) {
-      console.debug('[Cache] FLUSH - Redis unavailable');
+      logger.debug('FLUSH - Redis unavailable');
       return;
     }
 
     try {
       // Only flush keys with our prefix to avoid affecting other data
       await this.deletePattern('');
-      console.log('[Cache] FLUSH completed');
+      logger.info('Cache FLUSH completed');
     } catch (error) {
-      console.error('[Cache] Error flushing cache:', error);
+      logger.error({ error }, 'Error flushing cache');
     }
   },
 
@@ -406,9 +409,9 @@ export const cacheService = {
     if (redisClient) {
       try {
         await redisClient.quit();
-        console.log('[Cache] Redis connection closed gracefully');
+        logger.info('Redis connection closed gracefully');
       } catch (error) {
-        console.error('[Cache] Error closing Redis connection:', error);
+        logger.error({ error }, 'Error closing Redis connection');
       }
     }
   },

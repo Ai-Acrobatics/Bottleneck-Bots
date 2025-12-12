@@ -26,6 +26,7 @@ import { settingsRouter } from "./api/routers/settings";
 import { webhooksRouter } from "./api/routers/webhooks";
 import { agencyTasksRouter } from "./api/routers/agencyTasks";
 import { clientProfilesRouter } from "./api/routers/clientProfiles";
+import { healthRouter } from "./api/routers/health";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -71,6 +72,7 @@ export const appRouter = router({
   // Monitoring & Analytics
   alerts: alertsRouter,
   analytics: analyticsRouter,
+  health: healthRouter,
 
   // Settings & Configuration
   apiKeys: apiKeysRouter,

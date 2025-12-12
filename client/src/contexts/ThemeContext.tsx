@@ -32,12 +32,34 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
+
+    // Handle system theme preference
+    const applyTheme = (currentTheme: Theme) => {
+      if (currentTheme === "system") {
+        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (systemPrefersDark) {
+          root.classList.add("dark");
+        } else {
+          root.classList.remove("dark");
+        }
+      } else if (currentTheme === "dark") {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+    };
+
+    applyTheme(theme);
+
+    // Listen for system theme changes when theme is set to "system"
+    if (theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = () => applyTheme(theme);
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
     }
 
+    // Store theme preference in localStorage
     if (switchable) {
       localStorage.setItem("theme", theme);
     }

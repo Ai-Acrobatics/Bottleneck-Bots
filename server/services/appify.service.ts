@@ -5,7 +5,18 @@
  * Environment Variables Required:
  * - APIFY_API_KEY: Your Apify API token
  * - APIFY_TASK_ID: The Apify actor task ID for enrichment
+ *
+ * Includes:
+ * - Retry logic with exponential backoff
+ * - Circuit breaker pattern for service protection
+ * - Comprehensive error handling
  */
+
+import { withRetry, DEFAULT_RETRY_OPTIONS } from '../lib/retry';
+import { circuitBreakers } from '../lib/circuitBreaker';
+import { serviceLoggers } from '../lib/logger';
+
+const logger = serviceLoggers.apify;
 
 export interface LeadData {
   firstName?: string;
@@ -124,45 +135,78 @@ export class AppifyService {
       throw new Error("Apify task ID not configured. Set APIFY_TASK_ID environment variable.");
     }
 
-    try {
-      // Start Apify actor task run
-      const runResponse = await fetch(
-        `${this.baseUrl}/actor-tasks/${this.taskId}/runs`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: leadData.email,
-            phone: leadData.phone,
-            company: leadData.company,
-            linkedinUrl: leadData.linkedIn || leadData.linkedinUrl,
-            firstName: leadData.firstName,
-            lastName: leadData.lastName,
-          }),
+    return await circuitBreakers.apify.execute(async () => {
+      return await withRetry(async () => {
+        // Start Apify actor task run
+        const runResponse = await fetch(
+          `${this.baseUrl}/actor-tasks/${this.taskId}/runs`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: leadData.email,
+              phone: leadData.phone,
+              company: leadData.company,
+              linkedinUrl: leadData.linkedIn || leadData.linkedinUrl,
+              firstName: leadData.firstName,
+              lastName: leadData.lastName,
+            }),
+          }
+        );
+
+        if (!runResponse.ok) {
+          const errorText = await runResponse.text();
+          throw new Error(`Apify API error: ${runResponse.status} - ${errorText}`);
         }
-      );
 
-      if (!runResponse.ok) {
-        const errorText = await runResponse.text();
-        throw new Error(`Apify API error: ${runResponse.status} - ${errorText}`);
-      }
+        const runData: ApifyRunResponse = await runResponse.json();
+        const runId = runData.data.id;
 
-      const runData: ApifyRunResponse = await runResponse.json();
-      const runId = runData.data.id;
+        // Wait for run to complete (poll status)
+        let status = runData.data.status;
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes max (5 second intervals)
 
-      // Wait for run to complete (poll status)
-      let status = runData.data.status;
-      let attempts = 0;
-      const maxAttempts = 60; // 5 minutes max (5 second intervals)
+        while (status !== "SUCCEEDED" && status !== "FAILED" && attempts < maxAttempts) {
+          await sleep(5000); // Wait 5 seconds between polls
 
-      while (status !== "SUCCEEDED" && status !== "FAILED" && attempts < maxAttempts) {
-        await sleep(5000); // Wait 5 seconds between polls
+          const statusResponse = await fetch(
+            `${this.baseUrl}/actor-runs/${runId}`,
+            {
+              headers: {
+                "Authorization": `Bearer ${this.apiKey}`,
+              },
+            }
+          );
 
-        const statusResponse = await fetch(
-          `${this.baseUrl}/actor-runs/${runId}`,
+          if (!statusResponse.ok) {
+            throw new Error(`Failed to check run status: ${statusResponse.status}`);
+          }
+
+          const statusData: ApifyRunResponse = await statusResponse.json();
+          status = statusData.data.status;
+          attempts++;
+        }
+
+        if (status === "FAILED") {
+          throw new Error("Apify actor run failed");
+        }
+
+        if (status !== "SUCCEEDED") {
+          throw new Error("Apify actor run timed out");
+        }
+
+        // Get dataset results
+        const datasetId = runData.data.defaultDatasetId;
+        if (!datasetId) {
+          throw new Error("No dataset ID returned from Apify");
+        }
+
+        const datasetResponse = await fetch(
+          `${this.baseUrl}/datasets/${datasetId}/items`,
           {
             headers: {
               "Authorization": `Bearer ${this.apiKey}`,
@@ -170,95 +214,66 @@ export class AppifyService {
           }
         );
 
-        if (!statusResponse.ok) {
-          throw new Error(`Failed to check run status: ${statusResponse.status}`);
+        if (!datasetResponse.ok) {
+          throw new Error(`Failed to fetch dataset: ${datasetResponse.status}`);
         }
 
-        const statusData: ApifyRunResponse = await statusResponse.json();
-        status = statusData.data.status;
-        attempts++;
-      }
+        const datasetItems: ApifyDatasetItem[] = await datasetResponse.json();
 
-      if (status === "FAILED") {
-        throw new Error("Apify actor run failed");
-      }
-
-      if (status !== "SUCCEEDED") {
-        throw new Error("Apify actor run timed out");
-      }
-
-      // Get dataset results
-      const datasetId = runData.data.defaultDatasetId;
-      if (!datasetId) {
-        throw new Error("No dataset ID returned from Apify");
-      }
-
-      const datasetResponse = await fetch(
-        `${this.baseUrl}/datasets/${datasetId}/items`,
-        {
-          headers: {
-            "Authorization": `Bearer ${this.apiKey}`,
-          },
+        if (!datasetItems || datasetItems.length === 0) {
+          // Return original data with low confidence if no enrichment found
+          return {
+            ...leadData,
+            enrichmentSource: "apify",
+            enrichmentDate: new Date(),
+            confidence: 0,
+          };
         }
-      );
 
-      if (!datasetResponse.ok) {
-        throw new Error(`Failed to fetch dataset: ${datasetResponse.status}`);
-      }
+        // Parse and map Apify data to our format
+        const enrichedItem = datasetItems[0];
 
-      const datasetItems: ApifyDatasetItem[] = await datasetResponse.json();
-
-      if (!datasetItems || datasetItems.length === 0) {
-        // Return original data with low confidence if no enrichment found
-        return {
+        const enrichedData: EnrichedLeadData = {
           ...leadData,
+          fullName: enrichedItem.fullName || enrichedItem.name ||
+                    (leadData.firstName && leadData.lastName
+                      ? `${leadData.firstName} ${leadData.lastName}`
+                      : undefined),
+          firstName: enrichedItem.firstName || leadData.firstName,
+          lastName: enrichedItem.lastName || leadData.lastName,
+          title: enrichedItem.title || enrichedItem.jobTitle || leadData.jobTitle,
+          company: enrichedItem.company || enrichedItem.companyName || leadData.company,
+          location: enrichedItem.location,
+          socialProfiles: {
+            linkedin: enrichedItem.linkedinUrl || enrichedItem.linkedin || leadData.linkedIn,
+            twitter: enrichedItem.twitter,
+            facebook: enrichedItem.facebook,
+          },
+          companyInfo: {
+            name: enrichedItem.company || enrichedItem.companyName || leadData.company,
+            domain: enrichedItem.website || leadData.website,
+            industry: enrichedItem.industry,
+            size: enrichedItem.companySize,
+            location: enrichedItem.location,
+          },
+          contactInfo: {
+            email: enrichedItem.email || leadData.email,
+            phone: enrichedItem.phone || leadData.phone,
+            mobilePhone: enrichedItem.phone,
+          },
           enrichmentSource: "apify",
           enrichmentDate: new Date(),
-          confidence: 0,
+          confidence: enrichedItem.confidence || this.calculateConfidence(enrichedItem),
         };
-      }
 
-      // Parse and map Apify data to our format
-      const enrichedItem = datasetItems[0];
-
-      const enrichedData: EnrichedLeadData = {
-        ...leadData,
-        fullName: enrichedItem.fullName || enrichedItem.name ||
-                  (leadData.firstName && leadData.lastName
-                    ? `${leadData.firstName} ${leadData.lastName}`
-                    : undefined),
-        firstName: enrichedItem.firstName || leadData.firstName,
-        lastName: enrichedItem.lastName || leadData.lastName,
-        title: enrichedItem.title || enrichedItem.jobTitle || leadData.jobTitle,
-        company: enrichedItem.company || enrichedItem.companyName || leadData.company,
-        location: enrichedItem.location,
-        socialProfiles: {
-          linkedin: enrichedItem.linkedinUrl || enrichedItem.linkedin || leadData.linkedIn,
-          twitter: enrichedItem.twitter,
-          facebook: enrichedItem.facebook,
-        },
-        companyInfo: {
-          name: enrichedItem.company || enrichedItem.companyName || leadData.company,
-          domain: enrichedItem.website || leadData.website,
-          industry: enrichedItem.industry,
-          size: enrichedItem.companySize,
-          location: enrichedItem.location,
-        },
-        contactInfo: {
-          email: enrichedItem.email || leadData.email,
-          phone: enrichedItem.phone || leadData.phone,
-          mobilePhone: enrichedItem.phone,
-        },
-        enrichmentSource: "apify",
-        enrichmentDate: new Date(),
-        confidence: enrichedItem.confidence || this.calculateConfidence(enrichedItem),
-      };
-
-      return enrichedData;
-    } catch (error: any) {
-      console.error("Apify enrichment error:", error);
-      throw new Error(`Lead enrichment failed: ${error.message}`);
-    }
+        return enrichedData;
+      }, {
+        ...DEFAULT_RETRY_OPTIONS,
+        maxAttempts: 2,
+        initialDelayMs: 2000,
+        maxDelayMs: 15000,
+      });
+    });
   }
 
   /**
@@ -312,18 +327,20 @@ export class AppifyService {
       return false;
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/users/me`, {
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-        },
-      });
+    return await circuitBreakers.apify.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/users/me`, {
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+          },
+        });
 
-      return response.ok;
-    } catch (error) {
-      console.error("Apify API key validation error:", error);
+        return response.ok;
+      }, DEFAULT_RETRY_OPTIONS);
+    }).catch(error => {
+      logger.error({ error }, 'Apify API key validation error');
       return false;
-    }
+    });
   }
 
   /**
@@ -334,26 +351,28 @@ export class AppifyService {
       throw new Error("Apify API key not configured");
     }
 
-    try {
-      const response = await fetch(`${this.baseUrl}/users/me`, {
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-        },
-      });
+    return await circuitBreakers.apify.execute(async () => {
+      return await withRetry(async () => {
+        const response = await fetch(`${this.baseUrl}/users/me`, {
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Apify account info: ${response.status}`);
-      }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Apify account info: ${response.status}`);
+        }
 
-      const userData = await response.json();
+        const userData = await response.json();
 
-      // Apify uses a usage-based system, return approximate remaining credits
-      // This is a simplified calculation - adjust based on actual Apify pricing
-      return userData.data?.usageCycle?.creditsRemaining || 0;
-    } catch (error: any) {
-      console.error("Error fetching Apify credits:", error);
+        // Apify uses a usage-based system, return approximate remaining credits
+        // This is a simplified calculation - adjust based on actual Apify pricing
+        return userData.data?.usageCycle?.creditsRemaining || 0;
+      }, DEFAULT_RETRY_OPTIONS);
+    }).catch(error => {
+      logger.error({ error }, 'Error fetching Apify credits');
       return 0;
-    }
+    });
   }
 
   /**

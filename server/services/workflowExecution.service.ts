@@ -12,6 +12,15 @@ import { getBrowserbaseService } from "../_core/browserbase";
 import { browserbaseSDK } from "../_core/browserbaseSDK";
 import { cacheService, CACHE_TTL } from "./cache.service";
 import { cacheKeys } from "../lib/cacheKeys";
+import type {
+  WorkflowStep,
+  WorkflowStepType,
+  ExecutionContext,
+  StepResult,
+  ExecuteWorkflowOptions,
+  ExecutionStatus,
+  HttpMethod,
+} from "../types";
 
 /**
  * Workflow Execution Service
@@ -22,61 +31,25 @@ import { cacheKeys } from "../lib/cacheKeys";
 // TYPES & INTERFACES
 // ========================================
 
-export interface WorkflowStep {
-  type: string;
-  order: number;
-  config: Record<string, any>;
-}
+// Re-export types for backward compatibility
+export type {
+  WorkflowStep,
+  ExecutionContext,
+  StepResult,
+  ExecuteWorkflowOptions,
+  ExecutionStatus,
+};
 
-export interface ExecutionContext {
-  workflowId: number;
-  executionId: number;
+export interface TestExecuteWorkflowOptions {
   userId: number;
-  sessionId: string;
-  stagehand: Stagehand;
-  variables: Record<string, any>;
-  stepResults: Array<{
-    stepIndex: number;
-    type: string;
-    success: boolean;
-    result?: any;
-    error?: string;
-    timestamp: Date;
-  }>;
-  extractedData: Array<{
-    url: string;
-    dataType: string;
-    data: any;
-  }>;
-}
-
-export interface StepResult {
-  success: boolean;
-  result?: any;
-  error?: string;
-}
-
-export interface ExecuteWorkflowOptions {
-  workflowId: number;
-  userId: number;
-  variables?: Record<string, any>;
+  steps: WorkflowStep[];
+  variables?: Record<string, unknown>;
   geolocation?: {
     city?: string;
     state?: string;
     country?: string;
   };
-}
-
-export interface ExecutionStatus {
-  executionId: number;
-  workflowId: number;
-  status: string;
-  startedAt?: Date;
-  completedAt?: Date;
-  currentStep?: number;
-  stepResults?: any[];
-  output?: any;
-  error?: string;
+  stepByStep?: boolean;
 }
 
 // ========================================
@@ -117,7 +90,7 @@ function resolveModelApiKey(modelName: string): string {
  * Substitute variables in a string value
  * Supports {{variableName}} syntax
  */
-function substituteVariables(value: any, variables: Record<string, any>): any {
+function substituteVariables(value: unknown, variables: Record<string, unknown>): unknown {
   if (typeof value === "string") {
     return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
       return variables[varName] !== undefined ? String(variables[varName]) : match;
@@ -127,7 +100,7 @@ function substituteVariables(value: any, variables: Record<string, any>): any {
     if (Array.isArray(value)) {
       return value.map((item) => substituteVariables(item, variables));
     }
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
       result[key] = substituteVariables(val, variables);
     }
@@ -146,8 +119,8 @@ async function updateExecutionStatus(
     currentStep?: number;
     completedAt?: Date;
     error?: string;
-    output?: any;
-    stepResults?: any[];
+    output?: unknown;
+    stepResults?: unknown[];
   }
 ): Promise<void> {
   const db = await getDb();
@@ -863,6 +836,182 @@ export async function getExecutionStatus(executionId: number): Promise<Execution
     output: execution.output,
     error: execution.error || undefined,
   };
+}
+
+/**
+ * Test execute workflow without saving to database
+ * Used for testing workflows before saving them
+ */
+export async function testExecuteWorkflow(
+  options: TestExecuteWorkflowOptions
+): Promise<ExecutionStatus> {
+  const { userId, steps, variables = {}, geolocation, stepByStep = false } = options;
+
+  let stagehand: Stagehand | undefined;
+  let sessionId: string | undefined;
+
+  try {
+    // Validate and sort steps
+    if (!Array.isArray(steps) || steps.length === 0) {
+      throw new Error("Test workflow has no steps");
+    }
+
+    const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+
+    // Create browser session
+    const session = geolocation
+      ? await browserbaseSDK.createSessionWithGeoLocation(geolocation)
+      : await browserbaseSDK.createSession({
+          projectId: process.env.BROWSERBASE_PROJECT_ID,
+          proxies: true,
+          timeout: 3600,
+          keepAlive: true,
+          browserSettings: {
+            viewport: { width: 1920, height: 1080 },
+          },
+        });
+
+    sessionId = session.id;
+    console.log(`Test workflow session created: ${session.id}`);
+
+    // Initialize Stagehand
+    const modelName = "google/gemini-2.0-flash";
+    const modelApiKey = resolveModelApiKey(modelName);
+
+    stagehand = new Stagehand({
+      env: "BROWSERBASE",
+      verbose: 1,
+      disablePino: true,
+      modelApiKey,
+      apiKey: process.env.BROWSERBASE_API_KEY,
+      projectId: process.env.BROWSERBASE_PROJECT_ID,
+      browserbaseSessionCreateParams: {
+        projectId: process.env.BROWSERBASE_PROJECT_ID!,
+        proxies: true,
+        region: "us-west-2",
+        timeout: 3600,
+        keepAlive: true,
+        browserSettings: {
+          advancedStealth: false,
+          blockAds: true,
+          solveCaptchas: true,
+          recordSession: true,
+          viewport: { width: 1920, height: 1080 },
+        },
+        userMetadata: {
+          userId: `user-${userId}`,
+          testRun: "true",
+          environment: process.env.NODE_ENV || "development",
+        },
+      },
+    });
+
+    await stagehand.init();
+
+    // Create execution context (no execution ID since we're not saving)
+    const context: ExecutionContext = {
+      workflowId: -1, // Dummy ID for test
+      executionId: -1, // Dummy ID for test
+      userId,
+      sessionId: session.id,
+      stagehand,
+      variables: { ...variables },
+      stepResults: [],
+      extractedData: [],
+    };
+
+    const startTime = Date.now();
+
+    // Execute steps sequentially
+    for (let i = 0; i < sortedSteps.length; i++) {
+      const step = sortedSteps[i];
+      const stepStartTime = Date.now();
+
+      console.log(`Test run - Executing step ${i + 1}/${sortedSteps.length}: ${step.type}`);
+
+      // Execute step
+      const result = await executeStep(step, context);
+
+      // Calculate duration
+      const duration = Date.now() - stepStartTime;
+
+      // Add result to context with duration
+      context.stepResults.push({
+        stepIndex: i,
+        type: step.type,
+        success: result.success,
+        result: result.result,
+        error: result.error,
+        timestamp: new Date(),
+        duration,
+      } as any);
+
+      // Store result in variables if saveAs is specified
+      if (step.config.saveAs && result.success && result.result) {
+        context.variables[step.config.saveAs] = result.result;
+      }
+
+      // Check if step failed and should stop execution
+      if (!result.success && !step.config.continueOnError) {
+        const totalDuration = Date.now() - startTime;
+
+        // Clean up
+        await stagehand.close();
+
+        return {
+          executionId: -1,
+          workflowId: -1,
+          status: "failed",
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+          stepResults: context.stepResults,
+          output: {
+            extractedData: context.extractedData,
+            finalVariables: context.variables,
+            duration: totalDuration,
+          },
+          error: `Step ${i + 1} failed: ${result.error}`,
+        };
+      }
+
+      // If step-by-step mode, add a small delay to allow UI to update
+      if (stepByStep && i < sortedSteps.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    const totalDuration = Date.now() - startTime;
+
+    // Clean up
+    await stagehand.close();
+
+    return {
+      executionId: -1,
+      workflowId: -1,
+      status: "completed",
+      startedAt: new Date(startTime),
+      completedAt: new Date(),
+      stepResults: context.stepResults,
+      output: {
+        extractedData: context.extractedData,
+        finalVariables: context.variables,
+        duration: totalDuration,
+      },
+    };
+  } catch (error) {
+    console.error("Test workflow execution failed:", error);
+
+    // Clean up browser session
+    if (stagehand) {
+      try {
+        await stagehand.close();
+      } catch (closeError) {
+        console.error("Failed to close Stagehand:", closeError);
+      }
+    }
+
+    throw error;
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "./authMiddleware";
 import { getDb } from "../../../db";
 import { apiRequestLogs } from "../../../../drizzle/schema";
+import { serviceLoggers } from "../../../lib/logger";
 
 /**
  * Request with timing information
@@ -28,11 +29,13 @@ export function requestLogger(
   req.startTime = Date.now();
 
   // Log request
-  console.log(`[API] ${req.method} ${req.path}`, {
+  serviceLoggers.api.info({
+    method: req.method,
+    path: req.path,
     ip: req.ip,
     userAgent: req.headers["user-agent"],
-    apiKey: req.apiKey?.name,
-  });
+    apiKeyName: req.apiKey?.name,
+  }, 'API request received');
 
   // Capture response finish event
   const originalSend = res.send;
@@ -42,11 +45,17 @@ export function requestLogger(
     const responseTime = Date.now() - (req.startTime || Date.now());
 
     // Log response
-    console.log(`[API] ${req.method} ${req.path} - ${res.statusCode} (${responseTime}ms)`);
+    serviceLoggers.api.info({
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      responseTime,
+      apiKeyName: req.apiKey?.name,
+    }, 'API request completed');
 
     // Store request log asynchronously (don't block response)
     storeRequestLog(req, res, responseTime).catch((error) => {
-      console.error("Failed to store request log:", error);
+      serviceLoggers.api.error({ error: error.message }, 'Failed to store request log');
     });
 
     return originalSend.call(this, body);
@@ -91,7 +100,7 @@ async function storeRequestLog(
     await db.insert(apiRequestLogs).values(logEntry);
   } catch (error) {
     // Silent fail - don't break API functionality
-    console.error("Failed to store request log:", error);
+    serviceLoggers.api.error({ error }, 'Failed to store request log in database');
   }
 }
 

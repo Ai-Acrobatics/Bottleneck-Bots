@@ -5,6 +5,10 @@
  * TODO: Implement actual platform detection logic with ML or keyword matching
  */
 
+import { serviceLoggers } from '../lib/logger';
+
+const logger = serviceLoggers.platform;
+
 export interface PlatformDetectionInput {
   prompt: string;
   url?: string;
@@ -32,7 +36,11 @@ class PlatformDetectionService {
     // 4. Calculate confidence scores
     // 5. Return detected platforms with primary platform
 
-    console.log(`TODO: Detect platforms from prompt: "${input.prompt}"`);
+    logger.debug({
+      prompt: input.prompt,
+      url: input.url,
+      hasContext: !!input.context
+    }, 'Platform detection requested - implementation pending');
 
     // Default response
     return {
@@ -54,7 +62,7 @@ class PlatformDetectionService {
     // 2. Store in database or configuration
     // 3. Include patterns for DNS/domain detection
 
-    console.log("TODO: Seed platform keywords");
+    logger.debug('Seed platform keywords requested - implementation pending');
 
     // Example platforms to support:
     // - GoHighLevel (GHL)
@@ -91,7 +99,10 @@ class PlatformDetectionService {
    */
   async addPlatformKeywords(platform: string, keywords: string[]): Promise<void> {
     // TODO: Add custom keywords for a platform
-    console.log(`TODO: Add keywords for platform ${platform}`, keywords);
+    logger.debug({
+      platform,
+      keywordCount: keywords.length
+    }, 'Add platform keywords requested - implementation pending');
   }
 }
 

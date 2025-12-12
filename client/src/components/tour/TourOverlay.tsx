@@ -64,8 +64,8 @@ export function TourOverlay({ targetRect }: TourOverlayProps) {
 
           {/* Gradient for subtle glow effect */}
           <radialGradient id="spotlight-glow">
-            <stop offset="0%" stopColor="rgba(99, 102, 241, 0.4)" />
-            <stop offset="100%" stopColor="rgba(99, 102, 241, 0)" />
+            <stop offset="0%" stopColor="rgba(16, 185, 129, 0.4)" />
+            <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
           </radialGradient>
         </defs>
 
@@ -96,7 +96,7 @@ export function TourOverlay({ targetRect }: TourOverlayProps) {
           }}
           rx={borderRadius}
           fill="none"
-          stroke="rgba(99, 102, 241, 0.8)"
+          stroke="rgba(16, 185, 129, 0.8)"
           strokeWidth="2"
         />
 

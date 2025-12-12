@@ -254,6 +254,8 @@ const apiKeyServiceEnum = z.enum([
   "twilio",
   "sendgrid",
   "gohighlevel",
+  "vapi",
+  "apify",
   "custom",
 ]);
 
@@ -329,6 +331,65 @@ export const settingsRouter = router({
       });
     }
   }),
+
+  /**
+   * Validate an API key before saving
+   * This allows testing keys before they are stored
+   */
+  validateApiKey: protectedProcedure
+    .input(
+      z.object({
+        service: apiKeyServiceEnum,
+        apiKey: z.string().min(1),
+        accountSid: z.string().optional(), // For Twilio
+        authToken: z.string().optional(), // For Twilio
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Import validation service
+        const { apiKeyValidationService } = await import("../../services/apiKeyValidation.service");
+
+        console.log(`[Settings] Validating new ${input.service} API key for user ${ctx.user.id}`);
+
+        // Build credentials object based on service
+        const credentials: Record<string, string> = { apiKey: input.apiKey };
+
+        // Special handling for Twilio which requires both accountSid and authToken
+        if (input.service === "twilio") {
+          if (!input.accountSid || !input.authToken) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Twilio requires both Account SID and Auth Token",
+            });
+          }
+          credentials.accountSid = input.accountSid;
+          credentials.authToken = input.authToken;
+        }
+
+        // Perform validation
+        const validationResult = await apiKeyValidationService.validate(
+          input.service,
+          credentials
+        );
+
+        return {
+          success: validationResult.valid,
+          message: validationResult.message,
+          isValid: validationResult.valid,
+          details: validationResult.details,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        console.error(`[Settings] API key validation error:`, error);
+        return {
+          success: false,
+          message: `Validation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          isValid: false,
+        };
+      }
+    }),
 
   /**
    * Save an API key (encrypted)
@@ -515,176 +576,49 @@ export const settingsRouter = router({
         const encryptedKey = (apiKeys as any)[input.service].key;
         const apiKey = decrypt(encryptedKey);
 
-        // Service-specific validation
-        switch (input.service) {
-          case "openai": {
-            try {
-              const { default: OpenAI } = await import("openai");
-              const openai = new OpenAI({ apiKey, timeout: 5000 });
+        // Import validation services
+        const { apiKeyValidationService } = await import("../../services/apiKeyValidation.service");
+        const { validationCache, ValidationCacheService } = await import("../../services/validationCache.service");
 
-              // Test the API key by listing models
-              await openai.models.list();
+        // Generate cache key
+        const cacheKey = ValidationCacheService.generateKey(
+          ctx.user.id,
+          input.service,
+          { apiKey }
+        );
 
-              return {
-                success: true,
-                message: "OpenAI API key is valid",
-                isValid: true,
-              };
-            } catch (error: any) {
-              // Specific OpenAI error handling
-              if (error?.status === 401) {
-                return {
-                  success: false,
-                  message: "Invalid OpenAI API key - authentication failed",
-                  isValid: false,
-                };
-              } else if (error?.status === 429) {
-                return {
-                  success: false,
-                  message: "OpenAI API key rate limit exceeded - key is valid but quota exceeded",
-                  isValid: false,
-                };
-              } else if (error?.code === "ETIMEDOUT" || error?.code === "ECONNABORTED") {
-                return {
-                  success: false,
-                  message: "OpenAI API request timed out - please try again",
-                  isValid: false,
-                };
-              }
-              throw error;
-            }
-          }
-
-          case "browserbase": {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-              const response = await fetch("https://www.browserbase.com/v1/sessions", {
-                method: "GET",
-                headers: {
-                  "Authorization": `Bearer ${apiKey}`,
-                  "Content-Type": "application/json",
-                },
-                signal: controller.signal,
-              });
-
-              clearTimeout(timeoutId);
-
-              if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                  return {
-                    success: false,
-                    message: "Invalid Browserbase API key - authentication failed",
-                    isValid: false,
-                  };
-                } else if (response.status === 429) {
-                  return {
-                    success: false,
-                    message: "Browserbase API rate limit exceeded - key is valid but quota exceeded",
-                    isValid: false,
-                  };
-                }
-
-                const errorText = await response.text().catch(() => "Unknown error");
-                return {
-                  success: false,
-                  message: `Browserbase API error (${response.status}): ${errorText}`,
-                  isValid: false,
-                };
-              }
-
-              return {
-                success: true,
-                message: "Browserbase API key is valid",
-                isValid: true,
-              };
-            } catch (error: any) {
-              if (error.name === "AbortError") {
-                return {
-                  success: false,
-                  message: "Browserbase API request timed out - please try again",
-                  isValid: false,
-                };
-              }
-              throw error;
-            }
-          }
-
-          case "anthropic": {
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-              // Test with a minimal messages API call
-              const response = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "x-api-key": apiKey,
-                  "anthropic-version": "2023-06-01",
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  model: "claude-3-haiku-20240307",
-                  max_tokens: 1,
-                  messages: [{ role: "user", content: "test" }],
-                }),
-                signal: controller.signal,
-              });
-
-              clearTimeout(timeoutId);
-
-              if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                  return {
-                    success: false,
-                    message: "Invalid Anthropic API key - authentication failed",
-                    isValid: false,
-                  };
-                } else if (response.status === 429) {
-                  return {
-                    success: false,
-                    message: "Anthropic API rate limit exceeded - key is valid but quota exceeded",
-                    isValid: false,
-                  };
-                }
-
-                const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-                return {
-                  success: false,
-                  message: `Anthropic API error (${response.status}): ${errorData.error?.message || "Unknown error"}`,
-                  isValid: false,
-                };
-              }
-
-              return {
-                success: true,
-                message: "Anthropic API key is valid",
-                isValid: true,
-              };
-            } catch (error: any) {
-              if (error.name === "AbortError") {
-                return {
-                  success: false,
-                  message: "Anthropic API request timed out - please try again",
-                  isValid: false,
-                };
-              }
-              throw error;
-            }
-          }
-
-          default:
-            // For other services without specific validation
-            return {
-              success: true,
-              message: `API key for ${input.service} is configured (validation not implemented)`,
-              isValid: true,
-            };
+        // Check cache first
+        const cachedResult = validationCache.get(cacheKey);
+        if (cachedResult) {
+          console.log(`[Settings] Using cached validation result for ${input.service}`);
+          return {
+            success: cachedResult.valid,
+            message: `${cachedResult.message} (cached)`,
+            isValid: cachedResult.valid,
+            details: cachedResult.details,
+          };
         }
+
+        // Perform real validation
+        console.log(`[Settings] Validating ${input.service} API key for user ${ctx.user.id}`);
+        const validationResult = await apiKeyValidationService.validate(
+          input.service,
+          { apiKey }
+        );
+
+        // Cache the result (5 minutes)
+        validationCache.set(cacheKey, validationResult);
+
+        return {
+          success: validationResult.valid,
+          message: validationResult.message,
+          isValid: validationResult.valid,
+          details: validationResult.details,
+        };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
+        console.error(`[Settings] API key test error:`, error);
         return {
           success: false,
           message: `API key test failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -1461,7 +1395,7 @@ export const settingsRouter = router({
     }),
 
   /**
-   * Test webhook with sample payload
+   * Test webhook with sample payload and logging
    */
   testWebhook: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -1501,38 +1435,30 @@ export const settingsRouter = router({
           });
         }
 
-        // Create test payload
-        const testPayload = {
+        // Use webhook service to send test with logging
+        const { sendWebhook } = await import("../../services/webhook.service");
+
+        const log = await sendWebhook({
+          webhookId: webhook.id,
+          userId: ctx.user.id,
           event: "webhook.test",
-          timestamp: new Date().toISOString(),
-          data: {
+          payload: {
             message: "This is a test webhook delivery",
             userId: ctx.user.id,
             webhookId: webhook.id,
           },
-        };
-
-        const payloadString = JSON.stringify(testPayload);
-        const signature = generateWebhookSignature(payloadString, webhook.secret);
-
-        // Send webhook
-        const response = await fetch(webhook.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Webhook-Signature": signature,
-            "X-Webhook-ID": webhook.id,
-          },
-          body: payloadString,
+          webhookUrl: webhook.url,
+          webhookSecret: webhook.secret,
         });
 
         return {
-          success: response.ok,
-          statusCode: response.status,
-          message: response.ok
+          success: log.status === "success",
+          statusCode: log.responseStatus || 0,
+          message: log.status === "success"
             ? "Test webhook delivered successfully"
-            : `Webhook delivery failed with status ${response.status}`,
-          responseBody: await response.text().catch(() => null),
+            : `Webhook delivery failed with status ${log.responseStatus || "unknown"}`,
+          responseBody: log.responseBody,
+          logId: log.id,
         };
       } catch (error) {
         return {
@@ -1543,26 +1469,119 @@ export const settingsRouter = router({
     }),
 
   /**
-   * Get webhook delivery logs
-   * TODO: Implement webhook logging system with dedicated database table
+   * Get webhook delivery logs with filtering
    */
   getWebhookLogs: protectedProcedure
     .input(
       z.object({
-        webhookId: z.string().uuid(),
+        webhookId: z.string().uuid().optional(),
+        event: z.string().optional(),
+        status: z.enum(["pending", "success", "failed", "retrying", "permanently_failed"]).optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
         limit: z.number().int().positive().max(100).default(50),
         offset: z.number().int().nonnegative().default(0),
       })
     )
     .query(async ({ ctx, input }) => {
-      // TODO: Implement webhook delivery logs storage
-      // Currently returns empty array - logs will be stored when webhook logging is implemented
-      return {
-        logs: [],
-        total: 0,
-        limit: input.limit,
-        offset: input.offset,
-      };
+      try {
+        const { getWebhookLogs } = await import("../../services/webhook.service");
+
+        const result = await getWebhookLogs({
+          userId: ctx.user.id,
+          webhookId: input.webhookId,
+          event: input.event,
+          status: input.status,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          limit: input.limit,
+          offset: input.offset,
+        });
+
+        return {
+          logs: result.logs,
+          total: result.total,
+          limit: input.limit,
+          offset: input.offset,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get webhook logs",
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Get webhook statistics and metrics
+   */
+  getWebhookStats: protectedProcedure
+    .input(
+      z.object({
+        webhookId: z.string().uuid().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const { getWebhookStats } = await import("../../services/webhook.service");
+
+        const stats = await getWebhookStats({
+          userId: ctx.user.id,
+          webhookId: input.webhookId,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+        });
+
+        return stats;
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get webhook stats",
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Manually retry a failed webhook delivery
+   */
+  retryWebhook: protectedProcedure
+    .input(
+      z.object({
+        logId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { retryWebhook } = await import("../../services/webhook.service");
+
+        const result = await retryWebhook(input.logId, ctx.user.id);
+
+        return {
+          success: result.status === "success",
+          status: result.status,
+          message: result.status === "success"
+            ? "Webhook delivered successfully"
+            : "Webhook retry attempted but failed",
+          log: result,
+        };
+      } catch (error) {
+        if (error instanceof Error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to retry webhook",
+          cause: error,
+        });
+      }
     }),
 
   /**

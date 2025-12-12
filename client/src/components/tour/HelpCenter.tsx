@@ -72,7 +72,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-lg pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5 rounded-lg pointer-events-none" />
         
         <div className="relative">
           <DialogHeader>
@@ -92,7 +92,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                 variants={itemVariants}
                 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"
               >
-                <Play className="w-5 h-5 text-indigo-400" />
+                <Play className="w-5 h-5 text-emerald-400" />
                 Available Tours
               </motion.h3>
               <motion.div
@@ -110,12 +110,12 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                         y: -4,
                         transition: { duration: 0.2 },
                       }}
-                      className="group relative bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 hover:border-indigo-500/50 transition-colors duration-200 cursor-pointer"
+                      className="group relative bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 hover:border-emerald-500/50 transition-colors duration-200 cursor-pointer"
                     >
                       <motion.div
-                        className="absolute inset-0 bg-gradient-to-br from-indigo-500/0 to-purple-500/0 rounded-lg"
+                        className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 to-teal-500/0 rounded-lg"
                         whileHover={prefersReducedMotion ? {} : {
-                          background: 'linear-gradient(to bottom right, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05))',
+                          background: 'linear-gradient(to bottom right, rgba(16, 185, 129, 0.05), rgba(20, 184, 166, 0.05))',
                           transition: { duration: 0.3 },
                         }}
                       />
@@ -163,7 +163,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                               <Button
                                 onClick={() => handleStartTour(tour.id)}
                                 size="sm"
-                                className="bg-indigo-600 hover:bg-indigo-700 flex-shrink-0"
+                                className="bg-emerald-600 hover:bg-emerald-700 flex-shrink-0"
                               >
                                 {isCompleted ? 'Restart' : 'Start'}
                               </Button>
@@ -198,7 +198,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                 variants={itemVariants}
                 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"
               >
-                <Keyboard className="w-5 h-5 text-indigo-400" />
+                <Keyboard className="w-5 h-5 text-emerald-400" />
                 Keyboard Shortcuts
               </motion.h3>
               <motion.div
@@ -245,7 +245,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                 variants={itemVariants}
                 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"
               >
-                <Lightbulb className="w-5 h-5 text-indigo-400" />
+                <Lightbulb className="w-5 h-5 text-emerald-400" />
                 Quick Tips
               </motion.h3>
               <motion.div
@@ -276,7 +276,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                           repeat: Infinity,
                           delay: index * 0.3,
                         }}
-                        className="flex-shrink-0 w-1.5 h-1.5 mt-2 bg-indigo-400 rounded-full"
+                        className="flex-shrink-0 w-1.5 h-1.5 mt-2 bg-emerald-400 rounded-full"
                       />
                       {tip}
                     </motion.li>
@@ -372,7 +372,7 @@ export function HelpCenter({ open, onOpenChange }: HelpCenterProps) {
                 }}
                 whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                className="flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
               >
                 View Documentation
                 <motion.div

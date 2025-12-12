@@ -146,7 +146,7 @@ export function TourTooltip({
         transition={{ duration: prefersReducedMotion ? 0 : 0.2, delay: 0.1 }}
         className="relative bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-lg shadow-2xl p-6"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-lg" />
 
         <div className="relative">
           <div className="flex items-start justify-between mb-4">
@@ -204,9 +204,9 @@ export function TourTooltip({
                     }}
                     className={'w-1.5 h-1.5 rounded-full transition-all duration-300 ' + (
                       index === currentStep
-                        ? 'bg-indigo-500 scale-125'
+                        ? 'bg-emerald-500 scale-125'
                         : index < currentStep
-                        ? 'bg-indigo-600/50'
+                        ? 'bg-emerald-600/50'
                         : 'bg-slate-600'
                     )}
                   />
@@ -244,7 +244,7 @@ export function TourTooltip({
                   <Button
                     onClick={onComplete}
                     size="sm"
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     Complete
                   </Button>
@@ -252,7 +252,7 @@ export function TourTooltip({
                   <Button
                     onClick={onNext}
                     size="sm"
-                    className="bg-indigo-600 hover:bg-indigo-700 gap-2"
+                    className="bg-emerald-600 hover:bg-emerald-700 gap-2"
                   >
                     Next
                     <ArrowRight className="w-4 h-4" />

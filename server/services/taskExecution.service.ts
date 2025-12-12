@@ -14,41 +14,45 @@ import {
 } from "../../drizzle/schema-webhooks";
 import { browserbaseSDK } from "../_core/browserbaseSDK";
 import { Stagehand } from "@browserbasehq/stagehand";
+import type {
+  ExecutionResult,
+  LegacyTaskExecutionConfig,
+  AutomationStep,
+  BrowserAction,
+  BrowserAutomationConfig,
+  ApiCallConfig,
+  NotificationConfig,
+  ReminderConfig,
+  GhlActionConfig,
+  ReportConfig,
+  TaskType,
+  HttpMethod,
+  BrowserActionType,
+  GhlActionType,
+  ReportType,
+  isApiCallConfig,
+  isBrowserAutomationConfig,
+  isNotificationConfig,
+  isReminderConfig,
+  isGhlActionConfig,
+  isReportConfig,
+} from "../types";
 
 // ========================================
 // TYPES
 // ========================================
 
-export interface ExecutionResult {
-  success: boolean;
-  output?: any;
-  error?: string;
-  duration?: number;
-  screenshots?: string[];
-}
+// Re-export for backward compatibility
+export type {
+  ExecutionResult,
+  AutomationStep,
+  BrowserAction,
+  BrowserAutomationConfig,
+  ApiCallConfig,
+};
 
-export interface TaskExecutionConfig {
-  workflowId?: number;
-  automationSteps?: AutomationStep[];
-  apiEndpoint?: string;
-  apiMethod?: "GET" | "POST" | "PUT" | "DELETE";
-  apiPayload?: any;
-  browserActions?: BrowserAction[];
-  timeout?: number;
-  retryCount?: number;
-}
-
-export interface AutomationStep {
-  type: "navigate" | "click" | "type" | "extract" | "wait" | "screenshot";
-  config: Record<string, any>;
-}
-
-export interface BrowserAction {
-  action: string;
-  selector?: string;
-  value?: string;
-  waitFor?: string;
-}
+// Legacy config type - kept for backward compatibility
+export type TaskExecutionConfig = LegacyTaskExecutionConfig;
 
 // ========================================
 // TASK EXECUTION SERVICE
@@ -60,25 +64,25 @@ export class TaskExecutionService {
    */
   private validateTaskConfig(task: typeof agencyTasks.$inferSelect): { valid: boolean; error?: string } {
     // Check if execution config exists for tasks that need it
-    const requiresConfig = ["browser_automation", "api_call", "ghl_action", "report_generation"];
+    const requiresConfig: TaskType[] = ["browser_automation", "api_call", "ghl_action", "report_generation"];
 
-    if (requiresConfig.includes(task.taskType) && !task.executionConfig) {
+    if (requiresConfig.includes(task.taskType as TaskType) && !task.executionConfig) {
       return { valid: false, error: `Task type ${task.taskType} requires execution configuration` };
     }
 
-    // Validate specific configurations
-    const config = task.executionConfig as any;
+    // Validate specific configurations using type guards
+    const config = task.executionConfig;
 
     switch (task.taskType) {
       case "browser_automation":
       case "data_extraction":
-        if (!config?.browserActions && !config?.automationSteps) {
+        if (!isBrowserAutomationConfig(config)) {
           return { valid: false, error: "Browser automation requires browserActions or automationSteps" };
         }
         break;
 
       case "api_call":
-        if (!config?.apiEndpoint) {
+        if (!isApiCallConfig(config)) {
           return { valid: false, error: "API call requires apiEndpoint" };
         }
         // Validate URL format
@@ -90,19 +94,19 @@ export class TaskExecutionService {
         break;
 
       case "ghl_action":
-        if (!config?.ghlAction) {
+        if (!isGhlActionConfig(config)) {
           return { valid: false, error: "GHL action requires ghlAction type" };
         }
         break;
 
       case "reminder":
-        if (!config?.reminderTime) {
+        if (!isReminderConfig(config)) {
           return { valid: false, error: "Reminder requires reminderTime" };
         }
         break;
 
       case "report_generation":
-        if (!config?.reportType) {
+        if (!isReportConfig(config)) {
           return { valid: false, error: "Report generation requires reportType" };
         }
         break;
@@ -416,40 +420,64 @@ export class TaskExecutionService {
     stagehand: Stagehand,
     page: any,
     step: AutomationStep | BrowserAction
-  ): Promise<any> {
-    const stepType = (step as AutomationStep).type || (step as BrowserAction).action;
-    const config = (step as AutomationStep).config || (step as any);
+  ): Promise<{ action: string; [key: string]: unknown }> {
+    // Determine step type
+    const stepType: BrowserActionType = 'type' in step ? step.type : (step.action as BrowserActionType);
+
+    // Get config - handle both AutomationStep and BrowserAction formats
+    const getConfigValue = <T>(key: string): T | undefined => {
+      if ('config' in step && step.config && typeof step.config === 'object') {
+        return (step.config as Record<string, unknown>)[key] as T;
+      }
+      return (step as Record<string, unknown>)[key] as T;
+    };
 
     switch (stepType) {
-      case "navigate":
-        await page.goto((config as any).url);
-        return { action: "navigate", url: (config as any).url };
+      case "navigate": {
+        const url = getConfigValue<string>('url');
+        if (!url) throw new Error("Navigate step requires URL");
+        await page.goto(url);
+        return { action: "navigate", url };
+      }
 
-      case "click":
-        if ((config as any).selector) {
-          await page.click((config as any).selector);
-        } else if ((config as any).instruction) {
-          await stagehand.act((config as any).instruction);
+      case "click": {
+        const selector = getConfigValue<string>('selector');
+        const instruction = getConfigValue<string>('instruction');
+
+        if (selector) {
+          await page.click(selector);
+        } else if (instruction) {
+          await stagehand.act(instruction);
         }
-        return { action: "click", selector: (config as any).selector };
+        return { action: "click", selector: selector || instruction };
+      }
 
-      case "type":
-        if ((config as any).selector) {
-          await page.fill((config as any).selector, (config as any).value);
+      case "type": {
+        const selector = getConfigValue<string>('selector');
+        const value = getConfigValue<string>('value');
+
+        if (selector && value) {
+          await page.fill(selector, value);
         }
-        return { action: "type", selector: (config as any).selector };
+        return { action: "type", selector, value };
+      }
 
-      case "extract":
-        const extracted = await stagehand.extract((config as any).instruction || "Extract the main content");
+      case "extract": {
+        const instruction = getConfigValue<string>('instruction') || "Extract the main content";
+        const extracted = await stagehand.extract(instruction);
         return { action: "extract", data: extracted };
+      }
 
-      case "wait":
-        await new Promise((resolve) => setTimeout(resolve, (config as any).duration || 1000));
-        return { action: "wait", duration: (config as any).duration };
+      case "wait": {
+        const duration = getConfigValue<number>('duration') || 1000;
+        await new Promise((resolve) => setTimeout(resolve, duration));
+        return { action: "wait", duration };
+      }
 
-      case "screenshot":
+      case "screenshot": {
         const screenshot = await page.screenshot({ encoding: "base64" });
         return { action: "screenshot", data: screenshot };
+      }
 
       default:
         return { action: stepType, error: "Unknown action" };
@@ -461,8 +489,9 @@ export class TaskExecutionService {
    */
   private async executeApiCall(task: typeof agencyTasks.$inferSelect): Promise<ExecutionResult> {
     try {
-      const config = task.executionConfig as TaskExecutionConfig | null;
-      if (!config?.apiEndpoint) {
+      const config = task.executionConfig;
+
+      if (!isApiCallConfig(config)) {
         return { success: false, error: "No API endpoint configured" };
       }
 
@@ -472,22 +501,21 @@ export class TaskExecutionService {
       };
 
       // Add authentication if configured
-      const apiConfig = config as any;
-      if (apiConfig.authType) {
-        switch (apiConfig.authType) {
+      if (config.authType) {
+        switch (config.authType) {
           case "bearer":
-            if (apiConfig.bearerToken) {
-              headers["Authorization"] = `Bearer ${apiConfig.bearerToken}`;
+            if (config.bearerToken) {
+              headers["Authorization"] = `Bearer ${config.bearerToken}`;
             }
             break;
           case "api_key":
-            if (apiConfig.apiKeyHeader && apiConfig.apiKey) {
-              headers[apiConfig.apiKeyHeader] = apiConfig.apiKey;
+            if (config.apiKeyHeader && config.apiKey) {
+              headers[config.apiKeyHeader] = config.apiKey;
             }
             break;
           case "basic":
-            if (apiConfig.username && apiConfig.password) {
-              const credentials = Buffer.from(`${apiConfig.username}:${apiConfig.password}`).toString('base64');
+            if (config.username && config.password) {
+              const credentials = Buffer.from(`${config.username}:${config.password}`).toString('base64');
               headers["Authorization"] = `Basic ${credentials}`;
             }
             break;
@@ -495,8 +523,8 @@ export class TaskExecutionService {
       }
 
       // Add custom headers if provided
-      if (apiConfig.customHeaders) {
-        Object.assign(headers, apiConfig.customHeaders);
+      if (config.customHeaders) {
+        Object.assign(headers, config.customHeaders);
       }
 
       // Build request options
@@ -506,12 +534,13 @@ export class TaskExecutionService {
       };
 
       // Add body for POST/PUT/PATCH
-      if (["POST", "PUT", "PATCH"].includes(config.apiMethod || "GET") && config.apiPayload) {
+      const methodsWithBody: HttpMethod[] = ["POST", "PUT", "PATCH"];
+      if (methodsWithBody.includes(config.apiMethod || "GET") && config.apiPayload) {
         requestOptions.body = JSON.stringify(config.apiPayload);
       }
 
       // Add timeout if configured
-      const timeout = apiConfig.timeout || 30000;
+      const timeout = config.timeout || 30000;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
       requestOptions.signal = controller.signal;
@@ -520,7 +549,7 @@ export class TaskExecutionService {
         const response = await fetch(config.apiEndpoint, requestOptions);
         clearTimeout(timeoutId);
 
-        let data: any;
+        let data: unknown;
         const contentType = response.headers.get("content-type");
 
         if (contentType?.includes("application/json")) {
@@ -587,10 +616,10 @@ export class TaskExecutionService {
     }
 
     try {
-      const config = task.executionConfig as TaskExecutionConfig | null;
+      const config = task.executionConfig;
 
       // Validate configuration
-      if (!config || !task.sourceWebhookId) {
+      if (!isNotificationConfig(config) || !task.sourceWebhookId) {
         return {
           success: false,
           error: "No webhook configured for notification"
@@ -613,7 +642,7 @@ export class TaskExecutionService {
 
       // Create notification message
       const notificationContent = task.description || task.title;
-      const recipientIdentifier = (config as any).recipient || "owner";
+      const recipientIdentifier = config.recipient;
 
       // Create outbound message
       await db.insert(outboundMessages).values({
@@ -655,18 +684,18 @@ export class TaskExecutionService {
     }
 
     try {
-      const config = task.executionConfig as TaskExecutionConfig | null;
+      const config = task.executionConfig;
 
       // Validate reminder configuration
-      if (!config || !(config as any).reminderTime) {
+      if (!isReminderConfig(config)) {
         return {
           success: false,
           error: "Reminder time not specified"
         };
       }
 
-      const reminderTime = new Date((config as any).reminderTime);
-      const reminderMessage = (config as any).reminderMessage || task.description || task.title;
+      const reminderTime = new Date(config.reminderTime);
+      const reminderMessage = config.reminderMessage || task.description || task.title;
 
       // Create a scheduled outbound message for the reminder
       if (task.sourceWebhookId) {
@@ -677,7 +706,7 @@ export class TaskExecutionService {
           conversationId: task.conversationId,
           messageType: "reminder",
           content: `Reminder: ${reminderMessage}`,
-          recipientIdentifier: (config as any).recipient || "owner",
+          recipientIdentifier: config.recipient || "owner",
           deliveryStatus: "pending",
           scheduledFor: reminderTime,
         });
@@ -706,22 +735,21 @@ export class TaskExecutionService {
    */
   private async executeGhlAction(task: typeof agencyTasks.$inferSelect): Promise<ExecutionResult> {
     try {
-      const config = task.executionConfig as TaskExecutionConfig | null;
+      const config = task.executionConfig;
 
       // Validate GHL configuration
-      if (!config || !(config as any).ghlAction) {
+      if (!isGhlActionConfig(config)) {
         return {
           success: false,
           error: "GHL action not specified"
         };
       }
 
-      const ghlConfig = config as any;
-      const action = ghlConfig.ghlAction; // e.g., "add_contact", "send_sms", "create_opportunity"
+      const action: GhlActionType = config.ghlAction;
 
       // Get GHL API credentials from environment or user config
       const ghlApiKey = process.env.GHL_API_KEY;
-      const ghlLocationId = ghlConfig.locationId || process.env.GHL_LOCATION_ID;
+      const ghlLocationId = config.locationId || process.env.GHL_LOCATION_ID;
 
       if (!ghlApiKey) {
         return {
@@ -732,54 +760,64 @@ export class TaskExecutionService {
 
       // Execute based on action type
       let endpoint = "";
-      let method = "POST";
-      let payload: any = {};
+      let method: HttpMethod = "POST";
+      let payload: Record<string, unknown> = {};
 
       switch (action) {
-        case "add_contact":
+        case "add_contact": {
+          const addConfig = config as GhlActionConfig & { ghlAction: 'add_contact' };
           endpoint = `https://rest.gohighlevel.com/v1/contacts/`;
           payload = {
-            firstName: ghlConfig.firstName,
-            lastName: ghlConfig.lastName,
-            email: ghlConfig.email,
-            phone: ghlConfig.phone,
-            ...(ghlConfig.customFields || {}),
+            firstName: addConfig.firstName,
+            lastName: addConfig.lastName,
+            email: addConfig.email,
+            phone: addConfig.phone,
+            ...(addConfig.customFields || {}),
           };
           break;
+        }
 
-        case "send_sms":
+        case "send_sms": {
+          const smsConfig = config as GhlActionConfig & { ghlAction: 'send_sms' };
           endpoint = `https://rest.gohighlevel.com/v1/conversations/messages`;
           payload = {
-            contactId: ghlConfig.contactId,
-            message: ghlConfig.message,
+            contactId: smsConfig.contactId,
+            message: smsConfig.message,
             type: "SMS",
           };
           break;
+        }
 
-        case "create_opportunity":
+        case "create_opportunity": {
+          const oppConfig = config as GhlActionConfig & { ghlAction: 'create_opportunity' };
           endpoint = `https://rest.gohighlevel.com/v1/opportunities/`;
           payload = {
-            pipelineId: ghlConfig.pipelineId,
+            pipelineId: oppConfig.pipelineId,
             locationId: ghlLocationId,
-            name: ghlConfig.opportunityName,
-            contactId: ghlConfig.contactId,
-            status: ghlConfig.status || "open",
-            monetaryValue: ghlConfig.monetaryValue,
+            name: oppConfig.opportunityName,
+            contactId: oppConfig.contactId,
+            status: oppConfig.status || "open",
+            monetaryValue: oppConfig.monetaryValue,
           };
           break;
+        }
 
-        case "add_tag":
-          endpoint = `https://rest.gohighlevel.com/v1/contacts/${ghlConfig.contactId}/tags`;
+        case "add_tag": {
+          const tagConfig = config as GhlActionConfig & { ghlAction: 'add_tag' };
+          endpoint = `https://rest.gohighlevel.com/v1/contacts/${tagConfig.contactId}/tags`;
           payload = {
-            tags: Array.isArray(ghlConfig.tags) ? ghlConfig.tags : [ghlConfig.tags],
+            tags: Array.isArray(tagConfig.tags) ? tagConfig.tags : [tagConfig.tags],
           };
           break;
+        }
 
-        case "update_contact":
-          endpoint = `https://rest.gohighlevel.com/v1/contacts/${ghlConfig.contactId}`;
+        case "update_contact": {
+          const updateConfig = config as GhlActionConfig & { ghlAction: 'update_contact' };
+          endpoint = `https://rest.gohighlevel.com/v1/contacts/${updateConfig.contactId}`;
           method = "PUT";
-          payload = ghlConfig.updateData || {};
+          payload = updateConfig.updateData;
           break;
+        }
 
         default:
           return {
@@ -799,12 +837,12 @@ export class TaskExecutionService {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data: unknown = await response.json();
 
       if (!response.ok) {
         return {
           success: false,
-          error: `GHL API error (${response.status}): ${data.message || JSON.stringify(data)}`,
+          error: `GHL API error (${response.status}): ${typeof data === 'object' && data && 'message' in data ? (data as any).message : JSON.stringify(data)}`,
           output: data,
         };
       }
@@ -850,27 +888,26 @@ export class TaskExecutionService {
     }
 
     try {
-      const config = task.executionConfig as TaskExecutionConfig | null;
+      const config = task.executionConfig;
 
       // Validate report configuration
-      if (!config || !(config as any).reportType) {
+      if (!isReportConfig(config)) {
         return {
           success: false,
           error: "Report type not specified"
         };
       }
 
-      const reportConfig = config as any;
-      const reportType = reportConfig.reportType; // e.g., "task_summary", "execution_stats", "webhook_activity"
+      const reportType: ReportType = config.reportType;
 
-      let reportData: any = {};
+      let reportData: Record<string, unknown> = {};
       let reportTitle = "";
 
       switch (reportType) {
         case "task_summary": {
           // Generate task summary report
-          const startDate = reportConfig.startDate ? new Date(reportConfig.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-          const endDate = reportConfig.endDate ? new Date(reportConfig.endDate) : new Date();
+          const startDate = config.startDate ? new Date(config.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const endDate = config.endDate ? new Date(config.endDate) : new Date();
 
           const tasks = await db
             .select()
@@ -883,12 +920,12 @@ export class TaskExecutionService {
               )
             );
 
-          const statusCounts = tasks.reduce((acc: any, t) => {
+          const statusCounts = tasks.reduce((acc: Record<string, number>, t) => {
             acc[t.status] = (acc[t.status] || 0) + 1;
             return acc;
           }, {});
 
-          const typeCounts = tasks.reduce((acc: any, t) => {
+          const typeCounts = tasks.reduce((acc: Record<string, number>, t) => {
             acc[t.taskType] = (acc[t.taskType] || 0) + 1;
             return acc;
           }, {});
@@ -911,7 +948,7 @@ export class TaskExecutionService {
             .from(taskExecutions)
             .innerJoin(agencyTasks, eq(taskExecutions.taskId, agencyTasks.id))
             .where(eq(agencyTasks.userId, task.userId))
-            .limit(reportConfig.limit || 100);
+            .limit(config.limit || 100);
 
           const successCount = executions.filter(e => e.task_executions.status === "success").length;
           const failedCount = executions.filter(e => e.task_executions.status === "failed").length;
@@ -940,9 +977,9 @@ export class TaskExecutionService {
             .select()
             .from(inboundMessages)
             .where(eq(inboundMessages.userId, task.userId))
-            .limit(reportConfig.limit || 100);
+            .limit(config.limit || 100);
 
-          const webhookCounts = messages.reduce((acc: any, m) => {
+          const webhookCounts = messages.reduce((acc: Record<string, number>, m) => {
             acc[m.webhookId] = (acc[m.webhookId] || 0) + 1;
             return acc;
           }, {});
@@ -977,7 +1014,7 @@ export class TaskExecutionService {
       };
 
       // Optionally send report as notification
-      if (reportConfig.sendNotification && task.sourceWebhookId) {
+      if (config.sendNotification && task.sourceWebhookId) {
         const reportSummary = this.formatReportSummary(reportType, reportData);
 
         await db.insert(outboundMessages).values({
@@ -987,7 +1024,7 @@ export class TaskExecutionService {
           conversationId: task.conversationId,
           messageType: "task_update",
           content: `${reportTitle}\n\n${reportSummary}`,
-          recipientIdentifier: reportConfig.recipient || "owner",
+          recipientIdentifier: config.recipient || "owner",
           deliveryStatus: "pending",
         });
       }
@@ -1008,7 +1045,7 @@ export class TaskExecutionService {
   /**
    * Format report data into readable summary
    */
-  private formatReportSummary(reportType: string, data: any): string {
+  private formatReportSummary(reportType: ReportType, data: Record<string, unknown>): string {
     switch (reportType) {
       case "task_summary":
         return `Total Tasks: ${data.totalTasks}\nCompletion Rate: ${data.completionRate}%\nBy Status: ${JSON.stringify(data.byStatus, null, 2)}`;

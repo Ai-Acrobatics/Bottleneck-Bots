@@ -537,3 +537,10 @@ export {
   type MetaAd,
   type InsertMetaAd,
 } from "./schema-meta-ads";
+
+// Webhooks
+export {
+  webhookLogs,
+  type WebhookLog,
+  type InsertWebhookLog,
+} from "./schema-webhooks";

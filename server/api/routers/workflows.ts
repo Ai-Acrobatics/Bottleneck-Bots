@@ -11,6 +11,7 @@ import {
   executeWorkflow,
   getExecutionStatus,
   cancelExecution,
+  testExecuteWorkflow,
 } from "../../services/workflowExecution.service";
 
 // Define Zod schemas for validation
@@ -542,6 +543,51 @@ export const workflowsRouter = router({
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
                     message: `Failed to cancel execution: ${error instanceof Error ? error.message : "Unknown error"}`,
+                });
+            }
+        }),
+
+    /**
+     * Test run a workflow without saving to database
+     * Executes workflow with provided configuration and returns step-by-step results
+     */
+    testRun: protectedProcedure
+        .input(
+            z.object({
+                steps: z.array(workflowStepSchema).min(1).max(50),
+                variables: z.record(z.string(), z.any()).optional(),
+                geolocation: z.object({
+                    city: z.string().optional(),
+                    state: z.string().optional(),
+                    country: z.string().optional(),
+                }).optional(),
+                stepByStep: z.boolean().default(false),
+            })
+        )
+        .mutation(async ({ input, ctx }) => {
+            const userId = ctx.user.id;
+
+            try {
+                const result = await testExecuteWorkflow({
+                    userId,
+                    steps: input.steps as any,
+                    variables: input.variables,
+                    geolocation: input.geolocation,
+                    stepByStep: input.stepByStep,
+                });
+
+                return {
+                    success: true,
+                    status: result.status,
+                    stepResults: result.stepResults,
+                    output: result.output,
+                    error: result.error,
+                };
+            } catch (error) {
+                console.error("Test workflow execution failed:", error);
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Test workflow execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
                 });
             }
         }),
