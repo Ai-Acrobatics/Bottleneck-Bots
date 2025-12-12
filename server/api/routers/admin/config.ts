@@ -4,7 +4,6 @@ import { TRPCError } from "@trpc/server";
 import { getDb } from "../../../db";
 import { featureFlags, systemConfig } from "../../../../drizzle/schema-admin";
 import { eq, desc } from "drizzle-orm";
-import { logAdminAction, getIpAddress, getUserAgent } from "../../../utils/auditLogger";
 
 /**
  * Admin Config Router
@@ -149,21 +148,6 @@ export const configRouter = router({
             })
             .returning();
 
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "flag.create",
-            targetType: "feature_flag",
-            targetId: flag.id,
-            newValue: {
-              name: flag.name,
-              enabled: flag.enabled,
-              rolloutPercentage: flag.rolloutPercentage,
-            },
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-          });
-
           console.log(`[Admin] Feature flag created: ${input.name} by admin ${ctx.user.id}`);
 
           return {
@@ -239,39 +223,11 @@ export const configRouter = router({
           if (input.userWhitelist !== undefined) updateData.userWhitelist = input.userWhitelist;
           if (input.metadata !== undefined) updateData.metadata = input.metadata;
 
-          // Capture changes for audit log
-          const oldValues: Record<string, any> = {};
-          const newValues: Record<string, any> = {};
-          if (input.name !== undefined && input.name !== existing.name) {
-            oldValues.name = existing.name;
-            newValues.name = input.name;
-          }
-          if (input.enabled !== undefined && input.enabled !== existing.enabled) {
-            oldValues.enabled = existing.enabled;
-            newValues.enabled = input.enabled;
-          }
-          if (input.rolloutPercentage !== undefined && input.rolloutPercentage !== existing.rolloutPercentage) {
-            oldValues.rolloutPercentage = existing.rolloutPercentage;
-            newValues.rolloutPercentage = input.rolloutPercentage;
-          }
-
           const [flag] = await db
             .update(featureFlags)
             .set(updateData)
             .where(eq(featureFlags.id, input.id))
             .returning();
-
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "flag.update",
-            targetType: "feature_flag",
-            targetId: input.id,
-            oldValue: oldValues,
-            newValue: newValues,
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-          });
 
           console.log(`[Admin] Feature flag updated: ${flag.name} by admin ${ctx.user.id}`);
 
@@ -325,20 +281,6 @@ export const configRouter = router({
             .delete(featureFlags)
             .where(eq(featureFlags.id, input.id));
 
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "flag.delete",
-            targetType: "feature_flag",
-            targetId: input.id,
-            oldValue: {
-              name: existing.name,
-              enabled: existing.enabled,
-            },
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-          });
-
           console.log(`[Admin] Feature flag deleted: ${existing.name} by admin ${ctx.user.id}`);
 
           return {
@@ -372,20 +314,6 @@ export const configRouter = router({
             });
           }
 
-          // Get existing flag to capture old value
-          const [existingFlag] = await db
-            .select()
-            .from(featureFlags)
-            .where(eq(featureFlags.id, input.id))
-            .limit(1);
-
-          if (!existingFlag) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Feature flag not found",
-            });
-          }
-
           const [flag] = await db
             .update(featureFlags)
             .set({
@@ -395,18 +323,12 @@ export const configRouter = router({
             .where(eq(featureFlags.id, input.id))
             .returning();
 
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "flag.toggle",
-            targetType: "feature_flag",
-            targetId: input.id,
-            oldValue: { enabled: existingFlag.enabled },
-            newValue: { enabled: input.enabled },
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-            metadata: { flagName: flag.name },
-          });
+          if (!flag) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Feature flag not found",
+            });
+          }
 
           console.log(`[Admin] Feature flag toggled: ${flag.name} to ${input.enabled} by admin ${ctx.user.id}`);
 
@@ -539,18 +461,6 @@ export const configRouter = router({
               })
               .where(eq(systemConfig.key, input.key))
               .returning();
-
-            // Log admin action for update
-            await logAdminAction({
-              adminId: ctx.user.id,
-              action: "config.update",
-              targetType: "system_config",
-              targetId: input.key,
-              oldValue: { value: existing.value },
-              newValue: { value: input.value },
-              ipAddress: getIpAddress(ctx.req),
-              userAgent: getUserAgent(ctx.req),
-            });
           } else {
             // Create new
             [config] = await db
@@ -563,17 +473,6 @@ export const configRouter = router({
               })
               .returning();
             isNew = true;
-
-            // Log admin action for create
-            await logAdminAction({
-              adminId: ctx.user.id,
-              action: "config.create",
-              targetType: "system_config",
-              targetId: input.key,
-              newValue: { value: input.value },
-              ipAddress: getIpAddress(ctx.req),
-              userAgent: getUserAgent(ctx.req),
-            });
           }
 
           console.log(`[Admin] System config ${isNew ? 'created' : 'updated'}: ${input.key} by admin ${ctx.user.id}`);
@@ -627,17 +526,6 @@ export const configRouter = router({
           await db
             .delete(systemConfig)
             .where(eq(systemConfig.key, input.key));
-
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "config.delete",
-            targetType: "system_config",
-            targetId: input.key,
-            oldValue: { value: existing.value },
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-          });
 
           console.log(`[Admin] System config deleted: ${input.key} by admin ${ctx.user.id}`);
 
@@ -725,8 +613,6 @@ export const configRouter = router({
             .where(eq(systemConfig.key, "maintenance_mode"))
             .limit(1);
 
-          const oldValue = existing ? existing.value : null;
-
           if (existing) {
             await db
               .update(systemConfig)
@@ -746,22 +632,6 @@ export const configRouter = router({
                 updatedBy: ctx.user.id,
               });
           }
-
-          // Log admin action
-          await logAdminAction({
-            adminId: ctx.user.id,
-            action: "maintenance.set",
-            targetType: "system_config",
-            targetId: "maintenance_mode",
-            oldValue: oldValue,
-            newValue: maintenanceValue,
-            ipAddress: getIpAddress(ctx.req),
-            userAgent: getUserAgent(ctx.req),
-            metadata: {
-              enabled: input.enabled,
-              message: input.message,
-            },
-          });
 
           console.log(`[Admin] Maintenance mode ${input.enabled ? 'enabled' : 'disabled'} by admin ${ctx.user.id}`);
 

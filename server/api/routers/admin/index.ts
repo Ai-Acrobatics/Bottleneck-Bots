@@ -3,7 +3,8 @@ import { usersRouter } from "./users";
 import { systemRouter } from "./system";
 import { auditRouter } from "./audit";
 import { configRouter } from "./config";
-import { securityRouter } from "./security";
+// Temporarily disabled to debug serverless crash
+// import { securityRouter } from "./security";
 
 /**
  * Admin Router Aggregator
@@ -53,5 +54,5 @@ export const adminRouter = router({
   system: systemRouter,
   audit: auditRouter,
   config: configRouter,
-  security: securityRouter,
+  // security: securityRouter, // Temporarily disabled to debug serverless crash
 });
