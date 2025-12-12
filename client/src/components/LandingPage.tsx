@@ -4,19 +4,24 @@ import { ArrowRight, CheckCircle2, Zap, Globe, Mail, Phone, BarChart3, Shield, U
 import { SkipLink } from './SkipLink';
 import { ExitIntentPopup } from './ExitIntentPopup';
 
-// Optimized image component with lazy loading
+// Optimized image component with lazy loading and CLS prevention
 const OptimizedImage: React.FC<{
   src: string;
   alt: string;
   className?: string;
   priority?: boolean;
-}> = ({ src, alt, className = '', priority = false }) => (
+  width?: number;
+  height?: number;
+}> = ({ src, alt, className = '', priority = false, width, height }) => (
   <img
     src={src}
     alt={alt}
     className={className}
     loading={priority ? 'eager' : 'lazy'}
     decoding="async"
+    width={width}
+    height={height}
+    style={width && height ? { aspectRatio: `${width}/${height}` } : undefined}
   />
 );
 

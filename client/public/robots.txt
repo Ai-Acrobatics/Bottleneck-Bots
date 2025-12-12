@@ -1,0 +1,14 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://www.ghlagencyai.com/sitemap.xml
+
+# Disallow API routes
+Disallow: /api/
+Disallow: /trpc/
+
+# Allow all assets
+Allow: /assets/
+Allow: /images/
