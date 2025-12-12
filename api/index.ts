@@ -8,14 +8,36 @@ import createApp from '../dist/index.js';
 
 // Cache the Express app instance
 let cachedApp: any = null;
+let initError: any = null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set VERCEL environment variable for the app
   process.env.VERCEL = "1";
   process.env.NODE_ENV = "production";
 
+  // If we had a previous init error, return it
+  if (initError) {
+    res.status(500).json({
+      error: 'App initialization failed',
+      message: initError.message || String(initError),
+      stack: initError.stack,
+    });
+    return;
+  }
+
   if (!cachedApp) {
-    cachedApp = await createApp();
+    try {
+      cachedApp = await createApp();
+    } catch (err: any) {
+      initError = err;
+      console.error('[Vercel] Failed to create app:', err);
+      res.status(500).json({
+        error: 'App initialization failed',
+        message: err.message || String(err),
+        stack: err.stack,
+      });
+      return;
+    }
   }
 
   // app is guaranteed to be non-null here
