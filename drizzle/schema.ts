@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: varchar("role", { length: 20 }).default("user").notNull(),
   onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(),
+  suspendedAt: timestamp("suspendedAt"), // When the user account was suspended (null = active)
+  suspensionReason: text("suspensionReason"), // Reason for account suspension
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -537,3 +539,28 @@ export {
   type MetaAd,
   type InsertMetaAd,
 } from "./schema-meta-ads";
+
+// Admin Dashboard
+export {
+  auditLogs,
+  featureFlags,
+  systemConfig,
+  supportTickets,
+  ticketMessages,
+  announcements,
+  securityEvents,
+  type AuditLog,
+  type InsertAuditLog,
+  type FeatureFlag,
+  type InsertFeatureFlag,
+  type SystemConfig,
+  type InsertSystemConfig,
+  type SupportTicket,
+  type InsertSupportTicket,
+  type TicketMessage,
+  type InsertTicketMessage,
+  type Announcement,
+  type InsertAnnouncement,
+  type SecurityEvent,
+  type InsertSecurityEvent,
+} from "./schema-admin";

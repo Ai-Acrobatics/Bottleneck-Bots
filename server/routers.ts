@@ -26,6 +26,7 @@ import { settingsRouter } from "./api/routers/settings";
 import { webhooksRouter } from "./api/routers/webhooks";
 import { agencyTasksRouter } from "./api/routers/agencyTasks";
 import { clientProfilesRouter } from "./api/routers/clientProfiles";
+import { adminRouter } from "./api/routers/admin";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -82,6 +83,9 @@ export const appRouter = router({
 
   // Client Management
   clientProfiles: clientProfilesRouter,
+
+  // Admin Dashboard
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

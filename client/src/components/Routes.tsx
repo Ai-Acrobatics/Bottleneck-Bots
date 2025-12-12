@@ -15,6 +15,8 @@ import LeadDetails from '@/pages/LeadDetails';
 import AICampaigns from '@/pages/AICampaigns';
 import CampaignDetails from '@/pages/CampaignDetails';
 import CreditPurchase from '@/pages/CreditPurchase';
+import { AdminDashboard } from '@/pages/admin/AdminDashboard';
+import { UserManagement } from '@/pages/admin/UserManagement';
 import DashboardLayout from './DashboardLayout';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -40,6 +42,9 @@ export function Routes() {
           <Route path="/ai-campaigns" component={AICampaigns} />
           <Route path="/ai-campaigns/:id" component={CampaignDetails} />
           <Route path="/credits" component={CreditPurchase} />
+          {/* Admin routes */}
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/users" component={UserManagement} />
 {/* Team management route - redirects to settings for now */}
           <Route>
             {() => (
