@@ -12,8 +12,15 @@
 
 import { Queue, QueueEvents, ConnectionOptions } from "bullmq";
 
+// Check if Redis is configured
+const REDIS_AVAILABLE = !!(process.env.REDIS_URL || process.env.REDIS_HOST);
+
 // Parse Redis connection from URL or individual env vars
-function getRedisConnection(): ConnectionOptions {
+function getRedisConnection(): ConnectionOptions | null {
+    if (!REDIS_AVAILABLE) {
+        return null;
+    }
+
     const redisUrl = process.env.REDIS_URL;
 
     if (redisUrl) {
@@ -30,9 +37,9 @@ function getRedisConnection(): ConnectionOptions {
         };
     }
 
-    // Fallback to individual env vars
+    // Fallback to individual env vars (only if REDIS_HOST is explicitly set)
     return {
-        host: process.env.REDIS_HOST || "localhost",
+        host: process.env.REDIS_HOST!,
         port: parseInt(process.env.REDIS_PORT || "6379"),
         password: process.env.REDIS_PASSWORD,
         username: process.env.REDIS_USERNAME,
@@ -128,125 +135,70 @@ export type JobData =
     | WorkflowExecutionJobData;
 
 /**
- * Queue Definitions
+ * Queue Definitions - Only create if Redis is available
  */
-export const emailQueue = new Queue("email", {
-    connection,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 2000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600, // Keep completed jobs for 24 hours
-            count: 1000, // Keep max 1000 completed jobs
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600, // Keep failed jobs for 7 days
-        },
-    },
-});
+const defaultEmailOptions = {
+    attempts: 3,
+    backoff: { type: "exponential" as const, delay: 2000 },
+    removeOnComplete: { age: 24 * 3600, count: 1000 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
 
-export const voiceQueue = new Queue("voice", {
-    connection,
-    defaultJobOptions: {
-        attempts: 2,
-        backoff: {
-            type: "exponential",
-            delay: 5000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600,
-            count: 1000,
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600,
-        },
-    },
-});
+const defaultVoiceOptions = {
+    attempts: 2,
+    backoff: { type: "exponential" as const, delay: 5000 },
+    removeOnComplete: { age: 24 * 3600, count: 1000 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
 
-export const seoQueue = new Queue("seo", {
-    connection,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 10000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600,
-            count: 500,
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600,
-        },
-    },
-});
+const defaultSeoOptions = {
+    attempts: 3,
+    backoff: { type: "exponential" as const, delay: 10000 },
+    removeOnComplete: { age: 24 * 3600, count: 500 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
 
-export const adsQueue = new Queue("ads", {
-    connection,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 2000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600,
-            count: 1000,
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600,
-        },
-    },
-});
+const defaultAdsOptions = {
+    attempts: 3,
+    backoff: { type: "exponential" as const, delay: 2000 },
+    removeOnComplete: { age: 24 * 3600, count: 1000 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
 
-export const enrichmentQueue = new Queue("enrichment", {
-    connection,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 5000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600,
-            count: 1000,
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600,
-        },
-    },
-});
+const defaultEnrichmentOptions = {
+    attempts: 3,
+    backoff: { type: "exponential" as const, delay: 5000 },
+    removeOnComplete: { age: 24 * 3600, count: 1000 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
 
-export const workflowQueue = new Queue("workflow", {
-    connection,
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-            type: "exponential",
-            delay: 2000,
-        },
-        removeOnComplete: {
-            age: 24 * 3600,
-            count: 1000,
-        },
-        removeOnFail: {
-            age: 7 * 24 * 3600,
-        },
-    },
-});
+const defaultWorkflowOptions = {
+    attempts: 3,
+    backoff: { type: "exponential" as const, delay: 2000 },
+    removeOnComplete: { age: 24 * 3600, count: 1000 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+};
+
+// Only create queues if Redis is configured
+export const emailQueue = connection ? new Queue("email", { connection, defaultJobOptions: defaultEmailOptions }) : null;
+export const voiceQueue = connection ? new Queue("voice", { connection, defaultJobOptions: defaultVoiceOptions }) : null;
+export const seoQueue = connection ? new Queue("seo", { connection, defaultJobOptions: defaultSeoOptions }) : null;
+export const adsQueue = connection ? new Queue("ads", { connection, defaultJobOptions: defaultAdsOptions }) : null;
+export const enrichmentQueue = connection ? new Queue("enrichment", { connection, defaultJobOptions: defaultEnrichmentOptions }) : null;
+export const workflowQueue = connection ? new Queue("workflow", { connection, defaultJobOptions: defaultWorkflowOptions }) : null;
 
 /**
- * Queue Events for monitoring
+ * Queue Events for monitoring - Only create if Redis is available
  */
-export const emailQueueEvents = new QueueEvents("email", { connection });
-export const voiceQueueEvents = new QueueEvents("voice", { connection });
-export const seoQueueEvents = new QueueEvents("seo", { connection });
-export const adsQueueEvents = new QueueEvents("ads", { connection });
-export const enrichmentQueueEvents = new QueueEvents("enrichment", { connection });
-export const workflowQueueEvents = new QueueEvents("workflow", { connection });
+export const emailQueueEvents = connection ? new QueueEvents("email", { connection }) : null;
+export const voiceQueueEvents = connection ? new QueueEvents("voice", { connection }) : null;
+export const seoQueueEvents = connection ? new QueueEvents("seo", { connection }) : null;
+export const adsQueueEvents = connection ? new QueueEvents("ads", { connection }) : null;
+export const enrichmentQueueEvents = connection ? new QueueEvents("enrichment", { connection }) : null;
+export const workflowQueueEvents = connection ? new QueueEvents("workflow", { connection }) : null;
+
+// Export availability flag
+export { REDIS_AVAILABLE };
 
 /**
  * Add job to queue with retry logic
@@ -262,6 +214,11 @@ export async function addJob<T extends JobData>(
         jobId?: string;
     }
 ) {
+    if (!REDIS_AVAILABLE) {
+        console.warn(`[Queue] Redis not configured - job ${jobType} will not be queued`);
+        return null;
+    }
+
     const queueMap = {
         email: emailQueue,
         voice: voiceQueue,
@@ -272,6 +229,10 @@ export async function addJob<T extends JobData>(
     };
 
     const queue = queueMap[queueName];
+    if (!queue) {
+        console.warn(`[Queue] Queue ${queueName} not available`);
+        return null;
+    }
 
     return await queue.add(jobType, data, {
         attempts: options?.attempts,
@@ -316,6 +277,10 @@ export async function addWorkflowExecutionJob(data: WorkflowExecutionJobData, op
  * Get queue statistics
  */
 export async function getQueueStats(queueName: "email" | "voice" | "seo" | "ads" | "enrichment" | "workflow") {
+    if (!REDIS_AVAILABLE) {
+        return { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: false, available: false };
+    }
+
     const queueMap = {
         email: emailQueue,
         voice: voiceQueue,
@@ -326,6 +291,9 @@ export async function getQueueStats(queueName: "email" | "voice" | "seo" | "ads"
     };
 
     const queue = queueMap[queueName];
+    if (!queue) {
+        return { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: false, available: false };
+    }
 
     const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
         queue.getWaitingCount(),
@@ -343,6 +311,7 @@ export async function getQueueStats(queueName: "email" | "voice" | "seo" | "ads"
         failed,
         delayed,
         paused,
+        available: true,
     };
 }
 
@@ -373,15 +342,11 @@ export async function getAllQueueStats() {
  * Graceful shutdown
  */
 export async function shutdownQueues() {
+    if (!REDIS_AVAILABLE) return;
+
     console.log("Closing all queues...");
-    await Promise.all([
-        emailQueue.close(),
-        voiceQueue.close(),
-        seoQueue.close(),
-        adsQueue.close(),
-        enrichmentQueue.close(),
-        workflowQueue.close(),
-    ]);
+    const queues = [emailQueue, voiceQueue, seoQueue, adsQueue, enrichmentQueue, workflowQueue];
+    await Promise.all(queues.filter(q => q !== null).map(q => q!.close()));
     console.log("All queues closed");
 }
 
@@ -389,14 +354,10 @@ export async function shutdownQueues() {
  * Graceful shutdown for queue events
  */
 export async function shutdownQueueEvents() {
+    if (!REDIS_AVAILABLE) return;
+
     console.log("Closing all queue events...");
-    await Promise.all([
-        emailQueueEvents.close(),
-        voiceQueueEvents.close(),
-        seoQueueEvents.close(),
-        adsQueueEvents.close(),
-        enrichmentQueueEvents.close(),
-        workflowQueueEvents.close(),
-    ]);
+    const events = [emailQueueEvents, voiceQueueEvents, seoQueueEvents, adsQueueEvents, enrichmentQueueEvents, workflowQueueEvents];
+    await Promise.all(events.filter(e => e !== null).map(e => e!.close()));
     console.log("All queue events closed");
 }

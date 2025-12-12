@@ -10,12 +10,13 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USER_INFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
 
-// Helper to get the correct redirect URI based on the request
-// Auto-detects from request host to ensure consistency between auth request and token exchange
+// Always use the canonical domain for OAuth redirect URI
+// This ensures consistency regardless of which domain the user accesses from
+const CANONICAL_REDIRECT_URI = "https://www.ghlagencyai.com/api/oauth/google/callback";
+
 function getRedirectUri(req: Request): string {
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-    const host = req.headers.host || "www.ghlagencyai.com";
-    return `${protocol}://${host}/api/oauth/google/callback`;
+    // Use env var if set (for local development), otherwise use canonical domain
+    return process.env.GOOGLE_REDIRECT_URI || CANONICAL_REDIRECT_URI;
 }
 
 export function registerGoogleAuthRoutes(app: Express) {
