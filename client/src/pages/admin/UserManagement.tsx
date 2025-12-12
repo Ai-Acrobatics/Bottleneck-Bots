@@ -54,7 +54,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const getRoleBadge = (role: 'user' | 'admin') => {
+const getRoleBadge = (role: string) => {
+  // Ensure role is valid
+  const validRole = (role === 'admin' ? 'admin' : 'user') as 'admin' | 'user';
   const styles = {
     admin: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
     user: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -65,10 +67,10 @@ const getRoleBadge = (role: 'user' | 'admin') => {
     user: UsersIcon,
   };
 
-  const Icon = icons[role];
+  const Icon = icons[validRole];
 
   return (
-    <Badge className={styles[role]}>
+    <Badge className={styles[validRole]}>
       <Icon className="mr-1 h-3 w-3" />
       {role.toUpperCase()}
     </Badge>
@@ -170,7 +172,7 @@ export const UserManagement: React.FC = () => {
     setShowUnsuspendDialog(true);
   };
 
-  const handleChangeRole = (userId: number, currentRole: 'user' | 'admin') => {
+  const handleChangeRole = (userId: number, currentRole: string) => {
     setSelectedUserId(userId);
     setNewRole(currentRole === 'admin' ? 'user' : 'admin');
     setShowRoleDialog(true);

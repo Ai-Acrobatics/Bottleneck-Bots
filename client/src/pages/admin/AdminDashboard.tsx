@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -74,13 +74,14 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, t
 };
 
 interface ActivityItemProps {
-  id: string;
+  id: string | number;
   type: string;
   timestamp: Date;
   userId: number | null;
   userName: string | null;
   userEmail: string | null;
   details: any;
+  metadata?: any;
 }
 
 const getActivityIcon = (type: string) => {
@@ -184,7 +185,7 @@ const ServiceStatus: React.FC<ServiceStatusProps> = ({ name, status, message }) 
 };
 
 export const AdminDashboard: React.FC = () => {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   // Fetch data with auto-refresh every 30 seconds
   const { data: stats, isLoading: statsLoading } = trpc.admin.system.getStats.useQuery(
@@ -272,7 +273,7 @@ export const AdminDashboard: React.FC = () => {
                   variant="outline"
                   size="sm"
                   className="border-slate-700 text-slate-300"
-                  onClick={() => navigate('/admin/audit')}
+                  onClick={() => setLocation('/admin/audit')}
                 >
                   View All
                   <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -320,7 +321,7 @@ export const AdminDashboard: React.FC = () => {
               <Button
                 className="w-full justify-start bg-indigo-600 hover:bg-indigo-700"
                 size="lg"
-                onClick={() => navigate('/admin/users')}
+                onClick={() => setLocation('/admin/users')}
               >
                 <Users className="mr-2 h-5 w-5" />
                 Manage Users
@@ -329,7 +330,7 @@ export const AdminDashboard: React.FC = () => {
                 variant="outline"
                 className="w-full justify-start border-slate-700 text-slate-300 hover:bg-slate-800"
                 size="lg"
-                onClick={() => navigate('/admin/system-health')}
+                onClick={() => setLocation('/admin/system')}
               >
                 <Database className="mr-2 h-5 w-5" />
                 System Health
@@ -338,7 +339,7 @@ export const AdminDashboard: React.FC = () => {
                 variant="outline"
                 className="w-full justify-start border-slate-700 text-slate-300 hover:bg-slate-800"
                 size="lg"
-                onClick={() => navigate('/admin/audit')}
+                onClick={() => setLocation('/admin/audit')}
               >
                 <AlertCircle className="mr-2 h-5 w-5" />
                 View Audit Logs
@@ -347,7 +348,7 @@ export const AdminDashboard: React.FC = () => {
                 variant="outline"
                 className="w-full justify-start border-slate-700 text-slate-300 hover:bg-slate-800"
                 size="lg"
-                onClick={() => navigate('/admin/config')}
+                onClick={() => setLocation('/admin/config')}
               >
                 <TrendingUp className="mr-2 h-5 w-5" />
                 Configuration

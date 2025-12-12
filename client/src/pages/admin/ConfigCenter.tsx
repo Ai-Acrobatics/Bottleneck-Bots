@@ -67,8 +67,8 @@ interface FeatureFlag {
   description: string | null;
   enabled: boolean;
   rolloutPercentage: number;
-  userWhitelist: number[] | null;
-  metadata: Record<string, any> | null;
+  userWhitelist: unknown;
+  metadata: unknown;
   createdAt: Date;
   updatedAt: Date;
 }

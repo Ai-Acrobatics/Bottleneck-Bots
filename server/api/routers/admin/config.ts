@@ -27,7 +27,7 @@ const createFlagSchema = z.object({
   enabled: z.boolean().default(false),
   rolloutPercentage: z.number().int().min(0).max(100).default(0),
   userWhitelist: z.array(z.number()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const updateFlagSchema = z.object({
@@ -37,7 +37,7 @@ const updateFlagSchema = z.object({
   enabled: z.boolean().optional(),
   rolloutPercentage: z.number().int().min(0).max(100).optional(),
   userWhitelist: z.array(z.number()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const deleteFlagSchema = z.object({
