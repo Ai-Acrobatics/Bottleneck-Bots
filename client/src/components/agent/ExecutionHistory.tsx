@@ -1,10 +1,12 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Clock, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Loader2, AlertCircle, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
-import type { AgentExecutionListItem } from '@/types/agent';
+
+// Status type from API
+type ExecutionStatus = 'started' | 'running' | 'success' | 'failed' | 'timeout' | 'cancelled' | 'needs_input';
 
 interface ExecutionHistoryProps {
   onSelectExecution?: (executionId: string) => void;
@@ -19,32 +21,42 @@ export function ExecutionHistory({
     limit: 20
   });
 
-  const getStatusIcon = (status: AgentExecutionListItem['status']) => {
+  const getStatusIcon = (status: ExecutionStatus) => {
     switch (status) {
-      case 'planning':
-      case 'executing':
+      case 'started':
+      case 'running':
         return <Loader2 className="w-4 h-4 animate-spin" />;
-      case 'completed':
+      case 'success':
         return <CheckCircle2 className="w-4 h-4" />;
       case 'failed':
+      case 'timeout':
         return <XCircle className="w-4 h-4" />;
       case 'cancelled':
         return <AlertCircle className="w-4 h-4" />;
+      case 'needs_input':
+        return <Pause className="w-4 h-4" />;
+      default:
+        return <Clock className="w-4 h-4" />;
     }
   };
 
-  const getStatusColor = (status: AgentExecutionListItem['status']) => {
+  const getStatusColor = (status: ExecutionStatus) => {
     switch (status) {
-      case 'planning':
+      case 'started':
         return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'executing':
+      case 'running':
         return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-      case 'completed':
+      case 'success':
         return 'text-green-600 bg-green-50 border-green-200';
       case 'failed':
+      case 'timeout':
         return 'text-red-600 bg-red-50 border-red-200';
       case 'cancelled':
         return 'text-orange-600 bg-orange-50 border-orange-200';
+      case 'needs_input':
+        return 'text-purple-600 bg-purple-50 border-purple-200';
+      default:
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
@@ -96,28 +108,28 @@ export function ExecutionHistory({
             {executions.map((execution) => (
               <button
                 key={execution.id}
-                onClick={() => onSelectExecution?.(execution.id)}
+                onClick={() => onSelectExecution?.(String(execution.id))}
                 className={cn(
                   'w-full text-left p-3 rounded-lg border transition-all',
                   'hover:shadow-sm hover:border-emerald-300',
-                  selectedExecutionId === execution.id
+                  selectedExecutionId === String(execution.id)
                     ? 'bg-emerald-50 border-emerald-300 shadow-sm'
                     : 'bg-white border-gray-200'
                 )}
               >
                 <div className="flex items-start gap-2 mb-2">
-                  <div className={cn('mt-0.5', getStatusColor(execution.status))}>
-                    {getStatusIcon(execution.status)}
+                  <div className={cn('mt-0.5', getStatusColor(execution.status as ExecutionStatus))}>
+                    {getStatusIcon(execution.status as ExecutionStatus)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                      {execution.task}
+                      {execution.task?.title || `Task #${execution.taskId}`}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{formatRelativeTime(execution.createdAt)}</span>
+                  <span>{formatRelativeTime(execution.startedAt)}</span>
                   {execution.duration && (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -129,7 +141,7 @@ export function ExecutionHistory({
                 <div className="mt-2">
                   <span className={cn(
                     'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border',
-                    getStatusColor(execution.status)
+                    getStatusColor(execution.status as ExecutionStatus)
                   )}>
                     {execution.status}
                   </span>

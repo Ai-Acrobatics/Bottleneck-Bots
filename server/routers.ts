@@ -35,6 +35,9 @@ import { mcpRouter } from "./api/routers/mcp";
 import { swarmRouter } from "./api/routers/swarm";
 import { knowledgeRouter } from "./api/routers/knowledge";
 import { subscriptionRouter } from "./api/routers/subscription";
+import { memoryRouter } from "./api/routers/memory";
+import { toolsRouter } from "./api/routers/tools";
+import { subAccountsRouter } from "./api/routers/subAccounts";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -92,6 +95,7 @@ export const appRouter = router({
 
   // Client Management
   clientProfiles: clientProfilesRouter,
+  subAccounts: subAccountsRouter,
 
   // Admin Dashboard
   admin: adminRouter,
@@ -106,6 +110,9 @@ export const appRouter = router({
   // MCP (Model Context Protocol)
   mcp: mcpRouter,
 
+  // Tools Execution Engine
+  tools: toolsRouter,
+
   // Swarm Coordination (Multi-Agent System)
   swarm: swarmRouter,
 
@@ -114,6 +121,9 @@ export const appRouter = router({
 
   // Subscription & Billing
   subscription: subscriptionRouter,
+
+  // Memory Management System
+  memory: memoryRouter,
 });
 
 export type AppRouter = typeof appRouter;

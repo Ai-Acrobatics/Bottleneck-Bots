@@ -746,6 +746,291 @@ export class GHLAutomation {
       required: ['name', 'email'],
     });
   }
+
+  /**
+   * Task 3.1: Create a new sub-account in GHL
+   * Complexity: Level 4 (Advanced)
+   * Estimated time: 15-30 minutes
+   * Cost: $0.30-$0.50 per action
+   */
+  public async createSubAccount(
+    sessionId: string,
+    config: {
+      businessName: string;
+      email: string;
+      phone?: string;
+      timezone?: string;
+      address?: {
+        street?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+      branding?: {
+        logoUrl?: string;
+        primaryColor?: string;
+        companyName?: string;
+      };
+      users?: Array<{
+        email: string;
+        firstName: string;
+        lastName: string;
+        role?: 'admin' | 'user';
+      }>;
+      templateSnapshot?: string; // Snapshot ID to import
+    }
+  ): Promise<{
+    success: boolean;
+    subAccountId?: string;
+    subAccountName?: string;
+    error?: string;
+    steps?: Array<{ step: string; success: boolean; duration: number }>;
+  }> {
+    const startTime = Date.now();
+    const steps: Array<{ step: string; success: boolean; duration: number }> = [];
+
+    const recordStep = (step: string, success: boolean, stepStart: number) => {
+      steps.push({ step, success, duration: Date.now() - stepStart });
+    };
+
+    try {
+      // Step 1: Navigate to Agency View / Sub-Accounts
+      let stepStart = Date.now();
+      console.log('[GHLAutomation] Step 1: Navigating to sub-accounts...');
+
+      await this.stagehand.act(sessionId, 'Click on the Agency/Settings icon in the bottom left sidebar');
+      await this.stagehand.waitFor(sessionId, 'timeout', 1500);
+      await this.stagehand.act(sessionId, 'Click on Sub-Accounts or Accounts in the menu');
+      await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+      recordStep('Navigate to sub-accounts', true, stepStart);
+
+      // Step 2: Click Create Sub-Account
+      stepStart = Date.now();
+      console.log('[GHLAutomation] Step 2: Creating new sub-account...');
+
+      await this.stagehand.act(sessionId, 'Click the "Add Sub-Account" or "Create Sub-Account" button');
+      await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+      recordStep('Open create sub-account form', true, stepStart);
+
+      // Step 3: Fill in business information
+      stepStart = Date.now();
+      console.log('[GHLAutomation] Step 3: Filling business information...');
+
+      await this.stagehand.act(sessionId, `Type "${config.businessName}" into the business name or company name field`);
+      await this.stagehand.act(sessionId, `Type "${config.email}" into the email field`);
+
+      if (config.phone) {
+        await this.stagehand.act(sessionId, `Type "${config.phone}" into the phone number field`);
+      }
+
+      if (config.timezone) {
+        await this.stagehand.act(sessionId, `Select "${config.timezone}" from the timezone dropdown`);
+      }
+      recordStep('Fill business information', true, stepStart);
+
+      // Step 4: Fill address if provided
+      if (config.address) {
+        stepStart = Date.now();
+        console.log('[GHLAutomation] Step 4: Filling address...');
+
+        if (config.address.street) {
+          await this.stagehand.act(sessionId, `Type "${config.address.street}" into the street address field`);
+        }
+        if (config.address.city) {
+          await this.stagehand.act(sessionId, `Type "${config.address.city}" into the city field`);
+        }
+        if (config.address.state) {
+          await this.stagehand.act(sessionId, `Type or select "${config.address.state}" for the state field`);
+        }
+        if (config.address.postalCode) {
+          await this.stagehand.act(sessionId, `Type "${config.address.postalCode}" into the postal code or zip code field`);
+        }
+        if (config.address.country) {
+          await this.stagehand.act(sessionId, `Select "${config.address.country}" from the country dropdown`);
+        }
+        recordStep('Fill address information', true, stepStart);
+      }
+
+      // Step 5: Apply template/snapshot if provided
+      if (config.templateSnapshot) {
+        stepStart = Date.now();
+        console.log('[GHLAutomation] Step 5: Applying template snapshot...');
+
+        await this.stagehand.act(sessionId, 'Click on "Use Snapshot" or template option');
+        await this.stagehand.waitFor(sessionId, 'timeout', 1500);
+        await this.stagehand.act(sessionId, `Select the snapshot or template with ID or name "${config.templateSnapshot}"`);
+        recordStep('Apply template snapshot', true, stepStart);
+      }
+
+      // Step 6: Save/Create the sub-account
+      stepStart = Date.now();
+      console.log('[GHLAutomation] Step 6: Saving sub-account...');
+
+      await this.stagehand.act(sessionId, 'Click the Save, Create, or Submit button to create the sub-account');
+      await this.stagehand.waitFor(sessionId, 'timeout', 5000); // Wait for creation
+      recordStep('Save sub-account', true, stepStart);
+
+      // Step 7: Extract the created sub-account ID
+      stepStart = Date.now();
+      console.log('[GHLAutomation] Step 7: Extracting sub-account details...');
+
+      const extractResult = await this.stagehand.extract<{
+        subAccountId: string;
+        subAccountName: string;
+      }>(sessionId, 'Extract the sub-account ID and name from the current page or URL', {
+        type: 'object',
+        properties: {
+          subAccountId: { type: 'string', description: 'The sub-account ID from the URL or page' },
+          subAccountName: { type: 'string', description: 'The sub-account business name' },
+        },
+        required: ['subAccountId', 'subAccountName'],
+      });
+      recordStep('Extract sub-account details', extractResult.success, stepStart);
+
+      // Step 8: Configure branding if provided
+      if (config.branding && extractResult.success) {
+        stepStart = Date.now();
+        console.log('[GHLAutomation] Step 8: Configuring branding...');
+
+        await this.stagehand.act(sessionId, 'Navigate to Settings or Business Profile');
+        await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+
+        if (config.branding.companyName) {
+          await this.stagehand.act(sessionId, `Update the company name to "${config.branding.companyName}"`);
+        }
+        if (config.branding.primaryColor) {
+          await this.stagehand.act(sessionId, `Set the primary brand color to "${config.branding.primaryColor}"`);
+        }
+        if (config.branding.logoUrl) {
+          await this.stagehand.act(sessionId, 'Click on upload logo or change logo');
+          // Note: Logo upload via URL may require additional handling
+        }
+
+        await this.stagehand.act(sessionId, 'Save the branding changes');
+        recordStep('Configure branding', true, stepStart);
+      }
+
+      // Step 9: Add users if provided
+      if (config.users && config.users.length > 0 && extractResult.success) {
+        stepStart = Date.now();
+        console.log('[GHLAutomation] Step 9: Adding users...');
+
+        await this.stagehand.act(sessionId, 'Navigate to Team or Users section in Settings');
+        await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+
+        for (const user of config.users) {
+          await this.stagehand.act(sessionId, 'Click Add User or Invite Team Member button');
+          await this.stagehand.waitFor(sessionId, 'timeout', 1000);
+          await this.stagehand.act(sessionId, `Type "${user.email}" into the email field`);
+          await this.stagehand.act(sessionId, `Type "${user.firstName}" into the first name field`);
+          await this.stagehand.act(sessionId, `Type "${user.lastName}" into the last name field`);
+
+          if (user.role) {
+            await this.stagehand.act(sessionId, `Select "${user.role}" role from the role dropdown`);
+          }
+
+          await this.stagehand.act(sessionId, 'Click Save or Send Invite button');
+          await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+        }
+        recordStep(`Add ${config.users.length} users`, true, stepStart);
+      }
+
+      const totalDuration = Date.now() - startTime;
+      console.log(`[GHLAutomation] Sub-account creation completed in ${totalDuration}ms`);
+
+      return {
+        success: true,
+        subAccountId: extractResult.data?.subAccountId,
+        subAccountName: extractResult.data?.subAccountName || config.businessName,
+        steps,
+      };
+
+    } catch (error) {
+      console.error('[GHLAutomation] Sub-account creation failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Sub-account creation failed',
+        steps,
+      };
+    }
+  }
+
+  /**
+   * Switch to a specific sub-account
+   */
+  public async switchToSubAccount(
+    sessionId: string,
+    subAccountIdentifier: string // Can be name or ID
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`[GHLAutomation] Switching to sub-account: ${subAccountIdentifier}`);
+
+      // Click on account switcher (usually in top-left or top-right)
+      await this.stagehand.act(sessionId, 'Click on the account switcher or sub-account dropdown in the header');
+      await this.stagehand.waitFor(sessionId, 'timeout', 1500);
+
+      // Search/select the sub-account
+      await this.stagehand.act(sessionId, `Search for or click on sub-account "${subAccountIdentifier}"`);
+      await this.stagehand.waitFor(sessionId, 'timeout', 3000);
+
+      return { success: true };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to switch sub-account',
+      };
+    }
+  }
+
+  /**
+   * List all sub-accounts
+   */
+  public async listSubAccounts(sessionId: string): Promise<ExtractResult<{
+    subAccounts: Array<{
+      id: string;
+      name: string;
+      email?: string;
+      status?: string;
+    }>;
+  }>> {
+    try {
+      // Navigate to sub-accounts list
+      await this.stagehand.act(sessionId, 'Click on the Agency/Settings icon in the sidebar');
+      await this.stagehand.waitFor(sessionId, 'timeout', 1500);
+      await this.stagehand.act(sessionId, 'Click on Sub-Accounts or Accounts');
+      await this.stagehand.waitFor(sessionId, 'timeout', 2000);
+
+      // Extract all sub-accounts
+      return this.stagehand.extract(sessionId, 'Extract all sub-accounts from the list including their ID, name, email, and status', {
+        type: 'object',
+        properties: {
+          subAccounts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'Sub-account ID' },
+                name: { type: 'string', description: 'Business name' },
+                email: { type: 'string', description: 'Email address' },
+                status: { type: 'string', description: 'Account status (active, paused, etc.)' },
+              },
+              required: ['id', 'name'],
+            },
+            description: 'List of all sub-accounts',
+          },
+        },
+        required: ['subAccounts'],
+      });
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list sub-accounts',
+      };
+    }
+  }
 }
 
 // ========================================

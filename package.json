@@ -18,7 +18,14 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "postinstall": "node scripts/stub-pino-pretty.js"
+    "postinstall": "node scripts/stub-pino-pretty.js",
+    "deploy:check": "tsx scripts/check-deployment.ts",
+    "deploy:check:prod": "tsx scripts/check-deployment.ts '' prod",
+    "deploy:check:preview": "tsx scripts/check-deployment.ts '' preview",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test tests/e2e/smoke",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report test-results/html"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

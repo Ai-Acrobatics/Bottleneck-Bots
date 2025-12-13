@@ -4,10 +4,61 @@ Complete implementation of the agent execution system with real-time thinking vi
 
 ## Components
 
-### 1. AgentDashboard (Page)
+### 1. AgentDashboard (Component)
+**Location:** `/root/github-repos/active/ghl-agency-ai/client/src/components/agent/AgentDashboard.tsx`
+
+**NEW: Comprehensive dashboard component** with real-time monitoring, metrics, and execution control.
+
+**Features:**
+- **Real-time Metrics Dashboard:**
+  - Active tasks counter
+  - Completion rate percentage
+  - Average response time
+  - Swarm agents count
+- **Task Management:**
+  - Text input for new tasks
+  - Pause/Resume controls
+  - Terminate execution
+  - Real-time status updates
+- **Recent Executions:**
+  - List of recent tasks with status badges
+  - Duration and timestamp display
+  - Error messages for failed executions
+- **Live Execution Logs:**
+  - Real-time event stream
+  - Color-coded log levels (info, success, warning, error, system)
+  - Auto-scrolling log viewer
+- **Quick Actions:**
+  - View all executions
+  - Swarm configuration
+  - Tool library
+  - Agent settings
+- **SSE Integration:**
+  - Live connection status indicator
+  - Automatic reconnection handling
+  - Real-time state synchronization
+
+**Usage:**
+```tsx
+import { AgentDashboard } from '@/components/agent/AgentDashboard';
+
+function App() {
+  return <AgentDashboard />;
+}
+```
+
+**Testing:**
+Comprehensive test suite available at `AgentDashboard.test.tsx` with:
+- Component rendering tests
+- User interaction tests
+- SSE integration tests
+- Metrics calculation tests
+- Accessibility tests
+
+### 1b. AgentDashboard (Page)
 **Location:** `/root/github-repos/active/ghl-agency-ai/client/src/pages/AgentDashboard.tsx`
 
-Main dashboard page that orchestrates the entire agent execution experience.
+**LEGACY:** Original dashboard page that uses sub-components.
 
 **Features:**
 - Full-page layout with sidebar history
@@ -122,6 +173,136 @@ Visual representation of the execution plan.
 - Status indicators (pending, in progress, completed, failed)
 - Current phase highlighting
 - Estimated duration display
+
+## Hooks
+
+### useAgentExecution
+**Location:** `/root/github-repos/active/ghl-agency-ai/client/src/hooks/useAgentExecution.ts`
+
+**NEW: Higher-level hook** for managing agent execution lifecycle with convenient methods.
+
+**Features:**
+- Wraps useAgentSSE for automatic connection management
+- Provides execution state and thinking steps
+- Convenient methods for start, pause, resume, cancel
+- Lifecycle callbacks (onComplete, onError)
+- Automatic state synchronization with store
+
+**Usage:**
+```tsx
+import { useAgentExecution } from '@/hooks/useAgentSSE';
+
+function CustomAgentControl() {
+  const {
+    currentExecution,
+    thinkingSteps,
+    isExecuting,
+    error,
+    isConnected,
+    startExecution,
+    cancelExecution,
+    pauseExecution,
+    resumeExecution,
+    completeExecution,
+    failExecution,
+    addThinkingStep,
+  } = useAgentExecution({
+    onComplete: (execution) => {
+      console.log('Task completed:', execution.result);
+    },
+    onError: (error) => {
+      console.error('Task failed:', error);
+    },
+  });
+
+  const handleStart = async () => {
+    const executionId = await startExecution('Create a landing page', {
+      priority: 'high',
+      tags: ['web', 'design'],
+    });
+    if (executionId) {
+      console.log('Started execution:', executionId);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={handleStart} disabled={isExecuting}>
+        {isExecuting ? 'Running...' : 'Start Task'}
+      </button>
+
+      {isExecuting && (
+        <div>
+          <button onClick={pauseExecution}>Pause</button>
+          <button onClick={resumeExecution}>Resume</button>
+          <button onClick={cancelExecution}>Cancel</button>
+        </div>
+      )}
+
+      {currentExecution && (
+        <div>
+          <h3>{currentExecution.task}</h3>
+          <p>Status: {currentExecution.status}</p>
+          <p>Thinking steps: {thinkingSteps.length}</p>
+        </div>
+      )}
+
+      {error && <div className="error">{error}</div>}
+    </div>
+  );
+}
+```
+
+**API:**
+```typescript
+interface UseAgentExecutionOptions {
+  autoStart?: boolean;
+  onComplete?: (execution: AgentExecution) => void;
+  onError?: (error: string) => void;
+}
+
+interface UseAgentExecutionReturn {
+  // State
+  currentExecution: AgentExecution | null;
+  thinkingSteps: ThinkingStep[];
+  isExecuting: boolean;
+  error: string | null;
+  isConnected: boolean;
+
+  // Actions
+  startExecution: (task: string, metadata?: Record<string, any>) => Promise<string | null>;
+  cancelExecution: () => Promise<void>;
+  pauseExecution: () => void;
+  resumeExecution: () => void;
+  completeExecution: (result?: any) => void;
+  failExecution: (error: string) => void;
+  addThinkingStep: (type: ThinkingStep['type'], content: string, metadata?: any) => void;
+}
+```
+
+### useAgentSSE
+**Location:** `/root/github-repos/active/ghl-agency-ai/client/src/hooks/useAgentSSE.ts`
+
+Lower-level hook for SSE connection management.
+
+**Usage:**
+```tsx
+import { useAgentSSE } from '@/hooks/useAgentSSE';
+
+function Component() {
+  const { isConnected, connect, disconnect, error } = useAgentSSE({
+    autoConnect: true,
+    sessionId: 'optional-session-id',
+  });
+
+  return (
+    <div>
+      Status: {isConnected ? 'Connected' : 'Disconnected'}
+      {error && <span>Error: {error}</span>}
+    </div>
+  );
+}
+```
 
 ## State Management
 

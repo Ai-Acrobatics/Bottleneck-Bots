@@ -221,3 +221,6 @@ export function useAgentSSE(options: UseAgentSSEOptions = {}) {
     disconnect,
   };
 }
+
+// Re-export useAgentExecution for convenience
+export { useAgentExecution } from './useAgentExecution';

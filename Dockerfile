@@ -29,7 +29,7 @@ RUN npm install -g pnpm@10
 
 WORKDIR /app
 
-# Copy package files, patches, stubs, and scripts
+# Copy package files, patches, stubs, and scripts (for postinstall)
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 COPY stubs/ ./stubs/

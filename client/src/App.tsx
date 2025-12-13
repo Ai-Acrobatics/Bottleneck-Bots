@@ -5,6 +5,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { TourProvider } from "./components/tour/TourProvider";
 import { SkipNavLink } from "./components/SkipNavLink";
+import { NotificationProvider } from "./components/notifications";
 import { trpc } from "@/lib/trpc";
 
 // Lazy load heavy components for better initial bundle size
@@ -98,12 +99,13 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system" switchable={true}>
         <TooltipProvider>
-          <TourProvider
-            onboardingCompleted={user?.onboardingCompleted === true}
-            isDashboardActive={currentView === 'DASHBOARD'}
-          >
-            <SkipNavLink />
-            <Toaster />
+          <NotificationProvider>
+            <TourProvider
+              onboardingCompleted={user?.onboardingCompleted === true}
+              isDashboardActive={currentView === 'DASHBOARD'}
+            >
+              <SkipNavLink />
+              <Toaster />
 
             {/* Admin Preview Toggle - Only visible for admin user */}
             {isAdmin && (
@@ -165,7 +167,8 @@ function App() {
                 <TermsOfService onBack={() => setCurrentView('LANDING')} />
               )}
             </Suspense>
-          </TourProvider>
+            </TourProvider>
+          </NotificationProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

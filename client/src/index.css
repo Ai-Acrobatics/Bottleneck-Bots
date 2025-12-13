@@ -403,6 +403,15 @@
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 /* Custom breakpoint for small phones (375px) */
 @media (min-width: 375px) {
   .xs\:text-sm { font-size: 0.875rem; }

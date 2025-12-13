@@ -28,7 +28,8 @@ import { SkipLink } from './SkipLink';
 import { ClientProfileModal } from './ClientProfileModal';
 import { AgentDashboard } from './agent/AgentDashboard';
 import { SubscriptionUsageCard, UpgradeModal, ExecutionPacksModal } from './subscription';
-import { Home, Terminal, Mail, Globe, Settings, Bot, Zap } from 'lucide-react';
+import { SwarmView } from './swarm/SwarmView';
+import { Home, Terminal, Mail, Globe, Settings, Bot, Zap, Network } from 'lucide-react';
 
 // Demo data only loaded when VITE_DEMO_MODE=1 (disabled by default in production)
 
@@ -41,12 +42,12 @@ const DEFAULT_USER: User = {
 };
 
 // ViewMode type definition
-type ViewMode = 'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER' | 'AGENT';
+type ViewMode = 'GLOBAL' | 'TERMINAL' | 'EMAIL_AGENT' | 'VOICE_AGENT' | 'SETTINGS' | 'SEO' | 'ADS' | 'MARKETPLACE' | 'AI_BROWSER' | 'AGENT' | 'SWARM';
 
 // Helper function to parse view from URL hash
 const getViewFromHash = (): ViewMode => {
   const hash = window.location.hash.slice(1); // remove #
-  const validViews: ViewMode[] = ['GLOBAL', 'TERMINAL', 'EMAIL_AGENT', 'VOICE_AGENT', 'SETTINGS', 'SEO', 'ADS', 'MARKETPLACE', 'AI_BROWSER', 'AGENT'];
+  const validViews: ViewMode[] = ['GLOBAL', 'TERMINAL', 'EMAIL_AGENT', 'VOICE_AGENT', 'SETTINGS', 'SEO', 'ADS', 'MARKETPLACE', 'AI_BROWSER', 'AGENT', 'SWARM'];
   return validViews.includes(hash.toUpperCase() as ViewMode) ? hash.toUpperCase() as ViewMode : 'GLOBAL';
 };
 
@@ -761,6 +762,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
             <Bot className="w-6 h-6" aria-hidden="true" />
           </button>
 
+          <button
+            onClick={() => setViewMode('SWARM')}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'SWARM' ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30' : 'text-slate-400 hover:bg-gray-100 hover:text-violet-500'}`}
+            aria-label="Swarm Coordinator"
+            aria-current={viewMode === 'SWARM' ? 'page' : undefined}
+            title="Swarm - Multi-Agent Coordination"
+          >
+            <Network className="w-6 h-6" aria-hidden="true" />
+          </button>
+
           <div className="flex-1"></div>
 
           <button
@@ -818,6 +829,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
 
           {viewMode === 'AGENT' && (
             <AgentDashboard />
+          )}
+
+          {viewMode === 'SWARM' && (
+            <SwarmView />
           )}
 
           {viewMode === 'TERMINAL' && (
