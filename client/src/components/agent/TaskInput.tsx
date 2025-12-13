@@ -1,23 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Send, Loader2, Sparkles, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { TaskTemplate } from './TaskTemplates';
 
 interface TaskInputProps {
   onSubmit: (task: string) => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  selectedTemplate?: TaskTemplate | null;
+  onClearTemplate?: () => void;
+  onShowTemplates?: () => void;
 }
 
 export function TaskInput({
   onSubmit,
   isLoading = false,
   disabled = false,
-  placeholder = 'Describe the task you want the agent to perform...'
+  placeholder = 'Describe the task you want the agent to perform...',
+  selectedTemplate,
+  onClearTemplate,
+  onShowTemplates,
 }: TaskInputProps) {
   const [task, setTask] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-fill task from selected template
+  useEffect(() => {
+    if (selectedTemplate) {
+      setTask(selectedTemplate.prompt);
+      textareaRef.current?.focus();
+    }
+  }, [selectedTemplate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,10 +57,24 @@ export function TaskInput({
       <CardContent className="p-4">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label htmlFor="task-input" className="block text-xs font-semibold text-gray-700 mb-2">
-              Agent Task
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="task-input" className="block text-xs font-semibold text-gray-700">
+                Agent Task
+              </label>
+              {selectedTemplate && onClearTemplate && (
+                <Badge
+                  variant="secondary"
+                  className="bg-emerald-50 text-emerald-700 gap-1 cursor-pointer hover:bg-emerald-100"
+                  onClick={onClearTemplate}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {selectedTemplate.name}
+                  <X className="w-3 h-3 ml-1" />
+                </Badge>
+              )}
+            </div>
             <textarea
+              ref={textareaRef}
               id="task-input"
               value={task}
               onChange={(e) => setTask(e.target.value)}
@@ -55,15 +86,31 @@ export function TaskInput({
                 'focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent',
                 'disabled:bg-gray-100 disabled:cursor-not-allowed',
                 'text-sm text-gray-900 placeholder:text-gray-400',
-                'transition-all'
+                'transition-all',
+                selectedTemplate && 'border-emerald-300 bg-emerald-50/30'
               )}
-              rows={3}
+              rows={4}
             />
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-500">
-              Press <kbd className="px-2 py-1 bg-gray-100 rounded border border-gray-300 font-mono">Ctrl+Enter</kbd> to submit
+            <div className="flex items-center gap-3">
+              {onShowTemplates && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onShowTemplates}
+                  className="text-xs gap-1"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Templates
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              )}
+              <span className="text-xs text-gray-500">
+                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-300 font-mono text-[10px]">Ctrl+Enter</kbd> to submit
+              </span>
             </div>
 
             <Button
