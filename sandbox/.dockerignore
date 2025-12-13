@@ -1,0 +1,4 @@
+# Ignore everything except necessary files
+*
+!requirements.txt
+!entrypoint.sh
