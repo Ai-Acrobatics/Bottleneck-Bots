@@ -20,13 +20,16 @@ import {
   buildSystemPrompt,
   buildTaskPrompt,
   buildObservationPrompt,
-  buildErrorRecoveryPrompt
+  buildErrorRecoveryPrompt,
+  type RAGContext
 } from "./agentPrompts";
 import { AgentSSEEmitter } from "../_core/agent-sse-events";
 import {
   registerBrowserTools,
   getBrowserToolDefinitions,
 } from "./agentBrowserTools";
+import { ragService } from "./rag.service";
+import { getToolRegistry, ShellTool, FileTool } from "./tools";
 
 // ========================================
 // TYPES & INTERFACES
@@ -298,8 +301,152 @@ export class AgentOrchestratorService {
       }
     });
 
-    // Additional tools will be registered here
-    // Browser automation, GHL actions, etc. will be added separately
+    // Tool: Retrieve documentation from knowledge base (RAG)
+    this.toolRegistry.set("retrieve_documentation", async (params: {
+      query: string;
+      topK?: number;
+      platforms?: string[];
+      categories?: string[];
+    }) => {
+      try {
+        const chunks = await ragService.retrieve(params.query, {
+          topK: params.topK || 5,
+          platforms: params.platforms,
+          categories: params.categories,
+          minSimilarity: 0.5,
+        });
+
+        if (chunks.length === 0) {
+          return {
+            success: true,
+            message: "No relevant documentation found for the query.",
+            chunks: [],
+            count: 0,
+          };
+        }
+
+        // Format chunks for agent consumption
+        const formattedChunks = chunks.slice(0, params.topK || 5).map((chunk, index) => ({
+          index: index + 1,
+          content: chunk.content,
+          relevance: chunk.similarity ? `${(chunk.similarity * 100).toFixed(1)}%` : 'N/A',
+          metadata: chunk.metadata,
+        }));
+
+        return {
+          success: true,
+          chunks: formattedChunks,
+          count: chunks.length,
+          message: `Found ${chunks.length} relevant document(s).`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to retrieve documentation',
+          chunks: [],
+          count: 0,
+        };
+      }
+    });
+
+    // Register shell and file tools from the new Tool system
+    const toolRegistry = getToolRegistry();
+    const shellTool = toolRegistry.get('shell') as ShellTool;
+    const fileTool = toolRegistry.get('file') as FileTool;
+
+    // Tool: Execute shell command
+    this.toolRegistry.set("shell_exec", async (params: {
+      command: string;
+      cwd?: string;
+      timeout?: number;
+      background?: boolean;
+    }) => {
+      const result = await shellTool.execute({
+        action: 'exec',
+        command: params.command,
+        cwd: params.cwd,
+        timeout: params.timeout?.toString(),
+        background: params.background?.toString(),
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
+
+    // Tool: Read file
+    this.toolRegistry.set("file_read", async (params: {
+      path: string;
+      lines?: number;
+      offset?: number;
+    }) => {
+      const result = await fileTool.execute({
+        action: 'read',
+        path: params.path,
+        lines: params.lines?.toString(),
+        offset: params.offset?.toString(),
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
+
+    // Tool: Write file
+    this.toolRegistry.set("file_write", async (params: {
+      path: string;
+      content: string;
+      createDirectories?: boolean;
+    }) => {
+      const result = await fileTool.execute({
+        action: 'write',
+        path: params.path,
+        content: params.content,
+        createDirectories: params.createDirectories?.toString() || 'true',
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
+
+    // Tool: Edit file
+    this.toolRegistry.set("file_edit", async (params: {
+      path: string;
+      oldContent: string;
+      newContent: string;
+      replaceAll?: boolean;
+    }) => {
+      const result = await fileTool.execute({
+        action: 'edit',
+        path: params.path,
+        oldContent: params.oldContent,
+        newContent: params.newContent,
+        replaceAll: params.replaceAll?.toString(),
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
+
+    // Tool: List files in directory
+    this.toolRegistry.set("file_list", async (params: {
+      path: string;
+      recursive?: boolean;
+      pattern?: string;
+    }) => {
+      const result = await fileTool.execute({
+        action: 'list',
+        path: params.path,
+        recursive: params.recursive?.toString(),
+        pattern: params.pattern,
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
+
+    // Tool: Search in file
+    this.toolRegistry.set("file_search", async (params: {
+      path: string;
+      pattern: string;
+      caseSensitive?: boolean;
+    }) => {
+      const result = await fileTool.execute({
+        action: 'search',
+        path: params.path,
+        pattern: params.pattern,
+        caseSensitive: params.caseSensitive?.toString(),
+      }, { userId: 0, sessionId: 'agent' });
+      return result;
+    });
   }
 
   /**
@@ -441,12 +588,184 @@ export class AgentOrchestratorService {
           },
           required: ["url"]
         }
+      },
+      {
+        name: "retrieve_documentation",
+        description: "Search the knowledge base for relevant documentation, support articles, and guides. Use this when you need help understanding how to complete a task, troubleshoot an issue, or learn about a specific platform or feature.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query describing what information you need"
+            },
+            topK: {
+              type: "number",
+              description: "Number of results to return (default: 5, max: 10)"
+            },
+            platforms: {
+              type: "array",
+              description: "Filter by specific platforms (e.g., 'ghl', 'zapier', 'mailchimp')",
+              items: { type: "string" }
+            },
+            categories: {
+              type: "array",
+              description: "Filter by documentation categories (e.g., 'api', 'workflows', 'troubleshooting')",
+              items: { type: "string" }
+            }
+          },
+          required: ["query"]
+        }
       }
     ];
 
     // Add browser automation tools
     const browserTools = getBrowserToolDefinitions();
     tools.push(...browserTools);
+
+    // Add shell and file tools
+    tools.push(
+      {
+        name: "shell_exec",
+        description: "Execute a shell command. Use this to run system commands, install packages, run scripts, or interact with the operating system.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            command: {
+              type: "string",
+              description: "The shell command to execute"
+            },
+            cwd: {
+              type: "string",
+              description: "Working directory for command execution"
+            },
+            timeout: {
+              type: "number",
+              description: "Timeout in milliseconds (default: 30000)"
+            },
+            background: {
+              type: "boolean",
+              description: "Run command in background (default: false)"
+            }
+          },
+          required: ["command"]
+        }
+      },
+      {
+        name: "file_read",
+        description: "Read the contents of a file. Use this to examine file contents, configuration, or data.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: {
+              type: "string",
+              description: "Path to the file to read"
+            },
+            lines: {
+              type: "number",
+              description: "Number of lines to read (for large files)"
+            },
+            offset: {
+              type: "number",
+              description: "Line number to start reading from"
+            }
+          },
+          required: ["path"]
+        }
+      },
+      {
+        name: "file_write",
+        description: "Write content to a file. Use this to create new files or overwrite existing ones.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: {
+              type: "string",
+              description: "Path where to write the file"
+            },
+            content: {
+              type: "string",
+              description: "Content to write to the file"
+            },
+            createDirectories: {
+              type: "boolean",
+              description: "Create parent directories if they don't exist (default: true)"
+            }
+          },
+          required: ["path", "content"]
+        }
+      },
+      {
+        name: "file_edit",
+        description: "Edit a file by replacing specific content. Use this for surgical edits to existing files.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: {
+              type: "string",
+              description: "Path to the file to edit"
+            },
+            oldContent: {
+              type: "string",
+              description: "The exact content to find and replace"
+            },
+            newContent: {
+              type: "string",
+              description: "The new content to replace with"
+            },
+            replaceAll: {
+              type: "boolean",
+              description: "Replace all occurrences (default: false, fails if multiple found)"
+            }
+          },
+          required: ["path", "oldContent", "newContent"]
+        }
+      },
+      {
+        name: "file_list",
+        description: "List files and directories. Use this to explore directory structures.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: {
+              type: "string",
+              description: "Directory path to list"
+            },
+            recursive: {
+              type: "boolean",
+              description: "List recursively (default: false)"
+            },
+            pattern: {
+              type: "string",
+              description: "Glob pattern to filter files (e.g., '*.ts')"
+            }
+          },
+          required: ["path"]
+        }
+      },
+      {
+        name: "file_search",
+        description: "Search for a pattern within a file. Use this to find specific content.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            path: {
+              type: "string",
+              description: "File path to search in"
+            },
+            pattern: {
+              type: "string",
+              description: "Regex pattern to search for"
+            },
+            caseSensitive: {
+              type: "boolean",
+              description: "Case sensitive search (default: true)"
+            }
+          },
+          required: ["path", "pattern"]
+        }
+      }
+    );
 
     return tools;
   }
@@ -636,10 +955,34 @@ export class AgentOrchestratorService {
         content: currentPrompt,
       });
 
+      // Fetch RAG context on first iteration
+      let ragContext: RAGContext | undefined;
+      if (state.iterations === 0) {
+        try {
+          const ragResult = await ragService.buildSystemPrompt(state.taskDescription, {
+            maxDocumentationTokens: 3000,
+            includeExamples: true,
+          });
+          ragContext = {
+            retrievedChunks: ragResult.retrievedChunks.map(chunk => ({
+              content: chunk.content,
+              similarity: chunk.similarity,
+              tokenCount: chunk.tokenCount,
+            })),
+            detectedPlatforms: ragResult.detectedPlatforms,
+          };
+          console.log(`[Agent] RAG context loaded: ${ragResult.retrievedChunks.length} chunks, platforms: ${ragResult.detectedPlatforms.join(', ')}`);
+        } catch (ragError) {
+          console.warn('[Agent] Failed to load RAG context:', ragError);
+          // Continue without RAG context
+        }
+      }
+
       // Call Claude with function calling
       const systemPrompt = buildSystemPrompt({
         userId: state.userId,
         taskDescription: state.taskDescription,
+        ragContext,
       });
 
       const response = await this.claude.messages.create({
