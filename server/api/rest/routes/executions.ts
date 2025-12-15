@@ -55,7 +55,7 @@ router.get(
 
     if (userTaskIds.length === 0) {
       // No tasks, return empty result
-      return res.json({
+      res.json({
         data: [],
         pagination: {
           page: query.page,
@@ -64,6 +64,7 @@ router.get(
           pages: 0,
         },
       });
+      return;
     }
 
     const conditions: any[] = [];
@@ -218,7 +219,7 @@ router.get(
         executionId: execution.id,
         taskId: execution.taskId,
         logs,
-        screenshots: execution.screenshots || [],
+        screenshots: (execution.metadata as any)?.screenshots || [],
         recordingUrl: execution.recordingUrl,
       },
     });

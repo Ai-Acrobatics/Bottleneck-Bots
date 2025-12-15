@@ -78,7 +78,7 @@ class S3StorageService {
 
       return `s3://${this.bucket}/${key}`;
     } catch (error) {
-      logger.error(`Failed to upload file: ${key}`, error);
+      logger.error({ err: error }, `Failed to upload file: ${key}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -110,27 +110,33 @@ class S3StorageService {
 
       // Convert stream to buffer
       const chunks: Uint8Array[] = [];
-      const reader = response.Body.getReader?.();
 
-      if (reader) {
+      // Check if Body is a ReadableStream (web streams)
+      if (response.Body && typeof (response.Body as any).getReader === 'function') {
+        const reader = (response.Body as any).getReader();
         let result = await reader.read();
         while (!result.done) {
           chunks.push(result.value);
           result = await reader.read();
         }
       } else {
-        // Fallback for non-stream bodies
+        // Fallback for Node.js streams or buffers
         const data = response.Body as any;
         if (typeof data === 'string') {
           chunks.push(Buffer.from(data));
         } else if (data instanceof Buffer) {
           chunks.push(data);
+        } else if (data && typeof data.read === 'function') {
+          // Node.js stream
+          for await (const chunk of data) {
+            chunks.push(chunk);
+          }
         }
       }
 
       return Buffer.concat(chunks);
     } catch (error) {
-      logger.error(`Failed to download file: ${key}`, error);
+      logger.error({ err: error }, `Failed to download file: ${key}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -158,7 +164,7 @@ class S3StorageService {
 
       logger.info(`File deleted successfully: ${key}`);
     } catch (error) {
-      logger.error(`Failed to delete file: ${key}`, error);
+      logger.error({ err: error }, `Failed to delete file: ${key}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -198,7 +204,7 @@ class S3StorageService {
 
       return files;
     } catch (error) {
-      logger.error(`Failed to list files with prefix: ${prefix}`, error);
+      logger.error({ err: error }, `Failed to list files with prefix: ${prefix}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -227,7 +233,7 @@ class S3StorageService {
 
       return url;
     } catch (error) {
-      logger.error(`Failed to generate signed URL for: ${key}`, error);
+      logger.error({ err: error }, `Failed to generate signed URL for: ${key}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -250,8 +256,8 @@ class S3StorageService {
       logger.info(`File copied successfully: ${sourceKey} -> ${destinationKey}`);
     } catch (error) {
       logger.error(
-        `Failed to copy file from ${sourceKey} to ${destinationKey}`,
-        error
+        { err: error },
+        `Failed to copy file from ${sourceKey} to ${destinationKey}`
       );
 
       throw new TRPCError({
@@ -286,7 +292,7 @@ class S3StorageService {
         ...response.Metadata,
       };
     } catch (error) {
-      logger.error(`Failed to get metadata for file: ${key}`, error);
+      logger.error({ err: error }, `Failed to get metadata for file: ${key}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

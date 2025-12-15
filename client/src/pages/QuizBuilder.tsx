@@ -172,7 +172,7 @@ export default function QuizBuilder() {
         const result = await createQuiz.mutateAsync({
           ...quizData,
           isPublished: publish,
-        });
+        } as any);
         savedQuizId = result.quiz.id;
         toast.success('Quiz created successfully');
       }

@@ -392,13 +392,12 @@ class SchedulerRunnerService {
       const stagehand = new Stagehand({
         env: "BROWSERBASE",
         verbose: 0,
-        enableCaching: false,
         disablePino: true,
         model: modelName,
         apiKey: process.env.BROWSERBASE_API_KEY,
         projectId: process.env.BROWSERBASE_PROJECT_ID,
         browserbaseSessionID: session.id,
-      });
+      } as any);
 
       await stagehand.init();
       const page = stagehand.context.pages()[0];

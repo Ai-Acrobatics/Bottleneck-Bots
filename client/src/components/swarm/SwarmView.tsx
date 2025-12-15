@@ -499,31 +499,31 @@ export function SwarmView({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Throughput</span>
                 <span className="text-sm font-medium">
-                  {metrics?.throughput?.toFixed(2) || 0} tasks/min
+                  {(metrics && 'global' in metrics ? metrics.global.throughput : metrics?.throughput)?.toFixed(2) || '0.00'} tasks/min
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Avg Latency</span>
                 <span className="text-sm font-medium">
-                  {metrics?.latency?.toFixed(0) || 0}ms
+                  {(metrics && 'global' in metrics ? metrics.global.latency : metrics?.latency)?.toFixed(0) || '0'}ms
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Success Rate</span>
                 <span className="text-sm font-medium">
-                  {((1 - (metrics?.errorRate || 0)) * 100).toFixed(1)}%
+                  {((1 - ((metrics && 'global' in metrics ? metrics.global.errorRate : metrics?.errorRate) || 0)) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Efficiency</span>
                 <span className="text-sm font-medium">
-                  {((metrics?.efficiency || 0) * 100).toFixed(1)}%
+                  {(((metrics && 'global' in metrics ? metrics.global.efficiency : metrics?.efficiency) || 0) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Agent Utilization</span>
                 <span className="text-sm font-medium">
-                  {((metrics?.agentUtilization || 0) * 100).toFixed(1)}%
+                  {(((metrics && 'global' in metrics ? metrics.global.agentUtilization : metrics?.agentUtilization) || 0) * 100).toFixed(1)}%
                 </span>
               </div>
             </CardContent>
@@ -541,18 +541,18 @@ export function SwarmView({
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total in Queue</span>
-                  <Badge variant="secondary">{queueData.queue.totalTasks || 0}</Badge>
+                  <Badge variant="secondary">{queueData.queue.queueLength || 0}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Pending</span>
                   <span className="text-sm font-medium">
-                    {queueData.queue.pendingTasks || 0}
+                    {queueData.queue.queueLength || 0}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Processing</span>
                   <span className="text-sm font-medium">
-                    {queueData.queue.processingTasks || 0}
+                    {queueData.queue.activeAssignments || 0}
                   </span>
                 </div>
               </CardContent>

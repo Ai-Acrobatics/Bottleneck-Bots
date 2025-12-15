@@ -62,7 +62,7 @@ export class ToolLogger {
       executionId: log.executionId,
       toolName: log.toolName,
       parameters: log.parameters,
-      result: log.result as Record<string, unknown>,
+      result: log.result as unknown as Record<string, unknown>,
       success: log.result.success,
       durationMs: log.duration,
       error: log.result.error,

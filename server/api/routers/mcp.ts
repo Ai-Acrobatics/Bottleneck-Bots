@@ -63,7 +63,7 @@ export const mcpRouter = router({
     .input(
       z.object({
         name: z.string().describe('Tool name in format: category/name'),
-        arguments: z.record(z.unknown()).optional().describe('Tool arguments'),
+        arguments: z.record(z.string(), z.unknown()).optional().describe('Tool arguments'),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -77,11 +77,7 @@ export const mcpRouter = router({
 
         const result = await registry.executeTool(
           input.name,
-          input.arguments || {},
-          {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          }
+          input.arguments || {}
         );
 
         return {
@@ -117,10 +113,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('file/read', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('file/read', input);
 
           return result;
         } catch (error) {
@@ -148,10 +141,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('file/write', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('file/write', input);
 
           return result;
         } catch (error) {
@@ -178,10 +168,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('file/list', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('file/list', input);
 
           return result;
         } catch (error) {
@@ -206,7 +193,7 @@ export const mcpRouter = router({
           command: z.string(),
           cwd: z.string().optional(),
           timeout: z.number().optional(),
-          env: z.record(z.string()).optional(),
+          env: z.record(z.string(), z.string()).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -214,10 +201,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('shell/execute', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('shell/execute', input);
 
           return result;
         } catch (error) {
@@ -241,7 +225,7 @@ export const mcpRouter = router({
         z.object({
           url: z.string().url(),
           method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']).optional(),
-          headers: z.record(z.string()).optional(),
+          headers: z.record(z.string(), z.string()).optional(),
           body: z.unknown().optional(),
           timeout: z.number().optional(),
         })
@@ -251,10 +235,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('web/request', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('web/request', input);
 
           return result;
         } catch (error) {
@@ -281,10 +262,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('web/fetch', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('web/fetch', input);
 
           return result;
         } catch (error) {
@@ -316,10 +294,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('database/query', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('database/query', input);
 
           return result;
         } catch (error) {
@@ -344,10 +319,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('database/tables', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('database/tables', input);
 
           return result;
         } catch (error) {
@@ -373,10 +345,7 @@ export const mcpRouter = router({
           const server = await getMCPServer();
           const registry = (server as any).toolRegistry;
 
-          const result = await registry.executeTool('database/schema', input, {
-            sessionId: ctx.req.sessionID,
-            userId: ctx.user?.id,
-          });
+          const result = await registry.executeTool('database/schema', input);
 
           return result;
         } catch (error) {

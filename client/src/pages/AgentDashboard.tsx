@@ -49,7 +49,7 @@ export function AgentDashboard() {
     fetchActiveBrowserSession,
   } = useAgentStore();
 
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | undefined>(undefined);
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<'preview' | 'templates'>('preview');
@@ -97,7 +97,7 @@ export function AgentDashboard() {
 
   const handleNewExecution = () => {
     clearCurrentExecution();
-    setSelectedExecutionId(null);
+    setSelectedExecutionId(undefined);
   };
 
   const handleSelectExecution = (executionId: string) => {
@@ -207,7 +207,24 @@ export function AgentDashboard() {
         {/* Thinking visualization */}
         <div className="flex-1 overflow-hidden">
           <AgentThinkingViewer
-            execution={currentExecution}
+            execution={currentExecution ? {
+              id: String(currentExecution.id),
+              task: currentExecution.taskDescription || '',
+              status: currentExecution.status === 'running' || currentExecution.status === 'started' ? 'executing' :
+                      currentExecution.status === 'success' || currentExecution.status === 'completed' ? 'completed' :
+                      currentExecution.status === 'failed' || currentExecution.status === 'timeout' ? 'failed' :
+                      currentExecution.status === 'cancelled' ? 'cancelled' :
+                      currentExecution.status === 'planning' ? 'planning' : 'executing',
+              plan: currentExecution.plan || undefined,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              completedAt: currentExecution.status === 'completed' || currentExecution.status === 'success' ? new Date() : undefined,
+              error: currentExecution.error,
+              result: currentExecution.output,
+              metadata: {
+                duration: currentExecution.duration,
+              },
+            } : null}
             thinkingSteps={thinkingSteps}
             isExecuting={isExecuting}
             onCancel={handleCancelExecution}

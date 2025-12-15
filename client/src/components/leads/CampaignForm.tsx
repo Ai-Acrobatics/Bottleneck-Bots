@@ -51,7 +51,7 @@ export function CampaignForm({ leadLists, onSubmit, onCancel }: CampaignFormProp
   });
 
   const { getBalance } = useCredits();
-  const { data: balance } = getBalance('calling');
+  const { data: balance } = getBalance({ creditType: 'calling' });
 
   const selectedList = leadLists.find((l) => l.id === formData.leadListId);
   const estimatedCost = selectedList ? selectedList.totalLeads * 2 : 0; // 2 credits per call

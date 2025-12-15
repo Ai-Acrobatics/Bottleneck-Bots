@@ -85,10 +85,10 @@ const queryMemorySchema = z.object({
  */
 const sessionContextSchema = z.object({
   sessionId: z.string().min(1, 'Session ID is required'),
-  context: z.record(z.any()),
+  context: z.record(z.string(), z.any()),
   agentId: z.string().optional(),
   userId: z.number().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -97,11 +97,11 @@ const sessionContextSchema = z.object({
 const reasoningPatternSchema = z.object({
   pattern: z.string().min(1, 'Pattern is required'),
   result: z.any(),
-  context: z.record(z.any()).optional(),
+  context: z.record(z.string(), z.any()).optional(),
   confidence: z.number().min(0).max(1).optional(),
   domain: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -547,16 +547,16 @@ export const memoryRouter = router({
         let consolidatedCount = 0;
 
         // For each group, keep the most recent and delete others
-        for (const [key, group] of keyGroups) {
+        for (const [key, group] of Array.from(keyGroups)) {
           if (group.length > 1) {
             // Sort by date, keep newest
-            group.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            group.sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
             const newest = group[0];
 
             // Merge metadata and values if needed
             const mergedMetadata = {
               ...newest.metadata,
-              consolidatedFrom: group.slice(1).map(e => e.id),
+              consolidatedFrom: group.slice(1).map((e: any) => e.id),
               consolidatedAt: new Date().toISOString(),
             };
 

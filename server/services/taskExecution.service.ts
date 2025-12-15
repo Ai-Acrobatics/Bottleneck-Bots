@@ -431,7 +431,7 @@ export class TaskExecutionService {
       if ('config' in step && step.config && typeof step.config === 'object') {
         return (step.config as Record<string, unknown>)[key] as T;
       }
-      return (step as Record<string, unknown>)[key] as T;
+      return (step as unknown as Record<string, unknown>)[key] as T;
     };
 
     switch (stepType) {
@@ -845,7 +845,7 @@ export class TaskExecutionService {
         return {
           success: false,
           error: `GHL API error (${response.status}): ${typeof data === 'object' && data && 'message' in data ? (data as any).message : JSON.stringify(data)}`,
-          output: data,
+          output: typeof data === 'object' && data ? data as Record<string, unknown> : { raw: data },
         };
       }
 

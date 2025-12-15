@@ -35,11 +35,15 @@ export default function LeadDetails() {
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  const { getList, exportLeads, enrichLead } =
+  const { getList, getLeads, exportLeads, enrichLead } =
     useLeadEnrichment();
 
-  const { data: leadList, isLoading } = getList(Number(id!));
+  const { data: leadList, isLoading } = getList({ listId: Number(id!) });
+  const { data: leadsData } = getLeads({ listId: Number(id!), limit: 1000 });
   const enrichMutation = enrichLead;
+
+  // Extract leads from the response
+  const leads = leadsData?.leads ?? [];
 
   if (isLoading) {
     return (
@@ -68,24 +72,57 @@ export default function LeadDetails() {
 
   const stats = {
     totalLeads: leadList.totalLeads || 0,
-    enriched: leadList.enrichedCount || 0,
-    failed: leadList.failedCount || 0,
-    creditsUsed: leadList.creditsCost || 0,
+    enriched: leadList.enrichedLeads || 0,
+    failed: leadList.failedLeads || 0,
+    creditsUsed: leadList.costInCredits || 0,
   };
 
   const handleExport = async (format: 'csv' | 'json' = 'csv') => {
     try {
-      // exportLeads is a query, not a mutation - call it directly
-      const result = await exportLeads({ listId: Number(id!), format });
+      // exportLeads is a query - we need to fetch the data
+      const result = await exportLeads({ listId: Number(id!) });
 
       if (result.data) {
-        const blob = new Blob([result.data.data], {
-          type: format === 'csv' ? 'text/csv' : 'application/json',
-        });
+        const exportData = result.data;
+        let blob: Blob;
+        let filename: string;
+
+        if (format === 'csv') {
+          // Convert to CSV
+          const leads = exportData.leads;
+          if (leads.length === 0) {
+            toast.error('No enriched leads to export');
+            return;
+          }
+
+          // Create CSV headers and rows
+          const headers = ['ID', 'Raw Data', 'Enriched Data', 'Enriched At'];
+          const rows = leads.map((lead: any) => [
+            lead.id,
+            JSON.stringify(lead.rawData),
+            JSON.stringify(lead.enrichedData),
+            lead.enrichedAt,
+          ]);
+
+          const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+          ].join('\n');
+
+          blob = new Blob([csvContent], { type: 'text/csv' });
+          filename = `${exportData.list.name}-leads.csv`;
+        } else {
+          // Export as JSON
+          blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json',
+          });
+          filename = `${exportData.list.name}-leads.json`;
+        }
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = result.data.filename;
+        a.download = filename;
         a.click();
         window.URL.revokeObjectURL(url);
 
@@ -106,7 +143,6 @@ export default function LeadDetails() {
       case 'enrich':
         try {
           await enrichMutation.mutateAsync({
-            listId: Number(id!),
             leadId: lead.id,
           });
           toast.success('Lead re-enrichment started');
@@ -292,7 +328,7 @@ export default function LeadDetails() {
 
         <TabsContent value="all" className="space-y-4">
           <LeadTable
-            leads={leadList.leads || []}
+            leads={leads as any[]}
             columns={allLeadsColumns}
             onLeadClick={(lead) => {
               setSelectedLead(lead);
@@ -305,7 +341,7 @@ export default function LeadDetails() {
 
         <TabsContent value="enriched" className="space-y-4">
           <LeadTable
-            leads={(leadList.leads || []).filter((l: any) => l.status === 'enriched')}
+            leads={leads.filter((l: any) => l.enrichmentStatus === 'enriched') as any[]}
             columns={enrichedLeadsColumns}
             onLeadClick={(lead) => {
               setSelectedLead(lead);
@@ -317,7 +353,7 @@ export default function LeadDetails() {
 
         <TabsContent value="failed" className="space-y-4">
           <LeadTable
-            leads={(leadList.leads || []).filter((l: any) => l.status === 'failed')}
+            leads={leads.filter((l: any) => l.enrichmentStatus === 'failed') as any[]}
             columns={allLeadsColumns}
             onLeadClick={(lead) => {
               setSelectedLead(lead);

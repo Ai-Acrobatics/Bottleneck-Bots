@@ -12,7 +12,7 @@ interface CreditBalanceProps {
 
 export function CreditBalance({ creditType, onBuyCredits, className }: CreditBalanceProps) {
   const { getBalance } = useCredits();
-  const { data: balance, isLoading } = getBalance(creditType);
+  const { data: balance, isLoading } = getBalance({ creditType: creditType as 'enrichment' | 'calling' | 'scraping' });
 
   if (isLoading) {
     return <Skeleton className="h-10 w-48" />;

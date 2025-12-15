@@ -50,9 +50,10 @@ export const stripeWebhookRouter = router({
             }
 
             try {
-                const Stripe = (await import("stripe")).default;
+                // Import Stripe with type definition
+                const { default: Stripe } = await import("stripe");
                 const stripe = new Stripe(stripeSecretKey, {
-                    apiVersion: "2024-12-18.acacia",
+                    apiVersion: "2024-12-18.acacia" as any,
                 });
 
                 // In production, verify the webhook signature
@@ -117,9 +118,9 @@ export const stripeWebhookRouter = router({
             }
 
             try {
-                const Stripe = (await import("stripe")).default;
+                const { default: Stripe } = await import("stripe");
                 const stripe = new Stripe(stripeSecretKey, {
-                    apiVersion: "2024-12-18.acacia",
+                    apiVersion: "2024-12-18.acacia" as any,
                 });
 
                 const session = await stripe.checkout.sessions.retrieve(input.sessionId);
@@ -243,9 +244,9 @@ async function handleChargeRefunded(charge: any) {
     }
 
     try {
-        const Stripe = (await import("stripe")).default;
+        const { default: Stripe } = await import("stripe");
         const stripe = new Stripe(stripeSecretKey, {
-            apiVersion: "2024-12-18.acacia",
+            apiVersion: "2024-12-18.acacia" as any,
         });
 
         // Find checkout sessions with this payment intent
@@ -268,7 +269,7 @@ async function handleChargeRefunded(charge: any) {
         }
 
         const userId = parseInt(metadata.userId);
-        const creditType = metadata.creditType;
+        const creditType = metadata.creditType as "enrichment" | "calling" | "scraping";
         const creditAmount = parseInt(metadata.creditAmount);
 
         // Deduct the credits back (refund)

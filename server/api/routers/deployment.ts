@@ -150,7 +150,7 @@ export const deploymentRouter = router({
           },
         };
       } catch (error) {
-        logger.error(`Deployment failed: ${input.projectName}`, error);
+        logger.error({ error, projectName: input.projectName }, 'Deployment failed');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -191,7 +191,7 @@ export const deploymentRouter = router({
           deployment: status,
         };
       } catch (error) {
-        logger.error(`Failed to get deployment status: ${input.deploymentId}`, error);
+        logger.error({ error, deploymentId: input.deploymentId }, 'Failed to get deployment status');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -247,7 +247,7 @@ export const deploymentRouter = router({
           total: deployments.length,
         };
       } catch (error) {
-        logger.error(`Failed to list deployments: ${input.projectId}`, error);
+        logger.error({ error, projectId: input.projectId }, 'Failed to list deployments');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -290,7 +290,7 @@ export const deploymentRouter = router({
           message: `Successfully rolled back to deployment ${input.deploymentId}`,
         };
       } catch (error) {
-        logger.error(`Rollback failed for deployment: ${input.deploymentId}`, error);
+        logger.error({ error, deploymentId: input.deploymentId }, 'Rollback failed for deployment');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -336,7 +336,7 @@ export const deploymentRouter = router({
           message: `Domain ${input.domain} has been added`,
         };
       } catch (error) {
-        logger.error(`Failed to add domain: ${input.domain}`, error);
+        logger.error({ error, domain: input.domain }, 'Failed to add domain');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -382,7 +382,7 @@ export const deploymentRouter = router({
           message: `Domain ${input.domain} has been removed`,
         };
       } catch (error) {
-        logger.error(`Failed to remove domain: ${input.domain}`, error);
+        logger.error({ error, domain: input.domain }, 'Failed to remove domain');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -445,10 +445,7 @@ export const deploymentRouter = router({
           count: Object.keys(input.variables).length,
         };
       } catch (error) {
-        logger.error(
-          `Failed to set environment variables for project: ${input.projectId}`,
-          error
-        );
+        logger.error({ error, projectId: input.projectId }, 'Failed to set environment variables for project');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -491,7 +488,7 @@ export const deploymentRouter = router({
           totalLines: logs.length,
         };
       } catch (error) {
-        logger.error(`Failed to get build logs for project: ${input.projectId}`, error);
+        logger.error({ error, projectId: input.projectId }, 'Failed to get build logs for project');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -535,7 +532,7 @@ export const deploymentRouter = router({
           },
         };
       } catch (error) {
-        logger.error(`Failed to get storage info for project: ${input.projectId}`, error);
+        logger.error({ error, projectId: input.projectId }, 'Failed to get storage info for project');
 
         if (error instanceof TRPCError) {
           throw error;
@@ -581,7 +578,7 @@ export const deploymentRouter = router({
           },
         };
       } catch (error) {
-        logger.error(`Failed to get analytics for project: ${input.projectId}`, error);
+        logger.error({ error, projectId: input.projectId }, 'Failed to get analytics for project');
 
         if (error instanceof TRPCError) {
           throw error;

@@ -150,6 +150,11 @@ async function executeNavigateStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'navigate') {
+    throw new Error("Invalid step config type for navigate");
+  }
+
   const url = substituteVariables(config.url, context.variables);
 
   if (!url) {
@@ -173,13 +178,18 @@ async function executeActStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'act') {
+    throw new Error("Invalid step config type for act");
+  }
+
   const instruction = substituteVariables(config.instruction, context.variables);
 
   if (!instruction) {
     throw new Error("Act step requires instruction");
   }
 
-  await context.stagehand.act(instruction);
+  await context.stagehand.act(String(instruction));
 
   return {
     success: true,
@@ -195,13 +205,18 @@ async function executeObserveStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'observe') {
+    throw new Error("Invalid step config type for observe");
+  }
+
   const instruction = substituteVariables(config.observeInstruction, context.variables);
 
   if (!instruction) {
     throw new Error("Observe step requires instruction");
   }
 
-  const actions = await context.stagehand.observe(instruction);
+  const actions = await context.stagehand.observe(String(instruction));
 
   return {
     success: true,
@@ -217,6 +232,11 @@ async function executeExtractStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'extract') {
+    throw new Error("Invalid step config type for extract");
+  }
+
   const instruction = substituteVariables(config.extractInstruction, context.variables);
 
   if (!instruction) {
@@ -230,7 +250,7 @@ async function executeExtractStep(
   // Use predefined schemas or custom extraction
   if (config.schemaType === "contactInfo") {
     extractedData = await context.stagehand.extract(
-      instruction,
+      String(instruction),
       z.object({
         contactInfo: z.object({
           email: z.string().optional(),
@@ -243,7 +263,7 @@ async function executeExtractStep(
     );
   } else if (config.schemaType === "productInfo") {
     extractedData = await context.stagehand.extract(
-      instruction,
+      String(instruction),
       z.object({
         productInfo: z.object({
           name: z.string().optional(),
@@ -257,7 +277,7 @@ async function executeExtractStep(
     );
   } else {
     // Custom extraction without schema
-    extractedData = await context.stagehand.extract(instruction);
+    extractedData = await context.stagehand.extract(String(instruction));
   }
 
   // Store extracted data in context for later use
@@ -298,6 +318,11 @@ async function executeWaitStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'wait') {
+    throw new Error("Invalid step config type for wait");
+  }
+
   const waitMs = config.waitMs || 1000;
 
   if (config.selector) {
@@ -305,7 +330,7 @@ async function executeWaitStep(
     const selector = substituteVariables(config.selector, context.variables);
     const page = context.stagehand.context.pages()[0];
     // Use Playwright's locator API instead of deprecated waitForSelector
-    await page.locator(selector).waitFor({ timeout: waitMs });
+    await page.locator(String(selector)).waitFor({ timeout: waitMs });
     return {
       success: true,
       result: { waitedFor: "selector", selector, timestamp: new Date() },
@@ -328,6 +353,11 @@ async function executeConditionStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'condition') {
+    throw new Error("Invalid step config type for condition");
+  }
+
   const condition = substituteVariables(config.condition, context.variables);
 
   if (!condition) {
@@ -382,6 +412,11 @@ async function executeLoopStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'loop') {
+    throw new Error("Invalid step config type for loop");
+  }
+
   const items = substituteVariables(config.items, context.variables);
 
   if (!Array.isArray(items)) {
@@ -415,9 +450,14 @@ async function executeApiCallStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'apiCall') {
+    throw new Error("Invalid step config type for apiCall");
+  }
+
   const url = substituteVariables(config.url, context.variables);
   const method = (config.method || "GET").toUpperCase();
-  const headers = substituteVariables(config.headers || {}, context.variables);
+  const headers = substituteVariables(config.headers || {}, context.variables) as Record<string, string>;
   const body = config.body ? substituteVariables(config.body, context.variables) : undefined;
 
   if (!url) {
@@ -436,7 +476,7 @@ async function executeApiCallStep(
     fetchOptions.body = typeof body === "string" ? body : JSON.stringify(body);
   }
 
-  const response = await fetch(url, fetchOptions);
+  const response = await fetch(String(url), fetchOptions);
   const responseData = await response.json().catch(() => response.text());
 
   // Store response in variables if variable name is provided
@@ -465,19 +505,24 @@ async function executeNotificationStep(
   context: ExecutionContext
 ): Promise<StepResult> {
   const { config } = step;
+
+  if (config.type !== 'notification') {
+    throw new Error("Invalid step config type for notification");
+  }
+
   const message = substituteVariables(config.message, context.variables);
-  const type = config.type || "info";
+  const notifType = config.notificationType || "info";
 
   if (!message) {
     throw new Error("Notification step requires message");
   }
 
   // In a real implementation, this would send notifications via email, SMS, etc.
-  console.log(`[Notification - ${type}]: ${message}`);
+  console.log(`[Notification - ${notifType}]: ${message}`);
 
   return {
     success: true,
-    result: { message, type, timestamp: new Date() },
+    result: { message, type: notifType, timestamp: new Date() },
   };
 }
 
@@ -678,14 +723,10 @@ export async function executeWorkflow(
       .where(eq(workflowExecutions.id, executionId));
 
     // 4. Initialize Stagehand
-    const modelName = "google/gemini-2.0-flash";
-    const modelApiKey = resolveModelApiKey(modelName);
-
     stagehand = new Stagehand({
       env: "BROWSERBASE",
       verbose: 1,
       disablePino: true,
-      modelApiKey,
       apiKey: process.env.BROWSERBASE_API_KEY,
       projectId: process.env.BROWSERBASE_PROJECT_ID,
       browserbaseSessionCreateParams: {
@@ -891,14 +932,10 @@ export async function testExecuteWorkflow(
     console.log(`Test workflow session created: ${session.id}`);
 
     // Initialize Stagehand
-    const modelName = "google/gemini-2.0-flash";
-    const modelApiKey = resolveModelApiKey(modelName);
-
     stagehand = new Stagehand({
       env: "BROWSERBASE",
       verbose: 1,
       disablePino: true,
-      modelApiKey,
       apiKey: process.env.BROWSERBASE_API_KEY,
       projectId: process.env.BROWSERBASE_PROJECT_ID,
       browserbaseSessionCreateParams: {

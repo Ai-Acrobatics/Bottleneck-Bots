@@ -170,7 +170,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
           : node
       ) as WorkflowNode[],
       selectedNode: get().selectedNode?.id === nodeId
-        ? { ...get().selectedNode!, data: { ...get().selectedNode!.data, ...data } }
+        ? { ...get().selectedNode!, data: { ...get().selectedNode!.data, ...data } } as WorkflowNode
         : get().selectedNode,
       isDirty: true,
     });

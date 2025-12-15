@@ -353,7 +353,7 @@ class CircuitBreakerRegistry {
   getAllHealth(): Record<string, ReturnType<CircuitBreaker['getHealth']>> {
     const health: Record<string, ReturnType<CircuitBreaker['getHealth']>> = {};
 
-    for (const [name, breaker] of this.breakers) {
+    for (const [name, breaker] of Array.from(this.breakers)) {
       health[name] = breaker.getHealth();
     }
 
@@ -364,7 +364,7 @@ class CircuitBreakerRegistry {
    * Reset all circuit breakers
    */
   resetAll(): void {
-    for (const breaker of this.breakers.values()) {
+    for (const breaker of Array.from(this.breakers.values())) {
       breaker.reset();
     }
   }

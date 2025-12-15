@@ -186,16 +186,16 @@ export const voiceRouter = router({
             }
 
             try {
-                let query = db.select().from(ai_call_campaigns).where(eq(ai_call_campaigns.userId, input.userId));
+                const whereConditions = [eq(ai_call_campaigns.userId, input.userId)];
 
                 if (input.status) {
-                    query = query.where(and(
-                        eq(ai_call_campaigns.userId, input.userId),
-                        eq(ai_call_campaigns.status, input.status)
-                    )) as any;
+                    whereConditions.push(eq(ai_call_campaigns.status, input.status));
                 }
 
-                const results = await query
+                const results = await db
+                    .select()
+                    .from(ai_call_campaigns)
+                    .where(and(...whereConditions))
                     .limit(input.limit)
                     .offset(input.offset)
                     .orderBy(desc(ai_call_campaigns.createdAt));
@@ -338,7 +338,9 @@ export const voiceRouter = router({
                         },
                     });
 
-                    jobIds.push(job.id || "");
+                    if (job && job.id) {
+                        jobIds.push(job.id);
+                    }
                 }
 
                 return {
@@ -488,7 +490,7 @@ export const voiceRouter = router({
                 return {
                     success: true,
                     callId: call.id,
-                    jobId: job.id,
+                    jobId: job?.id || null,
                 };
             } catch (error) {
                 console.error("Error making call:", error);
@@ -620,8 +622,6 @@ export const voiceRouter = router({
             }
 
             try {
-                let query = db.select().from(ai_calls).where(eq(ai_calls.userId, input.userId));
-
                 const conditions = [eq(ai_calls.userId, input.userId)];
 
                 if (input.campaignId) {
@@ -632,11 +632,10 @@ export const voiceRouter = router({
                     conditions.push(eq(ai_calls.status, input.status));
                 }
 
-                if (conditions.length > 1) {
-                    query = query.where(and(...conditions)) as any;
-                }
-
-                const results = await query
+                const results = await db
+                    .select()
+                    .from(ai_calls)
+                    .where(and(...conditions))
                     .limit(input.limit)
                     .offset(input.offset)
                     .orderBy(desc(ai_calls.calledAt));

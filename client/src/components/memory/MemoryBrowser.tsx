@@ -59,9 +59,13 @@ export function MemoryBrowser() {
     type: selectedType === 'all' ? undefined : selectedType,
   });
 
-  const { data: patternsData, isLoading: patternsLoading, refetch: refetchPatterns } = trpc.memory.getTopPatterns.useQuery({
-    limit: 20,
-  });
+  // TODO: Uncomment when getTopPatterns is implemented in the backend
+  // const { data: patternsData, isLoading: patternsLoading, refetch: refetchPatterns } = trpc.memory.getTopPatterns.useQuery({
+  //   limit: 20,
+  // });
+  const patternsData: any = null;
+  const patternsLoading = false;
+  const refetchPatterns = () => {};
 
   // Mutations
   const cleanup = trpc.memory.cleanup.useMutation({
@@ -519,10 +523,14 @@ function ReasoningPatternCard({ pattern, rank }: { pattern: any; rank: number })
 function MemorySearchView() {
   const [searchPattern, setSearchPattern] = useState('');
 
-  const { data, isLoading, refetch } = trpc.memory.findSimilarPatterns.useQuery(
-    { pattern: searchPattern, limit: 10 },
-    { enabled: searchPattern.length > 3 }
-  );
+  // TODO: Uncomment when findSimilarPatterns is implemented in the backend
+  // const { data, isLoading, refetch } = trpc.memory.findSimilarPatterns.useQuery(
+  //   { pattern: searchPattern, limit: 10 },
+  //   { enabled: searchPattern.length > 3 }
+  // );
+  const data: any = null;
+  const isLoading = false;
+  const refetch = () => {};
 
   return (
     <Card>

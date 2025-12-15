@@ -6,7 +6,8 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor, within, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentDashboard } from './AgentDashboard';

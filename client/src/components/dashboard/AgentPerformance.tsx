@@ -287,7 +287,7 @@ export function AgentPerformance({
           </div>
         ) : (
           <div className="space-y-3">
-            {executions.slice(0, limit).map((execution) => (
+            {executions.slice(0, limit).map((execution: any) => (
               <ExecutionItem
                 key={execution.id}
                 execution={execution}

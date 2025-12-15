@@ -172,7 +172,6 @@ export function useSessionLogs(sessionId?: string) {
 
   return {
     logs: query.data?.logs ?? [],
-    message: query.data?.message,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { getDb } from "../../../db";
 import { automationTemplates } from "../../../../drizzle/schema";
 import { scheduledBrowserTasks } from "../../../../drizzle/schema-scheduled-tasks";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { requireApiKey, requireScopes, type AuthenticatedRequest } from "../middleware/authMiddleware";
 import { asyncHandler, ApiError } from "../middleware/errorMiddleware";
 
@@ -31,7 +31,7 @@ const useTemplateSchema = z.object({
   scheduleType: z.enum(["daily", "weekly", "monthly", "cron", "once"]).optional(),
   cronExpression: z.string().optional(),
   timezone: z.string().default("UTC"),
-  customInputs: z.record(z.any()).optional(), // Custom values to override template defaults
+  customInputs: z.record(z.string(), z.any()).optional(), // Custom values to override template defaults
 });
 
 // ========================================
@@ -65,9 +65,11 @@ router.get(
       .offset(offset);
 
     // Get total count
-    const [{ total }] = await db
-      .select({ total: count() })
+    const [result] = await db
+      .select({ total: sql<number>`count(*)::int` })
       .from(automationTemplates);
+
+    const total = result?.total || 0;
 
     res.json({
       data: templates,

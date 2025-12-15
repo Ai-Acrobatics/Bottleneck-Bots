@@ -95,10 +95,11 @@ import { KeyboardShortcuts } from '@/components/KeyboardShortcuts';
 // PLACEHOLDER: Import the actual types from schema once available
 type ScheduledBrowserTask = {
   id: number;
+  userId: number;
   name: string;
   description: string | null;
   automationType: string;
-  automationConfig: any;
+  automationConfig: unknown;
   scheduleType: string;
   cronExpression: string;
   timezone: string;
@@ -129,14 +130,15 @@ type ScheduledTaskExecution = {
   status: string;
   triggerType: string;
   attemptNumber: number;
-  startedAt: Date;
+  startedAt: Date | null;
   completedAt: Date | null;
   duration: number | null;
-  output: any;
+  output: unknown;
   error: string | null;
-  logs: any;
+  logs: unknown;
   stepsCompleted: number;
   stepsTotal: number | null;
+  createdAt: Date;
 };
 
 const AUTOMATION_TYPES = [
@@ -285,8 +287,8 @@ export default function ScheduledTasksPage() {
     },
   });
 
-  const tasks: ScheduledBrowserTask[] = tasksData?.tasks || [];
-  const executions: ScheduledTaskExecution[] = executionsData?.executions || [];
+  const tasks: ScheduledBrowserTask[] = (tasksData?.tasks || []) as any;
+  const executions: ScheduledTaskExecution[] = (executionsData?.executions || []) as any;
 
   // Filter and search
   const filteredTasks = useMemo(() => {
@@ -383,12 +385,13 @@ export default function ScheduledTasksPage() {
 
   const openEditDialog = (task: ScheduledBrowserTask) => {
     setSelectedTask(task);
+    const config = task.automationConfig as any;
     setFormData({
       name: task.name,
       description: task.description || '',
       automationType: task.automationType,
-      url: task.automationConfig?.url || '',
-      instruction: task.automationConfig?.instruction || '',
+      url: config?.url || '',
+      instruction: config?.instruction || '',
       scheduleType: task.scheduleType,
       cronExpression: task.cronExpression,
       timezone: task.timezone,
@@ -517,12 +520,13 @@ export default function ScheduledTasksPage() {
 
   // Task duplication handler
   const handleDuplicateTask = (task: ScheduledBrowserTask) => {
+    const config = task.automationConfig as any;
     setFormData({
       name: `${task.name} (Copy)`,
       description: task.description || '',
       automationType: task.automationType,
-      url: task.automationConfig?.url || '',
-      instruction: task.automationConfig?.instruction || '',
+      url: config?.url || '',
+      instruction: config?.instruction || '',
       scheduleType: task.scheduleType,
       cronExpression: task.cronExpression,
       timezone: task.timezone,
@@ -1399,7 +1403,7 @@ export default function ScheduledTasksPage() {
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">URL</Label>
-                    <p className="text-sm font-medium break-all">{selectedTask.automationConfig?.url}</p>
+                    <p className="text-sm font-medium break-all">{(selectedTask.automationConfig as any)?.url}</p>
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Schedule</Label>

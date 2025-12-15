@@ -30,11 +30,11 @@ const listToolsSchema = z.object({
 
 const executeToolSchema = z.object({
   name: z.string().min(1).describe('Tool name in format: category/name'),
-  arguments: z.record(z.unknown()).optional().describe('Tool arguments'),
+  arguments: z.record(z.string(), z.unknown()).optional().describe('Tool arguments'),
   timeout: z.number().int().min(1000).max(300000).optional().describe('Execution timeout in milliseconds (1s - 5min)'),
   context: z.object({
     sessionId: z.string().optional(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   }).optional(),
 });
 
@@ -236,7 +236,7 @@ export const toolsRouter = router({
           input.name,
           input.arguments || {},
           {
-            sessionId: ctx.req.sessionID,
+            sessionId: input.context?.sessionId || `session_${Date.now()}`,
             userId: ctx.user.id,
             ...input.context,
           }

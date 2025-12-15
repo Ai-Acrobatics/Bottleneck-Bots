@@ -664,19 +664,26 @@ Make each variation distinct with different angles: emotional, logical, urgency,
         apiKey: process.env.BROWSERBASE_API_KEY,
         projectId: process.env.BROWSERBASE_PROJECT_ID,
         verbose: 1,
+        browserbaseSessionID: session.id,
       });
 
-      await stagehand.init({ sessionId: session.id });
+      await stagehand.init();
 
       try {
+        // Get the page from Stagehand context
+        const page = stagehand.context.activePage();
+        if (!page) {
+          throw new Error('No active page available');
+        }
+
         // Navigate to Meta Ads Manager
-        await stagehand.page.goto('https://business.facebook.com/adsmanager');
+        await page.goto('https://business.facebook.com/adsmanager');
 
         // Wait for login or dashboard
-        await stagehand.page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle');
 
         // Check if already logged in by looking for Ads Manager interface
-        const isLoggedIn = await stagehand.page.evaluate(() => {
+        const isLoggedIn = await page.evaluate(() => {
           return document.querySelector('[data-testid="ads-manager-app"]') !== null;
         });
 
@@ -701,29 +708,29 @@ Make each variation distinct with different angles: emotional, logical, urgency,
         }
 
         // Search for the ad
-        await stagehand.act({ action: `Search for ad with ID ${adId}` });
+        await stagehand.act(`Search for ad with ID ${adId}`);
 
         // Click on the ad to edit
-        await stagehand.act({ action: 'Click on the ad to edit it' });
+        await stagehand.act('Click on the ad to edit it');
 
         // Apply changes
         if (changes.headline) {
-          await stagehand.act({ action: `Change headline to: ${changes.headline}` });
+          await stagehand.act(`Change headline to: ${changes.headline}`);
         }
 
         if (changes.primaryText) {
-          await stagehand.act({ action: `Change primary text to: ${changes.primaryText}` });
+          await stagehand.act(`Change primary text to: ${changes.primaryText}`);
         }
 
         if (changes.description) {
-          await stagehand.act({ action: `Change description to: ${changes.description}` });
+          await stagehand.act(`Change description to: ${changes.description}`);
         }
 
         // Save changes
-        await stagehand.act({ action: 'Click the Save or Publish button' });
+        await stagehand.act('Click the Save or Publish button');
 
-        // Wait for confirmation
-        await stagehand.page.waitForTimeout(2000);
+        // Wait for confirmation (using setTimeout instead of deprecated waitForTimeout)
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Update job status
         await db

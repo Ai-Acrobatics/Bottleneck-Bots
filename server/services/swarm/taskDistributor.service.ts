@@ -170,10 +170,10 @@ export class TaskDistributor extends EventEmitter {
    * Add task to distribution queue with GHL-specific routing
    */
   async queueTask(task: TaskDefinition, ghlOperationType?: GHLOperationType, clientId?: string): Promise<void> {
-    // Enhance task with GHL operation metadata
-    const enhancedTask = {
+    // Enhance task with GHL operation metadata in input
+    const enhancedTask: TaskDefinition = {
       ...task,
-      metadata: {
+      input: {
         ...task.input,
         ghlOperationType,
         clientId,
@@ -210,8 +210,8 @@ export class TaskDistributor extends EventEmitter {
    */
   private sortTaskQueue(): void {
     this.taskQueue.sort((a, b) => {
-      const aGhlOp = a.metadata?.ghlOperationType as GHLOperationType | undefined;
-      const bGhlOp = b.metadata?.ghlOperationType as GHLOperationType | undefined;
+      const aGhlOp = a.input?.ghlOperationType as GHLOperationType | undefined;
+      const bGhlOp = b.input?.ghlOperationType as GHLOperationType | undefined;
 
       // First, sort by GHL urgency level if available
       if (aGhlOp && bGhlOp) {
@@ -282,8 +282,8 @@ export class TaskDistributor extends EventEmitter {
 
     // Add batched tasks to queue with batch metadata
     for (const task of batch.tasks) {
-      task.metadata = {
-        ...task.metadata,
+      task.input = {
+        ...task.input,
         batchId: batch.batchId,
       };
       this.taskQueue.push(task);
@@ -308,7 +308,7 @@ export class TaskDistributor extends EventEmitter {
   private startBatchProcessor(): void {
     setInterval(() => {
       const now = Date.now();
-      for (const [batchKey, batch] of this.taskBatches.entries()) {
+      for (const [batchKey, batch] of Array.from(this.taskBatches.entries())) {
         const age = now - batch.createdAt.getTime();
         if (age >= this.BATCH_WINDOW_MS && batch.status === 'pending') {
           this.processBatch(batchKey);
@@ -321,8 +321,8 @@ export class TaskDistributor extends EventEmitter {
    * Assign task to most suitable agent with session awareness
    */
   async assignTask(task: TaskDefinition, availableAgents: AgentState[]): Promise<AgentState | null> {
-    const ghlOperationType = task.metadata?.ghlOperationType as GHLOperationType | undefined;
-    const clientId = task.metadata?.clientId as string | undefined;
+    const ghlOperationType = task.input?.ghlOperationType as GHLOperationType | undefined;
+    const clientId = task.input?.clientId as string | undefined;
 
     // Check for session affinity
     let selectedAgent: AgentState | null = null;
@@ -372,7 +372,7 @@ export class TaskDistributor extends EventEmitter {
       sessionId,
       retryCount: 0,
       clientId,
-      batchId: task.metadata?.batchId as string | undefined,
+      batchId: task.input?.batchId as string | undefined,
     };
 
     this.assignments.set(task.id.id, assignment);
@@ -438,7 +438,7 @@ export class TaskDistributor extends EventEmitter {
    */
   private assignBrowserSession(agentId: string, clientId?: string): string {
     // Find existing session for this agent with capacity
-    for (const [sessionId, session] of this.browserSessions.entries()) {
+    for (const [sessionId, session] of Array.from(this.browserSessions.entries())) {
       if (session.agentId === agentId && session.activeTaskCount < session.maxConcurrentTasks) {
         if (clientId && !session.clientAffinity) {
           session.clientAffinity = clientId;
@@ -509,7 +509,7 @@ export class TaskDistributor extends EventEmitter {
    */
   cleanupStaleSessions(): void {
     const now = Date.now();
-    for (const [sessionId, session] of this.browserSessions.entries()) {
+    for (const [sessionId, session] of Array.from(this.browserSessions.entries())) {
       const age = now - session.lastUsed.getTime();
       if (age > this.SESSION_AFFINITY_TIMEOUT && session.activeTaskCount === 0) {
         this.browserSessions.delete(sessionId);
@@ -674,7 +674,7 @@ export class TaskDistributor extends EventEmitter {
       const now = Date.now();
       const tasksToRetry: string[] = [];
 
-      for (const [taskId, assignment] of this.failedTasks.entries()) {
+      for (const [taskId, assignment] of Array.from(this.failedTasks.entries())) {
         if (assignment.nextRetryAt && now >= assignment.nextRetryAt.getTime()) {
           tasksToRetry.push(taskId);
         }
@@ -709,8 +709,7 @@ export class TaskDistributor extends EventEmitter {
               maxRetries: this.MAX_RETRY_ATTEMPTS,
               timeoutAfter: 60000,
             },
-            input: {},
-            metadata: {
+            input: {
               ghlOperationType: assignment.ghlOperationType,
               clientId: assignment.clientId,
               batchId: assignment.batchId,
@@ -832,7 +831,7 @@ export class TaskDistributor extends EventEmitter {
     for (const task of this.taskQueue) {
       tasksByPriority[task.priority] = (tasksByPriority[task.priority] || 0) + 1;
 
-      const ghlOp = task.metadata?.ghlOperationType as GHLOperationType | undefined;
+      const ghlOp = task.input?.ghlOperationType as GHLOperationType | undefined;
       if (ghlOp) {
         tasksByGHLOperation[ghlOp] = (tasksByGHLOperation[ghlOp] || 0) + 1;
       }
@@ -840,7 +839,7 @@ export class TaskDistributor extends EventEmitter {
 
     // Calculate session health metrics
     const sessionHealth = { healthy: 0, degraded: 0, unhealthy: 0 };
-    for (const session of this.browserSessions.values()) {
+    for (const session of Array.from(this.browserSessions.values())) {
       if (session.health > 0.7) sessionHealth.healthy++;
       else if (session.health > 0.3) sessionHealth.degraded++;
       else sessionHealth.unhealthy++;

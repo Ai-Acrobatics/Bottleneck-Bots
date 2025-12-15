@@ -34,8 +34,20 @@ export function useAgentExecution(options: UseAgentExecutionOptions = {}) {
     error: null,
   });
 
-  const { status, currentTask, logs, setStatus, setCurrentTask, addLog } =
-    useAgentStore();
+  const { currentExecution, logs, addLog } = useAgentStore();
+
+  // Extract status from currentExecution
+  const status = currentExecution?.status || 'completed';
+
+  // Helper functions for store updates
+  const setStatus = (newStatus: typeof status) => {
+    useAgentStore.getState().setStatus(newStatus);
+  };
+
+  const setCurrentTask = (task: string | null) => {
+    // This is a placeholder - the store doesn't have setCurrentTask
+    // The task is part of the execution
+  };
 
   // SSE connection - only connect when we have an active execution
   const { isConnected, connect, disconnect } = useAgentSSE({
@@ -49,7 +61,7 @@ export function useAgentExecution(options: UseAgentExecutionOptions = {}) {
       type: log.level === 'error' ? 'error' : 'thinking',
       content: log.message,
       timestamp: new Date(log.timestamp),
-      metadata: log.detail ? { detail: log.detail } : undefined,
+      metadata: log.detail ? { error: log.detail } : undefined,
     }));
 
     setExecutionState((prev) => ({
@@ -161,7 +173,7 @@ export function useAgentExecution(options: UseAgentExecutionOptions = {}) {
       }));
 
       // Update store
-      setStatus('idle');
+      setStatus('cancelled');
       setCurrentTask(null);
 
       // Disconnect SSE
@@ -278,7 +290,7 @@ export function useAgentExecution(options: UseAgentExecutionOptions = {}) {
         error,
       }));
 
-      setStatus('error');
+      setStatus('failed');
 
       addLog({
         id: crypto.randomUUID(),

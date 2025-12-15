@@ -11,7 +11,7 @@ export const alertingService = {
    * Get in-app notifications for a user
    */
   async getInAppNotifications(
-    userId: string,
+    userId: number,
     options: {
       unreadOnly?: boolean;
       limit?: number;
@@ -46,7 +46,7 @@ export const alertingService = {
   /**
    * Mark a notification as read
    */
-  async markNotificationAsRead(notificationId: number, userId: string) {
+  async markNotificationAsRead(notificationId: number, userId: number) {
     const database = await getDb();
     if (!database) {
       throw new Error("Database not available");
@@ -70,7 +70,7 @@ export const alertingService = {
   /**
    * Mark all notifications as read for a user
    */
-  async markAllNotificationsAsRead(userId: string) {
+  async markAllNotificationsAsRead(userId: number) {
     const database = await getDb();
     if (!database) {
       throw new Error("Database not available");
@@ -95,7 +95,7 @@ export const alertingService = {
    * Create an in-app notification
    */
   async createNotification(params: {
-    userId: string;
+    userId: number;
     title: string;
     message: string;
     type?: "info" | "warning" | "error" | "success";

@@ -197,7 +197,7 @@ export const ragRouter = router({
     )
     .query(async ({ input }) => {
       try {
-        const database = await db;
+        const database = await getDb();
         if (!database) {
           throw new Error("Database not available");
         }
@@ -240,7 +240,7 @@ export const ragRouter = router({
           .offset(offset);
 
         // Get chunk counts for each source
-        const sourceIds = sources.map(s => s.id);
+        const sourceIds = sources.map((s: any) => s.id);
         const chunkCounts = await database
           .select({
             sourceId: documentationChunks.sourceId,
@@ -250,9 +250,9 @@ export const ragRouter = router({
           .where(sql`${documentationChunks.sourceId} = ANY(${sourceIds})`)
           .groupBy(documentationChunks.sourceId);
 
-        const countMap = new Map(chunkCounts.map(c => [c.sourceId, Number(c.count)]));
+        const countMap = new Map(chunkCounts.map((c: any) => [c.sourceId, Number(c.count)]));
 
-        const sourcesWithCounts = sources.map(s => ({
+        const sourcesWithCounts = sources.map((s: any) => ({
           ...s,
           chunkCount: countMap.get(s.id) || 0,
         }));
@@ -278,14 +278,16 @@ export const ragRouter = router({
     .input(z.object({ sourceId: z.number() }))
     .query(async ({ input }) => {
       try {
-        const database = await db;
+        const database = await getDb();
         if (!database) {
           throw new Error("Database not available");
         }
 
-        const source = await database.query.documentationSources.findFirst({
-          where: eq(documentationSources.id, input.sourceId),
-        });
+        const [source] = await database
+          .select()
+          .from(documentationSources)
+          .where(eq(documentationSources.id, input.sourceId))
+          .limit(1);
 
         if (!source) {
           throw new TRPCError({

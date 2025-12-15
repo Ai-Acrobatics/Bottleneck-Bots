@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent, within, waitFor } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import {
   VariableManager,
@@ -472,7 +473,7 @@ describe('VariableManager - Accessibility', () => {
   it('has proper aria-label for edit buttons', () => {
     renderComponent({ variables: mockVariables });
     const editButtons = screen.getAllByRole('button', { name: /edit/i });
-    editButtons.forEach((btn) => {
+    editButtons.forEach((btn: HTMLElement) => {
       expect(btn).toHaveAccessibleName();
     });
   });
@@ -480,7 +481,7 @@ describe('VariableManager - Accessibility', () => {
   it('has proper aria-label for delete buttons', () => {
     renderComponent({ variables: mockVariables });
     const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
-    deleteButtons.forEach((btn) => {
+    deleteButtons.forEach((btn: HTMLElement) => {
       expect(btn).toHaveAccessibleName();
     });
   });

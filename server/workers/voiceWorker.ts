@@ -10,7 +10,6 @@ import { vapiService } from "../services/vapi.service";
 import { getDb } from "../db";
 import { eq, sql } from "drizzle-orm";
 import { ai_calls, ai_call_campaigns } from "../../drizzle/schema";
-import type { Database } from "../db";
 
 /**
  * Process VOICE_CALL jobs
@@ -102,7 +101,7 @@ async function processVoiceCall(job: Job<VoiceCallJobData>) {
                             transcript: status.transcript,
                             recordingUrl: status.recordingUrl,
                             error: status.error,
-                            answeredAt: status.status === "answered" ? new Date() : null,
+                            answeredAt: status.outcome === "answered" ? new Date() : null,
                             completedAt: new Date(),
                         })
                         .where(eq(ai_calls.id, parseInt(callId)));

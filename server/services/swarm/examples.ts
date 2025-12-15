@@ -238,7 +238,7 @@ export async function taskDistributionExample() {
   ];
 
   for (const task of tasks) {
-    await distributor.queueTask(task);
+    await distributor.queueTask(task as any);
   }
 
   // Check queue status

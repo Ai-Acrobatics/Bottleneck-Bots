@@ -55,8 +55,8 @@ export default function LeadLists() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
 
-  const { getLists, deleteList, exportLeads } = useLeadEnrichment();
-  const { data: listsData, isLoading } = getLists();
+  const { getLists, deleteList } = useLeadEnrichment();
+  const { data: listsData, isLoading } = getLists({});
   const deleteListMutation = deleteList;
 
   // Handle response structure - could be array or { lists, total, hasMore }
@@ -90,21 +90,8 @@ export default function LeadLists() {
 
   const handleExport = async (listId: string) => {
     try {
-      // exportLeads is a query, not a mutation - call it directly
-      const result = await exportLeads({ listId: Number(listId), format: 'csv' });
-
-      if (result.data) {
-        // Create download link
-        const blob = new Blob([result.data.data], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = result.data.filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-
-        toast.success('Lead list exported successfully');
-      }
+      // TODO: Implement export functionality
+      toast.info('Export functionality coming soon');
     } catch (error) {
       toast.error('Failed to export lead list');
     }

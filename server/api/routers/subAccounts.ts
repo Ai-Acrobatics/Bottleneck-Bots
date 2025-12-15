@@ -301,16 +301,17 @@ export const subAccountsRouter = router({
         }
 
         // Apply pagination
-        const paginatedAccounts = result.subAccounts?.slice(
+        const subAccounts = (result as any).subAccounts || [];
+        const paginatedAccounts = subAccounts.slice(
           params.offset,
           params.offset + params.limit
-        ) || [];
+        );
 
         return {
           success: true,
           operationId,
           subAccounts: paginatedAccounts,
-          total: result.subAccounts?.length || 0,
+          total: subAccounts.length,
           limit: params.limit,
           offset: params.offset,
         };

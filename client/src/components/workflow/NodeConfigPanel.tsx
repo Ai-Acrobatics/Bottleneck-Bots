@@ -522,8 +522,9 @@ export const NodeConfigPanel: React.FC = () => {
                     onChange={(e) =>
                       handleUpdate({
                         errorHandling: {
-                          ...data.errorHandling,
+                          continueOnError: data.errorHandling?.continueOnError ?? false,
                           retryCount: parseInt(e.target.value),
+                          retryDelay: data.errorHandling?.retryDelay,
                         },
                       })
                     }
@@ -539,7 +540,8 @@ export const NodeConfigPanel: React.FC = () => {
                     onChange={(e) =>
                       handleUpdate({
                         errorHandling: {
-                          ...data.errorHandling,
+                          continueOnError: data.errorHandling?.continueOnError ?? false,
+                          retryCount: data.errorHandling?.retryCount,
                           retryDelay: parseInt(e.target.value),
                         },
                       })

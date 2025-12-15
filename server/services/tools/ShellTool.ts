@@ -204,7 +204,12 @@ export class ShellTool implements ITool {
   private async execCommand(params: ShellExecParams, context: ToolExecutionContext): Promise<ToolResult> {
     const { command, background = false, timeout = this.defaultTimeout } = params;
     const cwd = params.cwd || context.workingDirectory || process.cwd();
-    const env = { ...process.env, ...params.env };
+    const env: Record<string, string> = {
+      ...(Object.fromEntries(
+        Object.entries(process.env).filter(([_, v]) => v !== undefined)
+      ) as Record<string, string>),
+      ...(params.env || {})
+    };
 
     // Run in background
     if (background) {
@@ -508,7 +513,7 @@ export class ShellTool implements ITool {
     const now = Date.now();
     let cleaned = 0;
 
-    for (const [id, session] of this.sessions.entries()) {
+    for (const [id, session] of Array.from(this.sessions.entries())) {
       if (!session.isRunning && (now - session.startedAt.getTime()) > maxAgeMs) {
         this.sessions.delete(id);
         cleaned++;

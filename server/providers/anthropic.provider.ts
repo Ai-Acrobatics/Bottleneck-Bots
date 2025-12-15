@@ -358,7 +358,7 @@ export class AnthropicProvider extends BaseProvider {
     }
   }
 
-  destroy(): void {
+  override destroy(): void {
     super.destroy();
     // Anthropic client doesn't need explicit cleanup
   }

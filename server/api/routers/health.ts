@@ -62,7 +62,7 @@ export const healthRouter = router({
     const breakers = circuitBreakerRegistry.getAll();
     const states: Record<string, any> = {};
 
-    for (const [name, breaker] of breakers) {
+    for (const [name, breaker] of Array.from(breakers)) {
       states[name] = breaker.getState();
     }
 
@@ -280,7 +280,7 @@ export const healthRouter = router({
     const allStates = await (async () => {
       const breakers = circuitBreakerRegistry.getAll();
       const states: Record<string, any> = {};
-      for (const [name, breaker] of breakers) {
+      for (const [name, breaker] of Array.from(breakers)) {
         states[name] = breaker.getState();
       }
       return states;

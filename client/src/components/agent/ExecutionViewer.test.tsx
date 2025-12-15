@@ -11,7 +11,8 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ExecutionViewer } from './ExecutionViewer';
 import { useAgentStore } from '@/stores/agentStore';
@@ -369,7 +370,7 @@ describe('ExecutionViewer', () => {
 
       // Find and click copy button
       const copyButtons = screen.getAllByRole('button', { name: '' });
-      const paramsCopyButton = copyButtons.find((btn) => {
+      const paramsCopyButton = copyButtons.find((btn: HTMLElement) => {
         const parent = btn.closest('div');
         return parent?.textContent?.includes('Input Parameters');
       });
@@ -397,7 +398,7 @@ describe('ExecutionViewer', () => {
 
       // Find and click copy button for result
       const copyButtons = screen.getAllByRole('button', { name: '' });
-      const resultCopyButton = copyButtons.find((btn) => {
+      const resultCopyButton = copyButtons.find((btn: HTMLElement) => {
         const parent = btn.closest('div');
         return parent?.textContent?.includes('Output Result');
       });
@@ -425,7 +426,7 @@ describe('ExecutionViewer', () => {
 
       // Find and click copy button
       const copyButtons = screen.getAllByRole('button', { name: '' });
-      const detailsCopyButton = copyButtons.find((btn) => {
+      const detailsCopyButton = copyButtons.find((btn: HTMLElement) => {
         const parent = btn.closest('div');
         return parent?.textContent?.includes('Details');
       });

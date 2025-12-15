@@ -582,7 +582,7 @@ export const settingsRouter = router({
 
         // Generate cache key
         const cacheKey = ValidationCacheService.generateKey(
-          ctx.user.id,
+          String(ctx.user.id),
           input.service,
           { apiKey }
         );
@@ -697,7 +697,7 @@ export const settingsRouter = router({
 
         // Store state and code_verifier securely server-side (10-minute TTL)
         oauthStateService.set(state, {
-          userId: ctx.user.id,
+          userId: String(ctx.user.id),
           provider: input.provider,
           codeVerifier,
         });
@@ -1719,9 +1719,9 @@ export const settingsRouter = router({
     .input(
       z.object({
         theme: z.enum(["light", "dark", "system"]).optional(),
-        notifications: z.record(z.boolean()).optional(),
-        defaultBrowserConfig: z.record(z.any()).optional(),
-        defaultWorkflowSettings: z.record(z.any()).optional(),
+        notifications: z.record(z.string(), z.boolean()).optional(),
+        defaultBrowserConfig: z.record(z.string(), z.any()).optional(),
+        defaultWorkflowSettings: z.record(z.string(), z.any()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

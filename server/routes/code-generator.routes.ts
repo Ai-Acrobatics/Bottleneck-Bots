@@ -14,12 +14,13 @@ const router = Router();
  * POST /api/code-generator/component
  * Generate a React component
  */
-router.post('/component', async (req: Request, res: Response) => {
+router.post('/component', async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, projectId, techStack, existingFiles, features } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
+      res.status(400).json({ error: 'Prompt is required' });
+      return;
     }
 
     const context: ProjectContext = {
@@ -48,12 +49,13 @@ router.post('/component', async (req: Request, res: Response) => {
  * POST /api/code-generator/page
  * Generate a complete page with components
  */
-router.post('/page', async (req: Request, res: Response) => {
+router.post('/page', async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, projectId, techStack, existingFiles, features } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
+      res.status(400).json({ error: 'Prompt is required' });
+      return;
     }
 
     const context: ProjectContext = {
@@ -82,16 +84,18 @@ router.post('/page', async (req: Request, res: Response) => {
  * POST /api/code-generator/modify
  * Modify an existing file
  */
-router.post('/modify', async (req: Request, res: Response) => {
+router.post('/modify', async (req: Request, res: Response): Promise<void> => {
   try {
     const { filePath, instruction, projectId, techStack, existingFiles } = req.body;
 
     if (!filePath || !instruction) {
-      return res.status(400).json({ error: 'filePath and instruction are required' });
+      res.status(400).json({ error: 'filePath and instruction are required' });
+      return;
     }
 
     if (!existingFiles || !Array.isArray(existingFiles) || existingFiles.length === 0) {
-      return res.status(400).json({ error: 'existingFiles array is required' });
+      res.status(400).json({ error: 'existingFiles array is required' });
+      return;
     }
 
     const context: ProjectContext = {
@@ -123,12 +127,13 @@ router.post('/modify', async (req: Request, res: Response) => {
  * POST /api/code-generator/project
  * Generate a complete full-stack project
  */
-router.post('/project', async (req: Request, res: Response) => {
+router.post('/project', async (req: Request, res: Response): Promise<void> => {
   try {
     const { description, techStack } = req.body;
 
     if (!description || !techStack) {
-      return res.status(400).json({ error: 'description and techStack are required' });
+      res.status(400).json({ error: 'description and techStack are required' });
+      return;
     }
 
     const result = await codeGeneratorService.generateFullProject(
@@ -153,12 +158,13 @@ router.post('/project', async (req: Request, res: Response) => {
  * POST /api/code-generator/analyze
  * Analyze an existing project
  */
-router.post('/analyze', async (req: Request, res: Response) => {
+router.post('/analyze', async (req: Request, res: Response): Promise<void> => {
   try {
     const { projectId, techStack, existingFiles, features } = req.body;
 
     if (!existingFiles || !Array.isArray(existingFiles) || existingFiles.length === 0) {
-      return res.status(400).json({ error: 'existingFiles array is required' });
+      res.status(400).json({ error: 'existingFiles array is required' });
+      return;
     }
 
     const context: ProjectContext = {
@@ -187,12 +193,13 @@ router.post('/analyze', async (req: Request, res: Response) => {
  * POST /api/code-generator/stream
  * Generate code with streaming (SSE)
  */
-router.post('/stream', async (req: Request, res: Response) => {
+router.post('/stream', async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt, projectId, techStack, existingFiles, features } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
+      res.status(400).json({ error: 'Prompt is required' });
+      return;
     }
 
     // Set up SSE

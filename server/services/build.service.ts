@@ -61,7 +61,7 @@ class BuildService {
     try {
       await fs.mkdir(this.tempDir, { recursive: true });
     } catch (error) {
-      logger.error('Failed to create temp directory', error);
+      logger.error({ error }, 'Failed to create temp directory');
     }
   }
 
@@ -118,7 +118,7 @@ class BuildService {
     } catch (error) {
       const duration = Date.now() - startTime;
 
-      logger.error(`Build failed for project ${projectId}:`, error);
+      logger.error({ error }, `Build failed for project ${projectId}`);
 
       return {
         success: false,
@@ -131,7 +131,7 @@ class BuildService {
     } finally {
       // Cleanup temporary files after a delay
       this.cleanupBuildDir(buildDir).catch(err =>
-        logger.error(`Cleanup failed for ${buildDir}`, err)
+        logger.error({ error: err }, `Cleanup failed for ${buildDir}`)
       );
     }
   }
@@ -379,7 +379,7 @@ class BuildService {
       // Don't delete immediately, keep for 24 hours for debugging
       logger.debug(`Keeping build directory: ${buildDir}`);
     } catch (error) {
-      logger.error(`Cleanup failed for ${buildDir}:`, error);
+      logger.error({ error }, `Cleanup failed for ${buildDir}`);
     }
   }
 
@@ -429,7 +429,7 @@ class BuildService {
         }
       }
     } catch (error) {
-      logger.error('Failed to clean old builds', error);
+      logger.error({ error }, 'Failed to clean old builds');
     }
   }
 

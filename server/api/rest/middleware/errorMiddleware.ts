@@ -9,13 +9,20 @@ import type { Request, Response, NextFunction } from "express";
  * API Error class with structured error responses
  */
 export class ApiError extends Error {
+  public statusCode: number;
+  public code: string;
+  public details?: any;
+
   constructor(
-    public statusCode: number,
-    public message: string,
-    public code: string,
-    public details?: any
+    statusCode: number,
+    message: string,
+    code: string,
+    details?: any
   ) {
     super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
     this.name = "ApiError";
     Error.captureStackTrace(this, this.constructor);
   }

@@ -117,15 +117,12 @@ export class ReasoningBankService {
     // Simple text matching for now (can be enhanced with vector search later)
     conditions.push(sql`${reasoningPatterns.pattern} ILIKE ${`%${query}%`}`);
 
-    let dbQuery = db
+    const dbQuery = db
       .select()
       .from(reasoningPatterns)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(reasoningPatterns.usageCount), desc(reasoningPatterns.confidence));
-
-    if (options.limit) {
-      dbQuery = dbQuery.limit(options.limit);
-    }
+      .orderBy(desc(reasoningPatterns.usageCount), desc(reasoningPatterns.confidence))
+      .limit(options.limit || 10);
 
     const results = await dbQuery;
 
@@ -229,15 +226,12 @@ export class ReasoningBankService {
       conditions.push(gte(reasoningPatterns.confidence, options.minConfidence));
     }
 
-    let dbQuery = db
+    const dbQuery = db
       .select()
       .from(reasoningPatterns)
       .where(and(...conditions))
-      .orderBy(desc(reasoningPatterns.usageCount), desc(reasoningPatterns.confidence));
-
-    if (options.limit) {
-      dbQuery = dbQuery.limit(options.limit);
-    }
+      .orderBy(desc(reasoningPatterns.usageCount), desc(reasoningPatterns.confidence))
+      .limit(options.limit || 10);
 
     const results = await dbQuery;
     return results.map(row => this.rowToReasoningPattern(row));
@@ -352,7 +346,7 @@ export class ReasoningBankService {
     const patternWords = new Set(pattern.toLowerCase().split(/\s+/));
 
     let intersection = 0;
-    for (const word of queryWords) {
+    for (const word of Array.from(queryWords)) {
       if (patternWords.has(word)) {
         intersection++;
       }

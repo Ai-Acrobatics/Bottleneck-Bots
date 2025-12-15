@@ -160,8 +160,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         currentExecution: {
           id: result.executionId,
           status: result.status as CurrentExecution['status'],
-          plan: result.plan || null,
-          thinkingSteps: result.thinkingSteps || [],
+          plan: result.plan as AgentPlan | null,
+          thinkingSteps: (result.thinkingSteps || []) as unknown as ThinkingStep[],
           toolHistory: result.toolHistory || [],
           output: result.output,
           error: undefined,
@@ -169,14 +169,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           duration: result.duration,
           taskDescription,
         },
-        thinkingSteps: result.thinkingSteps || [],
-        isExecuting: result.status === 'running' || result.status === 'started' || result.status === 'planning' || result.status === 'executing',
+        thinkingSteps: (result.thinkingSteps || []) as unknown as ThinkingStep[],
+        isExecuting: ['running', 'started', 'planning', 'executing'].includes(result.status),
       });
 
       get().addLog({
         id: `log-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        level: result.status === 'completed' || result.status === 'success' ? 'success' : 'info',
+        level: ['completed', 'success'].includes(result.status) ? 'success' : 'info',
         message: `Execution ${result.status}`,
         detail: `ID: ${result.executionId}`,
       });
@@ -214,15 +214,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           id: result.id,
           status: result.status as CurrentExecution['status'],
           plan: result.plan as AgentPlan | null,
-          thinkingSteps: result.thinkingSteps || [],
-          toolHistory: result.toolHistory || [],
+          thinkingSteps: (result.thinkingSteps || []) as ThinkingStep[],
+          toolHistory: (result.toolHistory || []) as ToolHistoryEntry[],
           output: result.output,
           error: result.error || undefined,
           iterations: 0, // Not stored in this endpoint
           duration: result.duration || undefined,
         },
-        thinkingSteps: result.thinkingSteps || [],
-        isExecuting: result.status === 'running' || result.status === 'started',
+        thinkingSteps: (result.thinkingSteps || []) as ThinkingStep[],
+        isExecuting: ['running', 'started'].includes(result.status),
       });
     } catch (error) {
       console.error('Failed to load execution:', error);
@@ -245,7 +245,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       });
 
       set({
-        executionHistory: executions as AgentExecutionListItem[],
+        executionHistory: executions as unknown as AgentExecutionListItem[],
         isLoadingHistory: false,
       });
     } catch (error) {
@@ -407,8 +407,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         set({
           activeBrowserSession: {
             sessionId: activeSession.sessionId,
-            debugUrl: activeSession.debugUrl,
-            liveViewUrl: activeSession.liveViewUrl,
+            debugUrl: activeSession.debugUrl || undefined,
+            liveViewUrl: (activeSession as any).liveViewUrl,
           },
         });
       }

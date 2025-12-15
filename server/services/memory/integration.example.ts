@@ -143,11 +143,12 @@ export async function multiAgentCoordination(
     // Each agent stores its own context
     await memory.storeContext(
       sessionId,
-      `agent-${agentId}-task`,
       {
-        task,
-        status: 'started',
-        startedAt: new Date().toISOString(),
+        [`agent-${agentId}-task`]: {
+          task,
+          status: 'started',
+          startedAt: new Date().toISOString(),
+        },
       },
       {
         agentId,
@@ -168,8 +169,9 @@ export async function multiAgentCoordination(
     // Store result
     await memory.storeContext(
       sessionId,
-      `agent-${agentId}-result`,
-      result,
+      {
+        [`agent-${agentId}-result`]: result,
+      },
       {
         agentId,
         userId,

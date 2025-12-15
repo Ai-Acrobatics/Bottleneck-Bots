@@ -65,7 +65,7 @@ const swarmIdSchema = z.object({
 const agentTypeSchema = z.object({
   type: z.string() as z.ZodType<AgentType>,
   name: z.string().optional(),
-  config: z.record(z.any()).optional(),
+  config: z.record(z.string(), z.any()).optional(),
 });
 
 const taskSchema = z.object({
@@ -79,7 +79,7 @@ const taskSchema = z.object({
     tools: z.array(z.string()),
     permissions: z.array(z.string()),
   }),
-  input: z.record(z.any()),
+  input: z.record(z.string(), z.any()),
 });
 
 /**

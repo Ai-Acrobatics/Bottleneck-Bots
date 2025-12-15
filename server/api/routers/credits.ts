@@ -35,7 +35,7 @@ const createPackageSchema = z.object({
   creditType: creditTypeEnum,
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const updatePackageSchema = z.object({
@@ -46,7 +46,7 @@ const updatePackageSchema = z.object({
   price: z.number().int().positive().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const purchaseCreditsSchema = z.object({
@@ -59,7 +59,7 @@ const adjustCreditsSchema = z.object({
   amount: z.number().int(), // Can be positive or negative
   creditType: creditTypeEnum,
   description: z.string(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const transactionHistorySchema = z.object({
@@ -146,29 +146,28 @@ export const creditsRouter = router({
         });
       }
 
-      let query = db.select().from(credit_packages).orderBy(credit_packages.sortOrder);
+      // Build filter conditions
+      const conditions = [];
 
       if (input.activeOnly) {
-        query = db
-          .select()
-          .from(credit_packages)
-          .where(eq(credit_packages.isActive, true))
-          .orderBy(credit_packages.sortOrder);
+        conditions.push(eq(credit_packages.isActive, true));
       }
 
       if (input.creditType) {
-        query = db
-          .select()
-          .from(credit_packages)
-          .where(
-            input.activeOnly
-              ? and(eq(credit_packages.creditType, input.creditType), eq(credit_packages.isActive, true))
-              : eq(credit_packages.creditType, input.creditType)
-          )
-          .orderBy(credit_packages.sortOrder);
+        conditions.push(eq(credit_packages.creditType, input.creditType));
       }
 
-      const packages = await query;
+      // Execute query with filters
+      const packages = conditions.length > 0
+        ? await db
+            .select()
+            .from(credit_packages)
+            .where(and(...conditions))
+            .orderBy(credit_packages.sortOrder)
+        : await db
+            .select()
+            .from(credit_packages)
+            .orderBy(credit_packages.sortOrder);
 
       return { packages };
     }),
@@ -371,13 +370,13 @@ export const creditsRouter = router({
 
         // Get total count
         let countQuery = db
-          .select({ total: count() })
+          .select({ total: count(credit_transactions.id) })
           .from(credit_transactions)
           .where(eq(credit_transactions.userId, userId));
 
         if (input.creditType) {
           countQuery = db
-            .select({ total: count() })
+            .select({ total: count(credit_transactions.id) })
             .from(credit_transactions)
             .where(
               and(

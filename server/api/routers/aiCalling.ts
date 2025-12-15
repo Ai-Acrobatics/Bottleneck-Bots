@@ -382,7 +382,6 @@ export const aiCallingRouter = router({
         .update(ai_call_campaigns)
         .set({
           status: "paused",
-          pausedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(ai_call_campaigns.id, input.campaignId));
@@ -485,7 +484,6 @@ export const aiCallingRouter = router({
             vapiCallId: callResponse.callId,
             creditsUsed: 1,
             calledAt: new Date(),
-            createdAt: new Date(),
           })
           .returning();
 
@@ -524,7 +522,7 @@ export const aiCallingRouter = router({
             phoneNumber,
             status: "failed",
             error: error.message,
-            createdAt: new Date(),
+            calledAt: new Date(),
           })
           .returning();
 

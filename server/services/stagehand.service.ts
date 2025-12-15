@@ -28,8 +28,8 @@ export interface StagehandConfig {
 export interface StagehandSession {
   id: string;
   stagehand: Stagehand;
-  page: Page;
-  context: BrowserContext;
+  page: any; // Stagehand's page type is compatible but not exact match with Page
+  context: any; // Stagehand's context type is compatible but not exact match with BrowserContext
   createdAt: Date;
   lastActivityAt: Date;
   status: 'active' | 'idle' | 'closed';
@@ -154,12 +154,16 @@ export class StagehandService {
     const now = new Date();
     const maxIdleTime = 10 * 60 * 1000; // 10 minutes
 
-    for (const [sessionId, session] of this.sessions.entries()) {
-      const idleTime = now.getTime() - session.lastActivityAt.getTime();
-      if (idleTime > maxIdleTime && session.status === 'idle') {
-        console.log(`[StagehandService] Cleaning up idle session: ${sessionId}`);
-        await this.closeSession(sessionId);
-      }
+    const sessionsToCleanup = Array.from(this.sessions.entries())
+      .filter(([_, session]) => {
+        const idleTime = now.getTime() - session.lastActivityAt.getTime();
+        return idleTime > maxIdleTime && session.status === 'idle';
+      })
+      .map(([sessionId]) => sessionId);
+
+    for (const sessionId of sessionsToCleanup) {
+      console.log(`[StagehandService] Cleaning up idle session: ${sessionId}`);
+      await this.closeSession(sessionId);
     }
   }
 
@@ -329,10 +333,7 @@ export class StagehandService {
       this.updateActivity(session);
       console.log(`[StagehandService] Extracting data: ${instruction}`);
 
-      const result = await session.stagehand.extract({
-        instruction,
-        schema,
-      });
+      const result = await session.stagehand.extract(instruction, schema);
 
       console.log(`[StagehandService] Extraction completed:`, result);
 
@@ -363,9 +364,9 @@ export class StagehandService {
       this.updateActivity(session);
       console.log(`[StagehandService] Observing page: ${instruction || 'general observation'}`);
 
-      const observations = await session.stagehand.observe({
-        instruction: instruction || 'What actions are available on this page?',
-      });
+      const observations = await session.stagehand.observe(
+        instruction || 'What actions are available on this page?'
+      );
 
       console.log(`[StagehandService] Found ${observations.length} observations`);
 

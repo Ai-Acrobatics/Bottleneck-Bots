@@ -99,7 +99,7 @@ export class ToolRegistry extends EventEmitter {
   getToolsByCategory(category: ToolCategory): MCPTool[] {
     const tools: MCPTool[] = [];
 
-    for (const [name, meta] of this.metadata) {
+    for (const [name, meta] of Array.from(this.metadata)) {
       if (meta.category === category) {
         const tool = this.tools.get(name);
         if (tool) {
@@ -185,7 +185,7 @@ export class ToolRegistry extends EventEmitter {
     let totalInvocations = 0;
     let successfulInvocations = 0;
 
-    for (const metrics of this.metrics.values()) {
+    for (const metrics of Array.from(this.metrics.values())) {
       totalInvocations += metrics.totalInvocations;
       successfulInvocations += metrics.successfulInvocations;
     }

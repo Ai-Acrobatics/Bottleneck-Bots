@@ -28,8 +28,8 @@ export default function CreditPurchase() {
 
   const { getPackages, purchaseCredits, getTransactionHistory, getBalance } = useCredits();
 
-  const { data: packagesData, isLoading: packagesLoading } = getPackages();
-  const { data: historyData, isLoading: historyLoading } = getTransactionHistory();
+  const { data: packagesData, isLoading: packagesLoading } = getPackages({ activeOnly: true });
+  const { data: historyData, isLoading: historyLoading } = getTransactionHistory({});
   const { data: enrichmentBalance } = getBalance({ creditType: 'enrichment' });
   const { data: callingBalance } = getBalance({ creditType: 'calling' });
 
@@ -42,7 +42,7 @@ export default function CreditPurchase() {
   const handlePurchase = async (packageId: string) => {
     try {
       setSelectedPackageId(packageId);
-      await purchaseMutation.mutateAsync({ packageId });
+      await purchaseMutation.mutateAsync({ packageId: parseInt(packageId, 10) });
       toast.success('Credits purchased successfully!');
       setSelectedPackageId(null);
     } catch (error) {

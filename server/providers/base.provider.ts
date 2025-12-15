@@ -327,7 +327,7 @@ export abstract class BaseProvider implements ILLMProvider {
     }
 
     // Store metrics (in memory for now)
-    const requestId = response.id;
+    const requestId = response.id || `req-${Date.now()}`;
     this.requestMetrics.set(requestId, {
       timestamp: new Date(),
       model: response.model,
@@ -338,8 +338,10 @@ export abstract class BaseProvider implements ILLMProvider {
 
     // Clean up old metrics (keep last 1000)
     if (this.requestMetrics.size > 1000) {
-      const oldestKey = this.requestMetrics.keys().next().value;
-      this.requestMetrics.delete(oldestKey);
+      const oldestKey = this.requestMetrics.keys().next().value as string;
+      if (oldestKey) {
+        this.requestMetrics.delete(oldestKey);
+      }
     }
   }
 
@@ -349,12 +351,12 @@ export abstract class BaseProvider implements ILLMProvider {
   protected trackStreamRequest(
     request: LLMRequest,
     totalTokens: number,
-    totalCost: number,
+    totalCost: number | undefined,
     latency: number
   ): void {
     this.requestCount++;
     this.totalTokens += totalTokens;
-    this.totalCost += totalCost;
+    this.totalCost += totalCost || 0;
 
     // Store metrics
     const requestId = `stream-${Date.now()}`;

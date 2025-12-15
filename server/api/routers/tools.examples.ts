@@ -360,13 +360,13 @@ export async function analyzeToolMetrics(trpc: any) {
   console.log(`Average execution time: ${metrics.userStats.averageExecutionTime.toFixed(2)}ms`);
 
   console.log('\n=== Most Used Tools ===');
-  metrics.mostUsedTools.forEach((tool, index) => {
+  metrics.mostUsedTools.forEach((tool: any, index: number) => {
     console.log(`${index + 1}. ${tool.tool}: ${tool.count} executions`);
   });
 
   console.log('\n=== Category Breakdown ===');
   Object.entries(metrics.categoryStats)
-    .sort(([, a], [, b]) => b - a)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
     .forEach(([category, count]) => {
       console.log(`${category}: ${count} executions`);
     });
@@ -385,12 +385,12 @@ export async function analyzeToolMetrics(trpc: any) {
 
   // Find slowest executions
   const slowestExecutions = history.executions
-    .filter((e) => e.executionTime)
-    .sort((a, b) => (b.executionTime || 0) - (a.executionTime || 0))
+    .filter((e: any) => e.executionTime)
+    .sort((a: any, b: any) => (b.executionTime || 0) - (a.executionTime || 0))
     .slice(0, 5);
 
   console.log('\n=== Slowest Executions ===');
-  slowestExecutions.forEach((exec, index) => {
+  slowestExecutions.forEach((exec: any, index: number) => {
     console.log(`${index + 1}. ${exec.toolName}: ${exec.executionTime}ms (${exec.status})`);
   });
 
@@ -401,7 +401,7 @@ export async function analyzeToolMetrics(trpc: any) {
       successRate: (metrics.userStats.successfulExecutions / metrics.userStats.totalExecutions * 100),
       averageExecutionTime: metrics.userStats.averageExecutionTime,
       mostUsedCategory: Object.entries(metrics.categoryStats)
-        .sort(([, a], [, b]) => b - a)[0]?.[0],
+        .sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0],
       slowestExecutions,
     },
   };
@@ -482,7 +482,7 @@ export async function discoverTools(trpc: any) {
 
     console.log(`\n=== ${category.toUpperCase()} Tools (${categoryTools.totalCount}) ===`);
 
-    categoryTools.tools.forEach((tool) => {
+    categoryTools.tools.forEach((tool: any) => {
       console.log(`\n${tool.name}`);
       console.log(`  Description: ${tool.description}`);
       console.log(`  Schema:`, JSON.stringify(tool.inputSchema, null, 2));
@@ -490,7 +490,7 @@ export async function discoverTools(trpc: any) {
       // Get tool details
       trpc.tools.getToolDetails
         .query({ name: tool.name })
-        .then((details) => {
+        .then((details: any) => {
           console.log(`  Total executions: ${details.userStats.totalExecutions}`);
           console.log(`  Average execution time: ${details.userStats.averageExecutionTime.toFixed(2)}ms`);
         })
@@ -504,7 +504,7 @@ export async function discoverTools(trpc: any) {
   console.log('\n=== Searching for "file" tools ===');
   const searchResults = await trpc.tools.listTools.query({ search: 'file' });
   console.log(`Found ${searchResults.totalCount} tools matching "file"`);
-  searchResults.tools.forEach((tool) => {
+  searchResults.tools.forEach((tool: any) => {
     console.log(`- ${tool.name}: ${tool.description}`);
   });
 
@@ -538,7 +538,7 @@ export async function cleanupExecutionHistory(trpc: any) {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const oldFailedExecutions = history.executions.filter(
-    (e) =>
+    (e: any) =>
       e.status === 'failed' &&
       e.startTime &&
       new Date(e.startTime) < thirtyDaysAgo

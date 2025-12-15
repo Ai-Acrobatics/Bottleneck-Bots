@@ -325,8 +325,8 @@ async function processEmailDraft(job: Job<EmailDraftJobData>) {
   // Generate draft
   const draft = await emailService.generateDraft(
     {
-      subject: latestEmail.subject,
-      body: latestEmail.body || latestEmail.snippet,
+      subject: latestEmail.subject || "",
+      body: latestEmail.body || latestEmail.snippet || "",
       from: (latestEmail.from as any).email,
     },
     {

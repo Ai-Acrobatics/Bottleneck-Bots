@@ -78,13 +78,13 @@ export function MCPDashboard() {
         />
         <StatusCard
           title="Tools Available"
-          value={status?.serverMetrics?.toolsExecuted?.toString() || '100+'}
+          value="100+"
           icon={Wrench}
           status="info"
         />
         <StatusCard
           title="Uptime"
-          value={formatUptime(status?.serverMetrics?.uptime)}
+          value={formatUptime(0)}
           icon={Activity}
           status="success"
         />

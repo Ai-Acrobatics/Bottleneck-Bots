@@ -30,7 +30,7 @@ const createLeadListSchema = z.object({
   description: z.string().optional(),
   fileName: z.string().optional(),
   fileSize: z.number().int().positive().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const uploadLeadsSchema = z.object({
@@ -917,7 +917,7 @@ export const leadEnrichmentRouter = router({
 
     // Get active enrichment jobs
     const activeJobs = await db
-      .select({ count: count() })
+      .select({ count: sql<number>`count(*)::int` })
       .from(lead_lists)
       .where(and(eq(lead_lists.userId, userId), eq(lead_lists.status, "processing")));
 

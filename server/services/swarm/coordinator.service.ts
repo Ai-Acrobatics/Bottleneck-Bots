@@ -221,7 +221,7 @@ export class SwarmCoordinator extends EventEmitter {
     context.endTime = new Date();
 
     // Terminate all agents
-    for (const agent of context.agents.values()) {
+    for (const agent of Array.from(context.agents.values())) {
       this.terminateAgent(agent.id);
     }
 
@@ -281,7 +281,7 @@ export class SwarmCoordinator extends EventEmitter {
 
     // Count task statuses
     for (const swarm of swarms) {
-      for (const task of swarm.tasks.values()) {
+      for (const task of Array.from(swarm.tasks.values())) {
         if (task.status === 'completed') health.tasks.completed++;
         else if (task.status === 'failed') health.tasks.failed++;
         else if (task.status === 'running') health.tasks.running++;
@@ -324,7 +324,7 @@ export class SwarmCoordinator extends EventEmitter {
    */
   getMetrics(): { global: SwarmMetrics; swarms: Record<string, SwarmMetrics> } {
     const swarmMetrics: Record<string, SwarmMetrics> = {};
-    for (const [swarmId, context] of this.activeSwarms) {
+    for (const [swarmId, context] of Array.from(this.activeSwarms)) {
       swarmMetrics[swarmId] = context.metrics;
     }
 

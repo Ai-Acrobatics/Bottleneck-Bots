@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type {
-  SOPExecution,
+  SOPExecution as SOPExecutionType,
   SOPExecutionProps,
   SOPExecutionStep,
   ExecutionStatus,

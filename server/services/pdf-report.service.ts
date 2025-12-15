@@ -58,7 +58,7 @@ export class PDFReportService {
 
       console.log("[PDFReportService] PDF generated successfully");
 
-      return pdf;
+      return Buffer.from(pdf);
     } finally {
       await browserbaseSDK.terminateSession(session.id);
     }

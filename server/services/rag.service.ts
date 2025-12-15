@@ -306,7 +306,7 @@ class RAGService {
 
       return sources;
     } catch (error) {
-      logger.error({ error, userId }, 'List sources failed');
+      logger.error({ error, filters }, 'List sources failed');
       throw error;
     }
   }
@@ -364,7 +364,7 @@ class RAGService {
 
       const results = await db.execute(sqlQuery);
 
-      return results.rows as DocumentChunk[];
+      return results.rows as unknown as DocumentChunk[];
     } catch (error) {
       logger.error({ error, query }, 'Retrieve failed');
       throw error;
@@ -500,7 +500,7 @@ class RAGService {
 
       return platforms;
     } catch (error) {
-      logger.error({ error, query }, 'Platform detection failed');
+      logger.error({ error, prompt }, 'Platform detection failed');
       return [];
     }
   }

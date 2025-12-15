@@ -183,8 +183,8 @@ export class SEOService {
         url,
         ...seoData,
         performance,
-        technicalSEO,
         contentAnalysis,
+        technicalSEO,
         aiInsights,
         score,
         recommendations,
@@ -343,8 +343,10 @@ export class SEOService {
     return {
       hasRobotsTxt,
       hasSitemap,
+      isResponsive: pageData.isResponsive,
       hasSSL,
-      ...pageData,
+      canonicalUrl: pageData.canonicalUrl || null,
+      structuredData: pageData.structuredData,
     };
   }
 

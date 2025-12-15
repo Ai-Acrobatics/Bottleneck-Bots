@@ -4,7 +4,7 @@
  */
 
 export * from './types';
-export * from './errors';
+export { MCPError } from './errors';
 export * from './transport';
 export * from './registry';
 export * from './server';

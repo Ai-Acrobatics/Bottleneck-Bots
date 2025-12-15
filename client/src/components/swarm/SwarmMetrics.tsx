@@ -298,7 +298,7 @@ function PerformanceBar({
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">{value.toFixed(1)}%</span>
       </div>
-      <Progress value={value} className="h-2" indicatorClassName={color} />
+      <Progress value={value} className="h-2" />
     </div>
   );
 }

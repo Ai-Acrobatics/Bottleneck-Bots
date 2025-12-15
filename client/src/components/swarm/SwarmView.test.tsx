@@ -5,7 +5,8 @@
  */
 
 import * as React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SwarmView } from './SwarmView';

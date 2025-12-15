@@ -149,7 +149,7 @@ export const marketplaceRouter = router({
                 // Dynamically import Stripe (will fail gracefully if not installed)
                 const Stripe = (await import("stripe")).default;
                 const stripe = new Stripe(stripeSecretKey, {
-                    apiVersion: "2024-12-18.acacia",
+                    apiVersion: "2025-11-17.clover" as any,
                 });
 
                 // Create Stripe checkout session
@@ -219,7 +219,7 @@ export const marketplaceRouter = router({
             try {
                 const Stripe = (await import("stripe")).default;
                 const stripe = new Stripe(stripeSecretKey, {
-                    apiVersion: "2024-12-18.acacia",
+                    apiVersion: "2025-11-17.clover" as any,
                 });
 
                 const session = await stripe.checkout.sessions.retrieve(input.sessionId);

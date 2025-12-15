@@ -55,7 +55,7 @@ async function example2_researchTask() {
   console.log('Total phases:', result.plan?.phases.length);
 
   // Access stored data
-  console.log('\nStored Data Keys:', Object.keys(result.output));
+  console.log('\nStored Data Keys:', Object.keys(result.output as Record<string, unknown>));
 }
 
 /**
@@ -81,7 +81,7 @@ async function example3_apiTask() {
   });
 
   console.log('Status:', result.status);
-  console.log('GitHub Repo Info:', result.output.github_repo_info);
+  console.log('GitHub Repo Info:', (result.output as Record<string, unknown>).github_repo_info);
 }
 
 /**
@@ -111,8 +111,9 @@ async function example4_multiPhaseTask() {
     status: p.status
   })));
 
-  if (result.output.audit_report) {
-    console.log('\nAudit Report:', result.output.audit_report);
+  const output = result.output as Record<string, unknown>;
+  if (output.audit_report) {
+    console.log('\nAudit Report:', output.audit_report);
   }
 }
 
@@ -198,7 +199,8 @@ async function example7_withContext() {
   });
 
   console.log('Status:', result.status);
-  console.log('Workout Plan:', result.output.workout_plan || result.output);
+  const output = result.output as Record<string, unknown>;
+  console.log('Workout Plan:', output.workout_plan || result.output);
 }
 
 /**
@@ -222,7 +224,8 @@ async function example8_linkedTask() {
   console.log('Status:', result.status);
   console.log('Execution ID:', result.executionId);
   console.log('Task ID:', 999);
-  console.log('Leads Contacted:', result.output.leads_contacted || 0);
+  const output = result.output as Record<string, unknown>;
+  console.log('Leads Contacted:', output.leads_contacted || 0);
 }
 
 /**

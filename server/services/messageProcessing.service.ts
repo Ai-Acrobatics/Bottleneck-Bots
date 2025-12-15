@@ -15,7 +15,7 @@ import {
 import { automationWorkflows } from "../../drizzle/schema";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { addWorkflowExecutionJob } from "../workers/workflowWorker";
+// import { addWorkflowExecutionJob } from "../workers/workflowWorker"; // Not exported
 
 // ========================================
 // TYPES
@@ -309,10 +309,9 @@ export class MessageProcessingService {
         description: automationWorkflows.description,
       })
       .from(automationWorkflows)
-      .where(and(
-        eq(automationWorkflows.userId, userId),
-        eq(automationWorkflows.isActive, true)
-      ))
+      .where(
+        eq(automationWorkflows.userId, userId)
+      )
       .orderBy(desc(automationWorkflows.executionCount))
       .limit(20);
 
@@ -766,6 +765,50 @@ I'll start working on this ${task.scheduledFor ? `at ${task.scheduledFor.toLocal
 
 You can:
 - Tell me about tasks you need done
+- Ask about task status
+- Set reminders
+- Or just chat!`;
+  }
+
+  /**
+   * Trigger a workflow execution
+   */
+  private async triggerWorkflow(
+    userId: number,
+    workflowId: number,
+    parameters: Record<string, any>,
+    messageId: number
+  ): Promise<{ success: boolean; executionId?: number; error?: string }> {
+    // TODO: Implement workflow triggering when addWorkflowExecutionJob is exported
+    return {
+      success: false,
+      error: "Workflow triggering not yet implemented"
+    };
+  }
+
+
+  /**
+   * Handle list workflows request
+   */
+  private async handleListWorkflows(userId: number): Promise<string> {
+    const workflows = await this.getUserWorkflows(userId);
+
+    if (workflows.length === 0) {
+      return "You don't have any workflows configured yet.";
+    }
+
+    const workflowList = workflows.map((w, i) => `${i + 1}. ${w.name} (ID: ${w.id})`).join("\n");
+    return `Here are your available workflows:\n\n${workflowList}\n\nYou can trigger any of these by name or ID.`;
+  }
+
+  /**
+   * Handle help request
+   */
+  private handleHelp(): string {
+    return `I can help you with:
+- Create tasks from your messages
+- Trigger automated workflows
+- List your available workflows
 - Ask about task status
 - Set reminders
 - Or just chat!`;

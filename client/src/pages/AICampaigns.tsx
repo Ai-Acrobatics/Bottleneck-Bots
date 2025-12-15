@@ -67,8 +67,8 @@ export default function AICampaigns() {
     useAICalling();
   const { getLists } = useLeadEnrichment();
 
-  const { data: campaignsData, isLoading } = getCampaigns();
-  const { data: leadListsData } = getLists();
+  const { data: campaignsData, isLoading } = getCampaigns({});
+  const { data: leadListsData } = getLists({});
 
   // Extract arrays from response objects
   const campaigns = campaignsData?.campaigns ?? [];
@@ -175,11 +175,11 @@ export default function AICampaigns() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-tour="campaigns-stats">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Active Campaigns</p>
-          <p className="text-2xl font-bold">{campaigns?.filter(c => c.status === 'running').length || 0}</p>
+          <p className="text-2xl font-bold">{campaigns?.filter((c: any) => c.status === 'running').length || 0}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Total Leads</p>
-          <p className="text-2xl font-bold">{campaigns?.reduce((sum, c) => sum + (c.totalLeads || 0), 0) || 0}</p>
+          <p className="text-sm text-muted-foreground">Total Calls</p>
+          <p className="text-2xl font-bold">{campaigns?.reduce((sum: number, c: any) => sum + (c.callsMade || 0), 0) || 0}</p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">Conversion Rate</p>
@@ -187,7 +187,7 @@ export default function AICampaigns() {
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">This Month</p>
-          <p className="text-2xl font-bold">{campaigns?.filter(c => isThisMonth(new Date(c.createdAt))).length || 0}</p>
+          <p className="text-2xl font-bold">{campaigns?.filter((c: any) => isThisMonth(new Date(c.createdAt))).length || 0}</p>
         </Card>
       </div>
 
@@ -222,10 +222,9 @@ export default function AICampaigns() {
       ) : (
         <div className="space-y-4" data-tour="campaigns-list">
           {campaigns.map((campaign: any) => {
-            const progress =
-              campaign.totalLeads > 0
-                ? (campaign.callsMade / campaign.totalLeads) * 100
-                : 0;
+            // Get total leads from the lead list or use a default
+            const totalLeads = campaign.callsMade + campaign.callsSuccessful + campaign.callsFailed;
+            const progress = totalLeads > 0 ? (campaign.callsMade / totalLeads) * 100 : 0;
 
             return (
               <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
@@ -365,7 +364,7 @@ export default function AICampaigns() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Progress</span>
                       <span className="font-medium">
-                        {campaign.callsMade} / {campaign.totalLeads} ({progress.toFixed(0)}%)
+                        {campaign.callsMade} / {totalLeads} ({progress.toFixed(0)}%)
                       </span>
                     </div>
                     <Progress value={progress} className="h-2" />
@@ -396,7 +395,7 @@ export default function AICampaigns() {
             <DialogTitle>Create AI Campaign</DialogTitle>
           </DialogHeader>
           <CampaignForm
-            leadLists={leadLists}
+            leadLists={leadLists as any}
             onSubmit={handleCreateCampaign}
             onCancel={() => setCreateDialogOpen(false)}
           />

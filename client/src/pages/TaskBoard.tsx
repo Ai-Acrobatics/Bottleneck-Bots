@@ -607,7 +607,10 @@ export function TaskBoard() {
 
   // Fetch data
   const statsQuery = trpc.agencyTasks.getStats.useQuery();
-  const kanbanQuery = trpc.agencyTasks.getKanbanBoard.useQuery({ includeClosed: statusFilter === 'all' });
+  const kanbanQuery = trpc.agencyTasks.list.useQuery({
+    status: statusFilter !== 'all' ? statusFilter as TaskStatus : undefined,
+    limit: 1000
+  });
   const listQuery = trpc.agencyTasks.list.useQuery({
     status: statusFilter !== 'all' ? statusFilter as TaskStatus : undefined,
     priority: priorityFilter !== 'all' ? priorityFilter as TaskPriority : undefined,
@@ -629,14 +632,14 @@ export function TaskBoard() {
     },
   });
 
-  const deferMutation = trpc.agencyTasks.defer.useMutation({
+  const deferMutation = trpc.agencyTasks.update.useMutation({
     onSuccess: () => {
       toast.success('Task scheduled successfully');
       kanbanQuery.refetch();
       listQuery.refetch();
       statsQuery.refetch();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Failed to schedule task: ${error.message}`);
     },
   });
@@ -664,7 +667,11 @@ export function TaskBoard() {
   };
 
   const handleDeferSubmit = (id: number, scheduledFor: string, reason?: string) => {
-    deferMutation.mutate({ id, scheduledFor, reason });
+    deferMutation.mutate({
+      id,
+      scheduledFor: scheduledFor,
+      status: 'deferred' as TaskStatus
+    });
   };
 
   const handleCancel = (id: number) => {
@@ -795,16 +802,28 @@ export function TaskBoard() {
         {!isLoading && viewMode === 'kanban' && kanbanQuery.data && (
           <ScrollArea className="w-full">
             <div className="flex gap-4 pb-4">
-              {kanbanQuery.data.columns.map((column) => (
-                <KanbanColumnComponent
-                  key={column.id}
-                  column={column as KanbanColumn}
-                  onExecute={handleExecute}
-                  onDefer={handleDefer}
-                  onCancel={handleCancel}
-                  onView={handleView}
-                />
-              ))}
+              {(() => {
+                const tasks = kanbanQuery.data.tasks as Task[];
+                const columns: KanbanColumn[] = [
+                  { id: 'pending', title: 'Pending', tasks: tasks.filter(t => t.status === 'pending'), count: 0 },
+                  { id: 'queued', title: 'Queued', tasks: tasks.filter(t => t.status === 'queued'), count: 0 },
+                  { id: 'in_progress', title: 'In Progress', tasks: tasks.filter(t => t.status === 'in_progress'), count: 0 },
+                  { id: 'deferred', title: 'Scheduled', tasks: tasks.filter(t => t.status === 'deferred'), count: 0 },
+                  { id: 'completed', title: 'Completed', tasks: tasks.filter(t => t.status === 'completed'), count: 0 },
+                  { id: 'failed', title: 'Failed', tasks: tasks.filter(t => t.status === 'failed'), count: 0 },
+                ];
+                columns.forEach(c => c.count = c.tasks.length);
+                return columns.map((column: any) => (
+                  <KanbanColumnComponent
+                    key={column.id}
+                    column={column}
+                    onExecute={handleExecute}
+                    onDefer={handleDefer}
+                    onCancel={handleCancel}
+                    onView={handleView}
+                  />
+                ));
+              })()}
             </div>
           </ScrollArea>
         )}

@@ -269,12 +269,13 @@ async function handleOAuthCallback(
     }
 
     // Check if integration already exists for this user and provider
+    const userId = parseInt(stateData.userId, 10);
     const [existingIntegration] = await db
       .select()
       .from(integrations)
       .where(
         and(
-          eq(integrations.userId, stateData.userId),
+          eq(integrations.userId, userId),
           eq(integrations.service, provider)
         )
       )
@@ -309,7 +310,7 @@ async function handleOAuthCallback(
       });
 
       await db.insert(integrations).values({
-        userId: stateData.userId,
+        userId,
         service: provider,
         accessToken: encryptedAccessToken,
         refreshToken: encryptedRefreshToken,

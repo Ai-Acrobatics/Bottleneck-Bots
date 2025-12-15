@@ -135,34 +135,24 @@ export const alertsRouter = router({
         offset: input?.offset ?? 0,
       };
 
-      let query = database
-        .select()
-        .from(alertRules)
-        .where(eq(alertRules.userId, userId))
-        .orderBy(desc(alertRules.createdAt))
-        .limit(filters.limit)
-        .offset(filters.offset);
+      // Build where conditions
+      const whereConditions = [eq(alertRules.userId, userId)];
 
-      // Apply filters
       if (filters.isActive !== undefined) {
-        query = query.where(
-          and(
-            eq(alertRules.userId, userId),
-            eq(alertRules.isActive, filters.isActive)
-          )
-        ) as typeof query;
+        whereConditions.push(eq(alertRules.isActive, filters.isActive));
       }
 
       if (filters.ruleType) {
-        query = query.where(
-          and(
-            eq(alertRules.userId, userId),
-            eq(alertRules.ruleType, filters.ruleType)
-          )
-        ) as typeof query;
+        whereConditions.push(eq(alertRules.ruleType, filters.ruleType));
       }
 
-      const rules = await query;
+      const rules = await database
+        .select()
+        .from(alertRules)
+        .where(and(...whereConditions))
+        .orderBy(desc(alertRules.createdAt))
+        .limit(filters.limit)
+        .offset(filters.offset);
 
       // Get total count
       const [{ count }] = await database
@@ -532,9 +522,9 @@ export const alertsRouter = router({
         throw new Error("Database not available");
       }
 
-      const filters = input || {};
+      const filters = input || { days: 30 };
       const userId = ctx.user.id;
-      const cutoffDate = new Date(Date.now() - (filters.days || 30) * 24 * 60 * 60 * 1000);
+      const cutoffDate = new Date(Date.now() - filters.days * 24 * 60 * 60 * 1000);
 
       let whereConditions = [
         eq(alertHistory.userId, userId),
@@ -599,7 +589,7 @@ export const alertsRouter = router({
         byStatus,
         byRule,
         recent,
-        periodDays: filters.days || 30,
+        periodDays: filters.days,
       };
     }),
 
@@ -615,7 +605,7 @@ export const alertsRouter = router({
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      const filters = input || {};
+      const filters = input || { unreadOnly: false, limit: 50, offset: 0 };
       const notifications = await alertingService.getInAppNotifications(
         ctx.user.id,
         {

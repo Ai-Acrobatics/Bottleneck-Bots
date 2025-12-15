@@ -23,22 +23,33 @@ interface TourState {
   activeTour: string | null;
   currentStepIndex: number;
   completedTours: string[];
+  completedSteps: Record<string, string[]>;
   dismissedTips: string[];
   autoStartTours: boolean;
   hasSeenWelcome: boolean;
+  isPaused: boolean;
+  showTipsOnHover: boolean;
+  reducedMotion: boolean;
+  dontShowAgain: string[];
 
   // Actions
   startTour: (tourId: string) => void;
   nextStep: () => void;
+  prevStep: () => void;
   previousStep: () => void;
   skipTour: () => void;
   completeTour: () => void;
+  pauseTour: () => void;
+  resumeTour: () => void;
   markTourComplete: (tourId: string) => void;
   resetProgress: () => void;
   setAutoStartTours: (enabled: boolean) => void;
   setHasSeenWelcome: (seen: boolean) => void;
   isTourCompleted: (tourId: string) => boolean;
   dismissTip: (tipId: string) => void;
+  toggleDontShowAgain: (tourId: string) => void;
+  resetAllTours: () => void;
+  setPreference: <K extends keyof any>(key: K, value: any) => void;
   getUncompletedToursCount: () => number;
 }
 
@@ -48,20 +59,33 @@ export const useTourStore = create<TourState>()(
       activeTour: null,
       currentStepIndex: 0,
       completedTours: [],
+      completedSteps: {},
       dismissedTips: [],
       autoStartTours: true,
       hasSeenWelcome: false,
+      isPaused: false,
+      showTipsOnHover: true,
+      reducedMotion: false,
+      dontShowAgain: [],
 
       startTour: (tourId: string) => {
         set({
           activeTour: tourId,
           currentStepIndex: 0,
+          isPaused: false,
         });
       },
 
       nextStep: () => {
         const { currentStepIndex } = get();
         set({ currentStepIndex: currentStepIndex + 1 });
+      },
+
+      prevStep: () => {
+        const { currentStepIndex } = get();
+        if (currentStepIndex > 0) {
+          set({ currentStepIndex: currentStepIndex - 1 });
+        }
       },
 
       previousStep: () => {
@@ -122,11 +146,43 @@ export const useTourStore = create<TourState>()(
         return get().completedTours.includes(tourId);
       },
 
+      pauseTour: () => {
+        set({ isPaused: true });
+      },
+
+      resumeTour: () => {
+        set({ isPaused: false });
+      },
+
       dismissTip: (tipId: string) => {
         const { dismissedTips } = get();
         if (!dismissedTips.includes(tipId)) {
           set({ dismissedTips: [...dismissedTips, tipId] });
         }
+      },
+
+      toggleDontShowAgain: (tourId: string) => {
+        const { dontShowAgain } = get();
+        if (dontShowAgain.includes(tourId)) {
+          set({ dontShowAgain: dontShowAgain.filter(id => id !== tourId) });
+        } else {
+          set({ dontShowAgain: [...dontShowAgain, tourId] });
+        }
+      },
+
+      resetAllTours: () => {
+        set({
+          completedTours: [],
+          completedSteps: {},
+          activeTour: null,
+          currentStepIndex: 0,
+          hasSeenWelcome: false,
+          dontShowAgain: [],
+        });
+      },
+
+      setPreference: <K extends keyof any>(key: K, value: any) => {
+        set({ [key]: value } as any);
       },
 
       getUncompletedToursCount: () => {
@@ -140,9 +196,13 @@ export const useTourStore = create<TourState>()(
       name: 'tour-storage',
       partialize: (state) => ({
         completedTours: state.completedTours,
+        completedSteps: state.completedSteps,
         dismissedTips: state.dismissedTips,
         autoStartTours: state.autoStartTours,
         hasSeenWelcome: state.hasSeenWelcome,
+        showTipsOnHover: state.showTipsOnHover,
+        reducedMotion: state.reducedMotion,
+        dontShowAgain: state.dontShowAgain,
       }),
     }
   )

@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import {
   ExecutionHistoryPanel,

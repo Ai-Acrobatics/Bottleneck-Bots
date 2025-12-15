@@ -329,7 +329,7 @@ export const emailRouter = router({
 
       return {
         success: true,
-        jobId: job.id,
+        jobId: job?.id || '',
       };
     }),
 

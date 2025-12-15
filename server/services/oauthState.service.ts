@@ -87,7 +87,7 @@ class OAuthStateService {
     const now = Date.now();
     let expiredCount = 0;
 
-    for (const [state, data] of this.states.entries()) {
+    for (const [state, data] of Array.from(this.states.entries())) {
       if (now - data.createdAt > this.STATE_TTL) {
         this.states.delete(state);
         expiredCount++;

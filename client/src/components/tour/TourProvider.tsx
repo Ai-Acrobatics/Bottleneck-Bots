@@ -47,6 +47,7 @@ export function TourProvider({ children, onboardingCompleted = false, isDashboar
       }, 1000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [autoStartTours, hasSeenWelcome, onboardingCompleted, isDashboardActive, startTour, setHasSeenWelcome]);
 
   useEffect(() => {

@@ -277,7 +277,11 @@ export interface LegacyTaskExecutionConfig {
 
 export interface ExecutionResult {
   success: boolean;
-  output?: unknown;
+  output?: {
+    message?: string;
+    steps?: unknown[];
+    [key: string]: unknown;
+  };
   error?: string;
   duration?: number;
   screenshots?: string[];

@@ -107,11 +107,11 @@ export function SwarmDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <Badge
-            variant={health?.status === 'healthy' ? 'default' : 'destructive'}
-            className={health?.status === 'healthy' ? 'bg-green-500' : ''}
+            variant={'overall' in (health || {}) && (health?.overall || 0) >= 80 ? 'default' : 'destructive'}
+            className={'overall' in (health || {}) && (health?.overall || 0) >= 80 ? 'bg-green-500' : ''}
           >
-            <span className={`w-2 h-2 rounded-full mr-2 ${health?.status === 'healthy' ? 'bg-green-200 animate-pulse' : 'bg-red-200'}`} />
-            {health?.status === 'healthy' ? 'System Healthy' : 'System Unhealthy'}
+            <span className={`w-2 h-2 rounded-full mr-2 ${'overall' in (health || {}) && (health?.overall || 0) >= 80 ? 'bg-green-200 animate-pulse' : 'bg-red-200'}`} />
+            {'overall' in (health || {}) && (health?.overall || 0) >= 80 ? 'System Healthy' : 'System Unhealthy'}
           </Badge>
           <Button variant="outline" onClick={handleRefreshAll}>
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -131,30 +131,39 @@ export function SwarmDashboard() {
         />
         <StatCard
           title="Total Agents"
-          value={metrics?.totalAgentsSpawned?.toString() || '0'}
+          value={((health?.agents?.healthy || 0) + (health?.agents?.unhealthy || 0)).toString()}
           icon={Bot}
           status="success"
           description="Spawned agents"
         />
         <StatCard
           title="Tasks Completed"
-          value={metrics?.totalTasksCompleted?.toString() || '0'}
+          value={(health?.tasks?.completed || 0).toString()}
           icon={CheckCircle2}
           status="success"
           description="Successfully finished"
         />
         <StatCard
           title="Queue Depth"
-          value={queue?.pending?.toString() || '0'}
+          value={(health?.tasks?.pending || 0).toString()}
           icon={ListTodo}
-          status={queue?.pending && queue.pending > 10 ? 'warning' : 'info'}
+          status={health?.tasks?.pending && health.tasks.pending > 10 ? 'warning' : 'info'}
           description="Pending tasks"
         />
         <StatCard
           title="Success Rate"
-          value={metrics?.successRate ? `${(metrics.successRate * 100).toFixed(1)}%` : 'N/A'}
+          value={
+            health?.tasks?.completed && (health.tasks.completed + (health.tasks.failed || 0)) > 0
+              ? `${((health.tasks.completed / (health.tasks.completed + (health.tasks.failed || 0))) * 100).toFixed(1)}%`
+              : 'N/A'
+          }
           icon={Zap}
-          status={metrics?.successRate && metrics.successRate > 0.9 ? 'success' : 'warning'}
+          status={
+            health?.tasks?.completed && (health.tasks.completed + (health.tasks.failed || 0)) > 0 &&
+            health.tasks.completed / (health.tasks.completed + (health.tasks.failed || 0)) > 0.9
+              ? 'success'
+              : 'warning'
+          }
           description="Task completion"
         />
       </div>
@@ -288,21 +297,21 @@ function SwarmOverview({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge variant={health?.status === 'healthy' ? 'default' : 'destructive'}>
-                {health?.status || 'Unknown'}
+              <Badge variant={health?.overall && health.overall >= 80 ? 'default' : 'destructive'}>
+                {health?.overall ? (health.overall >= 80 ? 'Healthy' : 'Unhealthy') : 'Unknown'}
               </Badge>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Active Agents</p>
-              <p className="text-lg font-semibold">{health?.activeAgents || 0}</p>
+              <p className="text-lg font-semibold">{(health?.agents?.healthy || 0) + (health?.agents?.unhealthy || 0)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Active Swarms</p>
-              <p className="text-lg font-semibold">{health?.activeSwarms || 0}</p>
+              <p className="text-lg font-semibold">{swarms?.length || 0}</p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Pending Tasks</p>
-              <p className="text-lg font-semibold">{health?.pendingTasks || 0}</p>
+              <p className="text-lg font-semibold">{health?.tasks?.pending || 0}</p>
             </div>
           </div>
           {health?.lastError && (
@@ -328,10 +337,10 @@ function SwarmOverview({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <QueueItem label="Pending" value={queue?.pending || 0} color="bg-amber-500" />
-            <QueueItem label="In Progress" value={queue?.inProgress || 0} color="bg-blue-500" />
-            <QueueItem label="Completed" value={queue?.completed || 0} color="bg-green-500" />
-            <QueueItem label="Failed" value={queue?.failed || 0} color="bg-red-500" />
+            <QueueItem label="Pending" value={queue?.queueLength || 0} color="bg-amber-500" />
+            <QueueItem label="In Progress" value={queue?.activeAssignments || 0} color="bg-blue-500" />
+            <QueueItem label="Completed" value={health?.tasks?.completed || 0} color="bg-green-500" />
+            <QueueItem label="Failed" value={health?.tasks?.failed || 0} color="bg-red-500" />
           </div>
         </CardContent>
       </Card>

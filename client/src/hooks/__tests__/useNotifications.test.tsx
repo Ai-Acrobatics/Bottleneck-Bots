@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
+import { waitFor } from '@testing-library/dom';
 import { act } from 'react';
 import { useNotifications } from '../useNotifications';
 import { NotificationProvider } from '@/components/notifications/NotificationProvider';

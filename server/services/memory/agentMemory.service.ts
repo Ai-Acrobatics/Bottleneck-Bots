@@ -122,21 +122,13 @@ export class AgentMemoryService {
       );
     }
 
-    let query = db
+    const results = await db
       .select()
       .from(memoryEntries)
       .where(and(...conditions))
-      .orderBy(desc(memoryEntries.createdAt));
-
-    if (options.limit) {
-      query = query.limit(options.limit);
-    }
-
-    if (options.offset) {
-      query = query.offset(options.offset);
-    }
-
-    const results = await query;
+      .orderBy(desc(memoryEntries.createdAt))
+      .limit(options.limit || 1000)
+      .offset(options.offset || 0);
 
     return results.map(row => this.rowToMemoryEntry(row));
   }
@@ -239,10 +231,9 @@ export class AgentMemoryService {
       this.cache.delete(cacheKey);
     } else {
       // Clear all cache entries for this session
-      for (const [k] of this.cache) {
-        if (k.startsWith(`${sessionId}:`)) {
-          this.cache.delete(k);
-        }
+      const keysToDelete = Array.from(this.cache.keys()).filter(k => k.startsWith(`${sessionId}:`));
+      for (const k of keysToDelete) {
+        this.cache.delete(k);
       }
     }
 
@@ -366,21 +357,13 @@ export class AgentMemoryService {
       );
     }
 
-    let dbQuery = db
+    const results = await db
       .select()
       .from(memoryEntries)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(memoryEntries.createdAt));
-
-    if (query.limit) {
-      dbQuery = dbQuery.limit(query.limit);
-    }
-
-    if (query.offset) {
-      dbQuery = dbQuery.offset(query.offset);
-    }
-
-    const results = await dbQuery;
+      .orderBy(desc(memoryEntries.createdAt))
+      .limit(query.limit || 1000)
+      .offset(query.offset || 0);
     return results.map(row => this.rowToMemoryEntry(row));
   }
 
@@ -435,10 +418,11 @@ export class AgentMemoryService {
 
     // Clear expired entries from cache
     const now = Date.now();
-    for (const [key, entry] of this.cache) {
-      if (entry.expiresAt && entry.expiresAt.getTime() <= now) {
-        this.cache.delete(key);
-      }
+    const entriesToDelete = Array.from(this.cache.entries())
+      .filter(([_, entry]) => entry.expiresAt && entry.expiresAt.getTime() <= now)
+      .map(([key]) => key);
+    for (const key of entriesToDelete) {
+      this.cache.delete(key);
     }
 
     return result.rowCount || 0;

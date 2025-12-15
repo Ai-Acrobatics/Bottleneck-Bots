@@ -15,7 +15,7 @@ import { cronSchedulerService } from "../../services/cronScheduler.service";
  * Calculate next run time for a cron expression
  * Uses cronSchedulerService which implements cron-parser
  */
-function calculateNextRun(cronExpression: string, timezone: string): Date {
+function calculateNextRun(cronExpression: string, timezone: string): Date | null {
   return cronSchedulerService.getNextRunTime(cronExpression, timezone);
 }
 
@@ -40,7 +40,7 @@ const automationConfigSchema = z.object({
       height: z.number(),
     }).optional(),
   }).optional(),
-  extractionSchema: z.record(z.unknown()).optional(),
+  extractionSchema: z.record(z.string(), z.unknown()).optional(),
   successCriteria: z.string().optional(),
 });
 
@@ -49,7 +49,7 @@ const automationConfigSchema = z.object({
  */
 const notificationChannelSchema = z.object({
   type: z.enum(["email", "slack", "webhook"]),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
 });
 
 /**
@@ -111,7 +111,7 @@ export const scheduledTasksRouter = router({
 
       // Get total count for pagination
       const [totalCountResult] = await db
-        .select({ count: count() })
+        .select({ count: count(scheduledBrowserTasks.id) })
         .from(scheduledBrowserTasks)
         .where(and(...whereConditions));
 
@@ -195,7 +195,7 @@ export const scheduledTasksRouter = router({
         keepExecutionHistory: z.boolean().default(true),
         maxHistoryRecords: z.number().int().positive().optional().default(100),
         tags: z.array(z.string()).optional(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -280,7 +280,7 @@ export const scheduledTasksRouter = router({
         keepExecutionHistory: z.boolean().optional(),
         maxHistoryRecords: z.number().int().positive().optional(),
         tags: z.array(z.string()).optional(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -668,7 +668,7 @@ export const scheduledTasksRouter = router({
 
       // Get total count
       const [totalCountResult] = await db
-        .select({ count: count() })
+        .select({ count: count(scheduledTaskExecutions.id) })
         .from(scheduledTaskExecutions)
         .where(and(...whereConditions));
 

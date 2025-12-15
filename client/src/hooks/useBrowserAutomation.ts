@@ -57,9 +57,10 @@ export function useBrowserAutomation() {
 
       const duration = Date.now() - startTime;
 
-      // Store session ID for reuse
-      if (result.sessionId) {
-        setSessionId(result.sessionId);
+      // Store session ID for reuse (if available in result metadata)
+      const resultSessionId = (result as any).sessionId;
+      if (resultSessionId) {
+        setSessionId(resultSessionId);
       }
 
       // Convert result to Dashboard format
@@ -123,14 +124,18 @@ export function useBrowserAutomation() {
         },
       });
 
-      if (result.sessionId) {
-        setSessionId(result.sessionId);
+      // Extract session info from result (if available)
+      const resultSessionId = (result as any).sessionId;
+      const resultSessionUrl = (result as any).sessionUrl;
+
+      if (resultSessionId) {
+        setSessionId(resultSessionId);
       }
 
       return {
         success: result.success,
-        sessionId: result.sessionId,
-        sessionUrl: result.sessionUrl,
+        sessionId: resultSessionId,
+        sessionUrl: resultSessionUrl,
         message: (result as any).message || 'Workflow executed successfully',
       };
     } catch (error: any) {

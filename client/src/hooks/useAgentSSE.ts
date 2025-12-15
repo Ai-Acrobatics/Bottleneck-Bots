@@ -27,7 +27,7 @@ export function useAgentSSE(options: UseAgentSSEOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
 
-  const { setStatus, addLog, setCurrentTask, setConnectedAgents } = useAgentStore();
+  const { setStatus, addLog, setConnectedAgents } = useAgentStore();
 
   const connect = useCallback((sid?: string) => {
     const targetSessionId = sid || sessionId;
@@ -112,7 +112,6 @@ export function useAgentSSE(options: UseAgentSSEOptions = {}) {
 
       case 'task_started':
         setStatus('executing');
-        setCurrentTask(message.data?.task || '');
         addLog({
           id: crypto.randomUUID(),
           timestamp,
@@ -134,7 +133,7 @@ export function useAgentSSE(options: UseAgentSSEOptions = {}) {
         break;
 
       case 'task_failed':
-        setStatus('error');
+        setStatus('failed');
         addLog({
           id: crypto.randomUUID(),
           timestamp,

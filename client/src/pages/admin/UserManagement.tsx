@@ -77,15 +77,8 @@ const getRoleBadge = (role: string) => {
   );
 };
 
-const getStatusBadge = (completed: boolean, suspendedAt: Date | null) => {
-  if (suspendedAt) {
-    return (
-      <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-        <Ban className="mr-1 h-3 w-3" />
-        Suspended
-      </Badge>
-    );
-  }
+const getStatusBadge = (completed: boolean) => {
+  // Note: suspendedAt field not yet implemented in DB schema
   if (completed) {
     return (
       <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -380,7 +373,7 @@ export const UserManagement: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-slate-300">{user.email || 'N/A'}</TableCell>
                           <TableCell>{getRoleBadge(user.role)}</TableCell>
-                          <TableCell>{getStatusBadge(user.onboardingCompleted, user.suspendedAt)}</TableCell>
+                          <TableCell>{getStatusBadge(user.onboardingCompleted)}</TableCell>
                           <TableCell className="text-slate-400 text-sm">
                             {user.lastSignedIn
                               ? new Date(user.lastSignedIn).toLocaleString()
@@ -417,23 +410,13 @@ export const UserManagement: React.FC = () => {
                                     <Shield className="mr-2 h-4 w-4" />
                                     Change Role
                                   </DropdownMenuItem>
-                                  {!user.suspendedAt ? (
-                                    <DropdownMenuItem
-                                      className="text-slate-300 hover:bg-slate-800 hover:text-white"
-                                      onClick={() => handleSuspendUser(user.id)}
-                                    >
-                                      <Ban className="mr-2 h-4 w-4" />
-                                      Suspend User
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem
-                                      className="text-slate-300 hover:bg-slate-800 hover:text-white"
-                                      onClick={() => handleUnsuspendUser(user.id)}
-                                    >
-                                      <CheckCircle className="mr-2 h-4 w-4" />
-                                      Unsuspend User
-                                    </DropdownMenuItem>
-                                  )}
+                                  <DropdownMenuItem
+                                    className="text-slate-300 hover:bg-slate-800 hover:text-white"
+                                    onClick={() => handleSuspendUser(user.id)}
+                                  >
+                                    <Ban className="mr-2 h-4 w-4" />
+                                    Suspend User
+                                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -528,16 +511,6 @@ export const UserManagement: React.FC = () => {
               Are you sure you want to unsuspend {selectedUser?.name}? They will be able to log in again.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {selectedUser?.suspensionReason && (
-            <div className="py-2">
-              <label className="text-sm text-slate-400 mb-1 block">
-                Original Suspension Reason:
-              </label>
-              <p className="text-sm text-slate-300 bg-slate-800/50 p-3 rounded border border-slate-700">
-                {selectedUser.suspensionReason}
-              </p>
-            </div>
-          )}
           <AlertDialogFooter>
             <AlertDialogCancel className="border-slate-700">Cancel</AlertDialogCancel>
             <AlertDialogAction

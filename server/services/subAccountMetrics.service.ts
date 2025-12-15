@@ -258,7 +258,7 @@ class SubAccountMetricsService {
 
     // Check for long-running operations
     const now = Date.now();
-    for (const [operationId, operation] of this.operations) {
+    for (const [operationId, operation] of Array.from(this.operations)) {
       const duration = now - operation.startTime.getTime();
       const maxExpectedDuration = COST_CONSTANTS.subAccountCreate.estimatedMinutes * 2 * 60 * 1000; // 2x expected
 

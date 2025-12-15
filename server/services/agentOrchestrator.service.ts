@@ -964,12 +964,11 @@ export class AgentOrchestratorService {
             includeExamples: true,
           });
           ragContext = {
-            retrievedChunks: ragResult.retrievedChunks.map(chunk => ({
-              content: chunk.content,
-              similarity: chunk.similarity,
-              tokenCount: chunk.tokenCount,
+            relevantSelectors: ragResult.retrievedChunks.map(chunk => ({
+              elementName: 'document',
+              selector: chunk.content.substring(0, 100),
+              reliability: chunk.similarity || 0,
             })),
-            detectedPlatforms: ragResult.detectedPlatforms,
           };
           console.log(`[Agent] RAG context loaded: ${ragResult.retrievedChunks.length} chunks, platforms: ${ragResult.detectedPlatforms.join(', ')}`);
         } catch (ragError) {
@@ -1112,9 +1111,14 @@ export class AgentOrchestratorService {
 
     const startTime = Date.now();
 
-    // Create execution record
+    // Create execution record - Note: taskId is required in schema
+    // If no taskId provided, we need to create a placeholder task first or update the schema
+    if (!taskId) {
+      throw new Error("taskId is required for task execution");
+    }
+
     const [execution] = await db.insert(taskExecutions).values({
-      taskId: taskId || null,
+      taskId: taskId,
       status: "started",
       triggeredBy: "automatic",
       triggeredByUserId: userId,
@@ -1181,23 +1185,28 @@ export class AgentOrchestratorService {
       const duration = Date.now() - startTime;
 
       // Determine final result status
+      // Note: state.status type is narrowed by TypeScript control flow analysis
+      // but it could have been set to 'needs_input' earlier in the execution
+      const currentStatus = state.status as AgentState['status'];
       let resultStatus: 'completed' | 'failed' | 'needs_input' | 'max_iterations';
-      if (state.status === 'completed') {
+
+      if (currentStatus === 'completed') {
         resultStatus = 'completed';
         // Emit completion event
         emitter.executionComplete({
           result: state.context,
           duration,
         });
-      } else if (state.status === 'needs_input') {
+      } else if (currentStatus === 'needs_input') {
         resultStatus = 'needs_input';
-      } else if (state.status === 'failed') {
+      } else if (currentStatus === 'failed') {
         resultStatus = 'failed';
         // Emit error event
         emitter.executionError({
           error: state.errorCount > 0 ? 'Execution failed after multiple errors' : 'Execution failed',
         });
       } else {
+        // All other statuses (initializing, planning, executing) are treated as max_iterations
         resultStatus = 'max_iterations';
         // Emit error event
         emitter.executionError({

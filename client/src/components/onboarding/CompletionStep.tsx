@@ -262,7 +262,7 @@ export function CompletionStep({ data, onComplete, onBack, isLoading }: Completi
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fall {
           0% {
             transform: translateY(0) rotate(0deg);

@@ -116,10 +116,7 @@ export const apiKeysRouter = router({
         })
         .from(apiKeys)
         .where(
-          and(
-            eq(apiKeys.userId, ctx.user.id),
-            eq(apiKeys.revokedAt, null) as any // Not revoked
-          )
+          eq(apiKeys.userId, ctx.user.id)
         )
         .orderBy(desc(apiKeys.createdAt));
 
@@ -158,16 +155,17 @@ export const apiKeysRouter = router({
 
         // PLACEHOLDER: Check user's plan limits
         // For now, allow up to 5 API keys per user
-        const [{ count: existingKeys }] = await db
-          .select({ count: apiKeys.id })
+        const [result] = await db
+          .select({ count: count() })
           .from(apiKeys)
           .where(
             and(
               eq(apiKeys.userId, ctx.user.id),
-              eq(apiKeys.isActive, true),
-              eq(apiKeys.revokedAt, null) as any
+              eq(apiKeys.isActive, true)
             )
           );
+
+        const existingKeys = result?.count || 0;
 
         if (Number(existingKeys) >= 5) {
           throw new TRPCError({

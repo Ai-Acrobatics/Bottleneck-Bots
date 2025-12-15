@@ -124,7 +124,7 @@ class VercelDeployService {
         createdAt: new Date(deployment.createdAt),
       };
     } catch (error) {
-      logger.error(`Deployment failed: ${config.projectName}`, error);
+      logger.error({ error }, `Deployment failed: ${config.projectName}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -159,7 +159,7 @@ class VercelDeployService {
         error: deployment.errorMessage,
       };
     } catch (error) {
-      logger.error(`Failed to get deployment status: ${deploymentId}`, error);
+      logger.error({ error }, `Failed to get deployment status: ${deploymentId}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -198,7 +198,7 @@ class VercelDeployService {
         updatedAt: d.ready ? new Date(d.ready) : undefined,
       }));
     } catch (error) {
-      logger.error(`Failed to list deployments for project: ${projectId}`, error);
+      logger.error({ error }, `Failed to list deployments for project: ${projectId}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -221,7 +221,7 @@ class VercelDeployService {
       // This is a placeholder - actual implementation would need more context
       logger.info(`Rollback prepared for: ${deploymentId}`);
     } catch (error) {
-      logger.error(`Rollback failed for deployment: ${deploymentId}`, error);
+      logger.error({ error }, `Rollback failed for deployment: ${deploymentId}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -248,7 +248,7 @@ class VercelDeployService {
 
       logger.info(`Custom domain added: ${domain}`);
     } catch (error) {
-      logger.error(`Failed to add custom domain: ${domain}`, error);
+      logger.error({ error }, `Failed to add custom domain: ${domain}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -272,7 +272,7 @@ class VercelDeployService {
 
       logger.info(`Custom domain removed: ${domain}`);
     } catch (error) {
-      logger.error(`Failed to remove custom domain: ${domain}`, error);
+      logger.error({ error }, `Failed to remove custom domain: ${domain}`);
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -310,8 +310,8 @@ class VercelDeployService {
       logger.info(`Environment variables set for project: ${projectName}`);
     } catch (error) {
       logger.error(
-        `Failed to set environment variables for project: ${projectId}`,
-        error
+        { error },
+        `Failed to set environment variables for project: ${projectId}`
       );
 
       throw new TRPCError({

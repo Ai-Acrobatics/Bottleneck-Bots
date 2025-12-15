@@ -61,7 +61,7 @@ export default function CampaignDetails() {
   const { getCampaign, getCalls, startCampaign, pauseCampaign } =
     useAICalling();
 
-  const { data: campaign, isLoading } = getCampaign(Number(id!));
+  const { data: campaign, isLoading } = getCampaign({ campaignId: Number(id!) });
   const { data: callsData } = getCalls({ campaignId: Number(id!) });
 
   // Extract calls array from response object
@@ -194,7 +194,7 @@ export default function CampaignDetails() {
     labels: ['Successful', 'Failed', 'No Answer'],
     datasets: [
       {
-        data: [campaign.successful || 0, campaign.failed || 0, (campaign.callsMade - campaign.successful - campaign.failed) || 0],
+        data: [campaign.callsSuccessful || 0, campaign.callsFailed || 0, (campaign.callsMade - campaign.callsSuccessful - campaign.callsFailed) || 0],
         backgroundColor: [
           'rgba(34, 197, 94, 0.8)',
           'rgba(239, 68, 68, 0.8)',
@@ -271,7 +271,7 @@ export default function CampaignDetails() {
                 <p className="text-sm font-medium text-muted-foreground">Calls Made</p>
                 <p className="text-2xl font-bold">{campaign.callsMade}</p>
                 <p className="text-xs text-muted-foreground">
-                  of {campaign.totalLeads} total
+                  total calls
                 </p>
               </div>
               <div className="rounded-full bg-blue-100 p-3">
@@ -294,10 +294,10 @@ export default function CampaignDetails() {
                     dismissible={true}
                   />
                 </div>
-                <p className="text-2xl font-bold">{campaign.successful}</p>
+                <p className="text-2xl font-bold">{campaign.callsSuccessful}</p>
                 <p className="text-xs text-muted-foreground">
                   {campaign.callsMade > 0
-                    ? ((campaign.successful / campaign.callsMade) * 100).toFixed(1)
+                    ? ((campaign.callsSuccessful / campaign.callsMade) * 100).toFixed(1)
                     : 0}
                   % success rate
                 </p>
@@ -314,7 +314,7 @@ export default function CampaignDetails() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Failed</p>
-                <p className="text-2xl font-bold">{campaign.failed}</p>
+                <p className="text-2xl font-bold">{campaign.callsFailed}</p>
               </div>
               <div className="rounded-full bg-red-100 p-3">
                 <XCircle className="h-6 w-6 text-red-600" />
@@ -372,7 +372,7 @@ export default function CampaignDetails() {
             </CardHeader>
             <CardContent>
               <CallHistoryTable
-                calls={calls}
+                calls={calls as any[]}
                 onPlayRecording={handlePlayRecording}
                 onViewTranscript={handleViewTranscript}
               />
@@ -395,7 +395,7 @@ export default function CampaignDetails() {
             </CardHeader>
             <CardContent>
               <div className="p-4 bg-accent rounded-lg font-mono text-sm whitespace-pre-wrap">
-                {campaign.callScript}
+                {campaign.script}
               </div>
             </CardContent>
           </Card>
@@ -410,19 +410,19 @@ export default function CampaignDetails() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Voice Type</p>
-                  <p className="font-medium">{campaign.voiceType || 'Alloy'}</p>
+                  <p className="font-medium">{(campaign.settings as any)?.voice || 'female'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Voice Speed</p>
-                  <p className="font-medium">{campaign.voiceSpeed || '1.0'}x</p>
+                  <p className="font-medium">{(campaign.settings as any)?.speed || '1.0'}x</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Language</p>
-                  <p className="font-medium">{campaign.language || 'en-US'}</p>
+                  <p className="font-medium">{(campaign.settings as any)?.language || 'en-US'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Credits Used</p>
-                  <p className="font-medium">{campaign.creditsCost}</p>
+                  <p className="font-medium">{campaign.costInCredits}</p>
                 </div>
               </div>
             </CardContent>

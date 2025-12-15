@@ -142,7 +142,7 @@ export const listDirectoryTool: MCPTool = {
         modified: Date;
       }> = [];
 
-      async function listDir(dirPath: string): Promise<void> {
+      const listDir = async (dirPath: string): Promise<void> => {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
         for (const entry of entries) {

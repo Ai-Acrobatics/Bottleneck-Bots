@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/dom';
 import { act } from 'react';
 import { NotificationProvider, NotificationContext } from '../NotificationProvider';
 import { useContext } from 'react';
@@ -64,8 +65,8 @@ describe('NotificationProvider', () => {
     );
 
     expect(contextValue).not.toBeNull();
-    expect(contextValue?.notifications).toEqual([]);
-    expect(contextValue?.unreadCount).toBe(0);
+    expect(contextValue!.notifications).toEqual([]);
+    expect(contextValue!.unreadCount).toBe(0);
   });
 
   it('adds notifications correctly', async () => {
@@ -226,7 +227,7 @@ describe('NotificationProvider', () => {
       </NotificationProvider>
     );
 
-    expect(contextValue?.settings.soundEnabled).toBe(true);
+    expect(contextValue!.settings.soundEnabled).toBe(true);
 
     await act(async () => {
       contextValue?.updateSettings({ soundEnabled: false });

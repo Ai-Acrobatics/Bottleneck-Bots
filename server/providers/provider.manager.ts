@@ -56,7 +56,7 @@ export class ProviderManager {
     this.providers = await ProviderFactory.createProviders(this.config.providers);
 
     // Initialize request counts
-    for (const providerName of this.providers.keys()) {
+    for (const providerName of Array.from(this.providers.keys())) {
       this.requestCount.set(providerName, 0);
     }
 
@@ -164,7 +164,7 @@ export class ProviderManager {
     }
 
     // First available provider
-    for (const provider of this.providers.values()) {
+    for (const provider of Array.from(this.providers.values())) {
       if (this.isProviderAvailable(provider)) {
         return provider;
       }
@@ -180,7 +180,7 @@ export class ProviderManager {
     let bestProvider: ILLMProvider | null = null;
     let bestCost = Infinity;
 
-    for (const provider of this.providers.values()) {
+    for (const provider of Array.from(this.providers.values())) {
       if (!this.isProviderAvailable(provider)) continue;
 
       try {
@@ -359,17 +359,20 @@ export class ProviderManager {
     // Cleanup old cache entries
     if (this.cache.size > 1000) {
       const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
     }
   }
 
   private generateCacheKey(request: LLMRequest): string {
-    return JSON.stringify({
+    const key = JSON.stringify({
       model: request.model,
       messages: request.messages,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
     });
+    return key;
   }
 
   /**
@@ -395,7 +398,7 @@ export class ProviderManager {
   getStats() {
     const stats: Record<string, any> = {};
 
-    for (const [name, provider] of this.providers.entries()) {
+    for (const [name, provider] of Array.from(this.providers.entries())) {
       stats[name] = {
         requests: this.requestCount.get(name) || 0,
         status: provider.getStatus(),
@@ -409,7 +412,7 @@ export class ProviderManager {
    * Clean up resources
    */
   destroy(): void {
-    for (const provider of this.providers.values()) {
+    for (const provider of Array.from(this.providers.values())) {
       provider.destroy();
     }
 

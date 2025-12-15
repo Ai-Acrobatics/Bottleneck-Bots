@@ -325,10 +325,14 @@ export const AdminDashboard: React.FC = () => {
   const { data: stats, isLoading: statsLoading } = trpc.admin.system.getStats.useQuery(
     undefined,
     {
-      refetchInterval: 30000,
-      onSuccess: () => setLastUpdate(new Date())
+      refetchInterval: 30000
     }
   );
+
+  // Update lastUpdate when stats changes
+  if (stats) {
+    setLastUpdate(new Date());
+  }
 
   const { data: serviceStatus, isLoading: servicesLoading } = trpc.admin.system.getServiceStatus.useQuery(
     undefined,

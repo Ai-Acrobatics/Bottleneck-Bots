@@ -4,12 +4,11 @@ export { SOPStepEditor } from './SOPStepEditor';
 export { SOPVersionHistory } from './SOPVersionHistory';
 export { SOPExecution } from './SOPExecution';
 
-// Re-export types
+// Re-export types (excluding SOPExecution to avoid conflict with component)
 export type {
   SOP,
   SOPStep,
   SOPVersion,
-  SOPExecution,
   SOPExecutionStep,
   SOPTag,
   SOPResource,
@@ -29,3 +28,6 @@ export type {
   ExecutionStatus,
   StepStatus
 } from '@/types/sop';
+
+// Re-export SOPExecution type separately to avoid naming conflict
+export type { SOPExecution as SOPExecutionType } from '@/types/sop';

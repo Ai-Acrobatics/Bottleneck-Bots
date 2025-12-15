@@ -39,7 +39,7 @@ const createQuizSchema = z.object({
   passingScore: z.number().int().min(0).max(100).default(70),
   isPublished: z.boolean().default(false),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   attemptsAllowed: z.number().int().positive().optional(),
 });
 
@@ -54,7 +54,7 @@ const updateQuizSchema = z.object({
   isPublished: z.boolean().optional(),
   isActive: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   attemptsAllowed: z.number().int().positive().optional().nullable(),
 });
 
@@ -68,7 +68,7 @@ const createQuestionSchema = z.object({
   order: z.number().int().nonnegative(),
   explanation: z.string().optional(),
   hint: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const updateQuestionSchema = z.object({
@@ -81,7 +81,7 @@ const updateQuestionSchema = z.object({
   order: z.number().int().nonnegative().optional(),
   explanation: z.string().optional(),
   hint: z.string().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const submitAnswerSchema = z.object({

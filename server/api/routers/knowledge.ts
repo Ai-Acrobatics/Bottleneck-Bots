@@ -28,7 +28,7 @@ const actionStepSchema = z.object({
   value: z.string().optional(),
   waitFor: z.string().optional(),
   timeout: z.number().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const actionPatternSchema = z.object({
@@ -48,7 +48,7 @@ const elementSelectorSchema = z.object({
   successRate: z.number().optional(),
   totalAttempts: z.number().optional(),
   screenshotRef: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const brandVoiceExampleSchema = z.object({
@@ -88,7 +88,7 @@ const clientContextSchema = z.object({
   competitors: z.array(z.string()),
   uniqueSellingPoints: z.array(z.string()),
   customerPersonas: z.array(customerPersonaSchema),
-  customFields: z.record(z.unknown()).optional(),
+  customFields: z.record(z.string(), z.unknown()).optional(),
 });
 
 const agentFeedbackSchema = z.object({
@@ -369,7 +369,9 @@ export const knowledgeRouter = router({
     .input(agentFeedbackSchema)
     .mutation(async ({ input }) => {
       try {
-        await knowledgeService.submitFeedback(input);
+        // Map input to match service expectations - exclude fields not in DB schema
+        const { actionsTaken, ...feedbackData } = input;
+        await knowledgeService.submitFeedback(feedbackData as any);
         return {
           success: true,
           message: 'Feedback submitted successfully',

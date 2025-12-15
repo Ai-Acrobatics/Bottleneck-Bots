@@ -733,7 +733,7 @@ export const browserRouter = router({
             .limit(1);
 
           if (session) {
-            [dbRecord] = await db.insert(extractedData).values({
+            const insertResult = await db.insert(extractedData).values({
               sessionId: session.id,
               userId,
               url: currentUrl,
@@ -746,6 +746,7 @@ export const browserRouter = router({
               },
               tags: input.tags,
             }).returning();
+            dbRecord = (Array.isArray(insertResult) ? insertResult[0] : null) || null;
           }
         }
 
