@@ -91,6 +91,7 @@
     "framer-motion": "^12.23.26",
     "google-auth-library": "^10.5.0",
     "googleapis": "^168.0.0",
+    "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
     "ioredis": "^5.8.2",
     "isomorphic-fetch": "^3.0.0",

@@ -1,5 +1,6 @@
 import "./config";
 import express from "express";
+import helmet from "helmet";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -51,6 +52,42 @@ export async function createApp() {
 
   // Sentry middleware must be the first middleware
   setupSentryMiddleware(app);
+
+  // Security headers with helmet
+  // Disable CSP in development for Vite HMR to work
+  const isDevelopment = process.env.NODE_ENV === "development";
+  app.use(
+    helmet({
+      contentSecurityPolicy: isDevelopment
+        ? false
+        : {
+            directives: {
+              defaultSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              scriptSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", "data:", "https:", "blob:"],
+              connectSrc: ["'self'", "wss:", "https:"],
+              fontSrc: ["'self'", "data:"],
+              objectSrc: ["'none'"],
+              mediaSrc: ["'self'"],
+              frameSrc: ["'self'"],
+              workerSrc: ["'self'", "blob:"],
+            },
+          },
+      hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true,
+      },
+      frameguard: {
+        action: "sameorigin", // Allow same-origin for iframes
+      },
+      noSniff: true,
+      referrerPolicy: {
+        policy: "strict-origin-when-cross-origin",
+      },
+    })
+  );
 
   // On Vercel, the body is already parsed and attached to req.body
   // We need to skip express.json() parsing to avoid "Bad Request" errors

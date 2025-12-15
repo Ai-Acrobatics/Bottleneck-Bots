@@ -87,13 +87,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
             {isMobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
           </button>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
-            <Button onClick={onLogin} className="lg:hidden bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg rounded-full px-3 sm:px-6 text-xs sm:text-sm font-bold relative overflow-hidden group">
-              <span className="relative z-10 flex items-center gap-1 sm:gap-2">
-                Start Free <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </Button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile CTA Buttons - visible below lg breakpoint */}
+            <div className="flex lg:hidden items-center gap-2 sm:gap-4">
+              <Button variant="ghost" onClick={onLogin} className="font-semibold text-xs sm:text-sm text-gray-700 hover:text-emerald-600 px-2 sm:px-4 min-h-[44px]">
+                Log In
+              </Button>
+              <Button onClick={onLogin} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg rounded-full px-3 sm:px-6 text-xs sm:text-sm font-bold relative overflow-hidden group min-h-[44px]">
+                <span className="relative z-10 flex items-center gap-1 sm:gap-2">
+                  Start Free <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </Button>
+            </div>
+            {/* Desktop CTA Buttons - visible at lg breakpoint and above */}
             <div className="hidden lg:flex items-center gap-2 sm:gap-4">
               <Button variant="ghost" onClick={onLogin} className="font-semibold text-xs sm:text-sm text-gray-700 hover:text-emerald-600 px-2 sm:px-4">
                 Log In

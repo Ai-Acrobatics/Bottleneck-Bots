@@ -7,20 +7,31 @@ import { credit_packages } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 /**
- * Stripe Webhook Router
- * Handles Stripe webhook events for payment processing
+ * DEPRECATED: Stripe Webhook Router
  *
- * Setup Instructions:
+ * WARNING: This endpoint is NO LONGER SECURE and should NOT be used
+ *
+ * REASON FOR DEPRECATION:
+ * - No signature verification (critical security vulnerability)
+ * - No idempotency checking (can award credits multiple times)
+ * - Publicly accessible tRPC endpoint (DDoS vulnerability)
+ * - Cannot verify Stripe signatures (JSON already parsed)
+ *
+ * REPLACEMENT:
+ * Use the new Express-based webhook endpoint instead:
+ * Location: server/api/webhooks/stripe.ts
+ * URL: /api/webhooks/stripe
+ *
+ * MIGRATION GUIDE:
+ * See: STRIPE_WEBHOOK_FIX.md
+ *
+ * NEW SETUP INSTRUCTIONS:
  * 1. Install Stripe CLI: https://stripe.com/docs/stripe-cli
- * 2. Forward webhooks to local endpoint: stripe listen --forward-to localhost:3000/api/trpc/stripeWebhook.handleWebhook
+ * 2. Forward webhooks to new endpoint: stripe listen --forward-to localhost:3000/api/webhooks/stripe
  * 3. Copy webhook signing secret to .env: STRIPE_WEBHOOK_SECRET=whsec_...
- * 4. In production, configure webhook endpoint in Stripe Dashboard
+ * 4. In production, configure webhook endpoint in Stripe Dashboard: https://dashboard.stripe.com/webhooks
  *
- * Events Handled:
- * - checkout.session.completed: Credits purchase completed
- * - payment_intent.succeeded: Payment succeeded
- * - payment_intent.payment_failed: Payment failed
- * - charge.refunded: Handle refunds
+ * This endpoint will be removed in a future version.
  */
 
 export const stripeWebhookRouter = router({
