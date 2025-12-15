@@ -1,5 +1,9 @@
+import React from 'react';
 import { expect, afterEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+
+// Make React available globally for JSX in tests
+(globalThis as any).React = React;
 
 // Server-side environment setup (node environment)
 if (typeof window === 'undefined') {
