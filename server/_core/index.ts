@@ -13,10 +13,19 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { webhookEndpointsRouter } from "../api/webhookEndpoints";
 import { schedulerRunnerService } from "../services/schedulerRunner.service";
+import { memoryCleanupScheduler } from "../services/memory";
 import { getDb } from "../db";
 import { scheduledBrowserTasks } from "../../drizzle/schema-scheduled-tasks";
 import { eq } from "drizzle-orm";
 import { cronSchedulerService } from "../services/cronScheduler.service";
+import {
+  initSentry,
+  setupSentryMiddleware,
+  sentryErrorHandler
+} from "../lib/sentry";
+
+// Initialize Sentry as early as possible
+initSentry();
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -39,6 +48,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 export async function createApp() {
   const app = express();
+
+  // Sentry middleware must be the first middleware
+  setupSentryMiddleware(app);
 
   // On Vercel, the body is already parsed and attached to req.body
   // We need to skip express.json() parsing to avoid "Bad Request" errors
@@ -83,6 +95,18 @@ export async function createApp() {
   } else {
     serveStatic(app);
   }
+
+  // Sentry error handler must be after all routes and before other error handlers
+  app.use(sentryErrorHandler);
+
+  // Generic error handler for any remaining errors
+  app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled error:", err);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: process.env.NODE_ENV === "development" ? err.message : "An error occurred",
+    });
+  });
 
   return app;
 }
@@ -146,6 +170,31 @@ async function initializeScheduledTasks() {
   }
 }
 
+/**
+ * Initialize memory cleanup scheduler on startup
+ */
+async function initializeMemoryCleanup() {
+  try {
+    console.log("Initializing memory cleanup scheduler...");
+
+    // Configuration from environment variables with sensible defaults
+    const cleanupIntervalHours = parseInt(process.env.MEMORY_CLEANUP_INTERVAL_HOURS || "6");
+    const consolidateIntervalHours = parseInt(process.env.MEMORY_CONSOLIDATE_INTERVAL_HOURS || "24");
+    const runImmediately = process.env.MEMORY_CLEANUP_RUN_ON_STARTUP === "true";
+
+    // Start the memory cleanup scheduler
+    memoryCleanupScheduler.start({
+      cleanupIntervalMs: cleanupIntervalHours * 60 * 60 * 1000,
+      consolidateIntervalMs: consolidateIntervalHours * 60 * 60 * 1000,
+      runImmediately,
+    });
+
+    console.log("Memory cleanup scheduler initialized successfully");
+  } catch (error) {
+    console.error("Error initializing memory cleanup scheduler:", error);
+  }
+}
+
 async function startServer() {
   const app = await createApp();
   const server = createServer(app);
@@ -162,6 +211,9 @@ async function startServer() {
 
     // Initialize scheduled tasks after server starts
     initializeScheduledTasks().catch(console.error);
+
+    // Initialize memory cleanup scheduler
+    initializeMemoryCleanup().catch(console.error);
 
     // Optionally start workers in development mode
     if (process.env.NODE_ENV === "development" && process.env.START_WORKERS === "true") {
@@ -181,6 +233,7 @@ async function startServer() {
   process.on("SIGTERM", () => {
     console.log("SIGTERM received, shutting down gracefully...");
     schedulerRunnerService.stop();
+    memoryCleanupScheduler.stop();
     server.close(() => {
       console.log("Server closed");
       process.exit(0);
@@ -190,6 +243,7 @@ async function startServer() {
   process.on("SIGINT", () => {
     console.log("SIGINT received, shutting down gracefully...");
     schedulerRunnerService.stop();
+    memoryCleanupScheduler.stop();
     server.close(() => {
       console.log("Server closed");
       process.exit(0);

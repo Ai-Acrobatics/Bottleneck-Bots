@@ -28,9 +28,8 @@ jobs:
       - name: Type check
         run: pnpm run check
 
+      - name: Lint
+        run: pnpm run lint
+
       - name: Run tests
         run: pnpm run test
-
-      # TODO (Hitesh): Add linting step
-      # - name: Lint
-      #   run: pnpm run lint

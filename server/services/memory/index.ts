@@ -274,6 +274,18 @@ export function getMemorySystem(): MemorySystem {
 export { AgentMemoryService, getAgentMemory } from "./agentMemory.service";
 export { ReasoningBankService, getReasoningBank } from "./reasoningBank.service";
 
+// Re-export memory cleanup scheduler
+export {
+  memoryCleanupScheduler,
+  queueMemoryCleanup,
+  queueMemoryConsolidation,
+} from "./memoryCleanup.scheduler";
+export type {
+  MemoryCleanupOptions,
+  MemoryConsolidateOptions,
+  MemoryCleanupStats,
+} from "./memoryCleanup.scheduler";
+
 // Re-export types
 export type {
   MemoryEntry,

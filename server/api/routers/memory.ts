@@ -13,7 +13,7 @@
 import { z } from 'zod';
 import { publicProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
-import { getMemorySystem } from '../../services/memory';
+import { getMemorySystem, memoryCleanupScheduler } from '../../services/memory';
 
 // ========================================
 // ZOD SCHEMAS
@@ -722,6 +722,133 @@ export const memoryRouter = router({
           healthy: false,
           error: error instanceof Error ? error.message : 'Unknown error',
         };
+      }
+    }),
+
+  // ========================================
+  // MEMORY CLEANUP SCHEDULER CONTROL
+  // ========================================
+
+  /**
+   * Manually trigger memory cleanup
+   */
+  triggerCleanup: publicProcedure
+    .input(z.object({
+      cleanupExpired: z.boolean().optional(),
+      cleanupLowPerformance: z.boolean().optional(),
+      minSuccessRate: z.number().min(0).max(1).optional(),
+      minUsageCount: z.number().min(0).optional(),
+    }).optional())
+    .mutation(async ({ input }) => {
+      try {
+        const result = await memoryCleanupScheduler.runCleanup(input);
+
+        return {
+          success: true,
+          expiredCleaned: result.expiredCleaned,
+          lowPerformanceCleaned: result.lowPerformanceCleaned,
+          message: `Cleaned ${result.expiredCleaned} expired entries and ${result.lowPerformanceCleaned} low-performance patterns`,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to run cleanup',
+        });
+      }
+    }),
+
+  /**
+   * Manually trigger memory consolidation
+   */
+  triggerConsolidation: publicProcedure
+    .input(z.object({
+      sessionId: z.string().optional(),
+      agentId: z.string().optional(),
+      threshold: z.number().min(0).max(1).optional(),
+    }).optional())
+    .mutation(async ({ input }) => {
+      try {
+        const result = await memoryCleanupScheduler.runConsolidation(input);
+
+        return {
+          success: true,
+          consolidatedCount: result.consolidatedCount,
+          message: `Consolidated ${result.consolidatedCount} duplicate entries`,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to run consolidation',
+        });
+      }
+    }),
+
+  /**
+   * Get memory cleanup scheduler statistics
+   */
+  getCleanupStats: publicProcedure
+    .query(() => {
+      try {
+        const stats = memoryCleanupScheduler.getStats();
+
+        return {
+          success: true,
+          stats,
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get cleanup stats',
+        });
+      }
+    }),
+
+  /**
+   * Start memory cleanup scheduler
+   */
+  startCleanupScheduler: publicProcedure
+    .input(z.object({
+      cleanupIntervalHours: z.number().positive().optional(),
+      consolidateIntervalHours: z.number().positive().optional(),
+      runImmediately: z.boolean().optional(),
+    }).optional())
+    .mutation(({ input }) => {
+      try {
+        memoryCleanupScheduler.start({
+          cleanupIntervalMs: (input?.cleanupIntervalHours || 6) * 60 * 60 * 1000,
+          consolidateIntervalMs: (input?.consolidateIntervalHours || 24) * 60 * 60 * 1000,
+          runImmediately: input?.runImmediately,
+        });
+
+        return {
+          success: true,
+          message: 'Memory cleanup scheduler started',
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to start cleanup scheduler',
+        });
+      }
+    }),
+
+  /**
+   * Stop memory cleanup scheduler
+   */
+  stopCleanupScheduler: publicProcedure
+    .mutation(() => {
+      try {
+        memoryCleanupScheduler.stop();
+
+        return {
+          success: true,
+          message: 'Memory cleanup scheduler stopped',
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to stop cleanup scheduler',
+        });
       }
     }),
 });
