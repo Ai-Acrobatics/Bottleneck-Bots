@@ -410,11 +410,10 @@ class VisualVerificationService {
     }
 
     try {
-      const result = await stagehandService.getCurrentUrl(sessionId);
+      const currentUrl = await stagehandService.getCurrentUrl(sessionId);
 
-      if (result.success && result.url) {
-        const currentUrl = result.url;
-        const expectedUrl = config.expectedUrl;
+      if (currentUrl) {
+        const expectedUrl = config.expectedUrl!;
 
         // Check for exact match or pattern match
         const exactMatch = currentUrl === expectedUrl;
@@ -474,9 +473,10 @@ class VisualVerificationService {
 
       const screenshotResult = await stagehandService.screenshot(sessionId, {
         fullPage: false,
+        returnBase64: true,
       });
 
-      if (!screenshotResult.success || !screenshotResult.screenshot) {
+      if (!screenshotResult.success || !screenshotResult.base64) {
         return {
           success: false,
           confidence: 0,
@@ -494,7 +494,7 @@ class VisualVerificationService {
         method: 'screenshot_comparison',
         details: 'Screenshot captured successfully (comparison pending full implementation)',
         evidence: {
-          screenshotAfter: screenshotResult.screenshot,
+          screenshotAfter: screenshotResult.base64,
         },
         timestamp: new Date(),
       };
@@ -555,8 +555,8 @@ class VisualVerificationService {
 
   private async getCurrentUrl(sessionId: string): Promise<string> {
     try {
-      const result = await stagehandService.getCurrentUrl(sessionId);
-      return result.url || '';
+      const url = await stagehandService.getCurrentUrl(sessionId);
+      return url || '';
     } catch {
       return '';
     }
