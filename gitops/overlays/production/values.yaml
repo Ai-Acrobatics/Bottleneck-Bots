@@ -4,7 +4,7 @@
 replicaCount: 3
 
 image:
-  tag: "0c456e2"
+  tag: "6a53cb4"
   repository: ghcr.io/ghl-agency-ai/ghl-agency-ai
   pullPolicy: Always
   # tag is set by CI/CD pipeline
