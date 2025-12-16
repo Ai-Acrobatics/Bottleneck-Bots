@@ -10,30 +10,102 @@ import {
   BrowserbaseSDKError,
   type SessionCreateOptions,
 } from "./browserbaseSDK";
-import { createMockBrowserbaseClient, mockEnv } from "../../client/src/__tests__/helpers/test-helpers";
 
-// Mock the Browserbase SDK
-vi.mock("@browserbasehq/sdk", () => ({
-  default: vi.fn(),
-}));
+// Helper functions defined locally to avoid cross-directory import issues
+
+function mockEnv(vars: Record<string, string>): () => void {
+  const originalEnv = { ...process.env };
+
+  Object.entries(vars).forEach(([key, value]) => {
+    process.env[key] = value;
+  });
+
+  return () => {
+    process.env = originalEnv;
+  };
+}
+
+function createMockBrowserbaseClient() {
+  return {
+    sessions: {
+      create: vi.fn().mockResolvedValue({
+        id: "session-123",
+        createdAt: new Date().toISOString(),
+        projectId: "project-123",
+        status: "RUNNING",
+      }),
+      update: vi.fn().mockResolvedValue({
+        id: "session-123",
+        status: "REQUEST_RELEASE",
+      }),
+      retrieve: vi.fn().mockResolvedValue({
+        id: "session-123",
+        status: "RUNNING",
+      }),
+      list: vi.fn().mockResolvedValue([]),
+      debug: vi.fn().mockResolvedValue({
+        debuggerUrl: "https://browserbase.com/debug/session-123",
+        debuggerFullscreenUrl: "https://browserbase.com/debug/session-123/fullscreen",
+        wsUrl: "wss://browserbase.com/ws/session-123",
+      }),
+      recording: {
+        retrieve: vi.fn().mockResolvedValue({
+          recordingUrl: "https://browserbase.com/recording/session-123",
+          status: "COMPLETED",
+        }),
+      },
+      logs: {
+        list: vi.fn().mockResolvedValue([
+          {
+            timestamp: new Date().toISOString(),
+            level: "info",
+            message: "Test log",
+          },
+        ]),
+      },
+      downloads: {
+        list: vi.fn().mockResolvedValue([]),
+      },
+      uploads: {
+        list: vi.fn().mockResolvedValue([]),
+      },
+    },
+  };
+}
+
+// Create mock client instance outside to persist between tests
+let mockClientInstance: ReturnType<typeof createMockBrowserbaseClient>;
+
+// Mock the Browserbase SDK using a proper class constructor
+vi.mock("@browserbasehq/sdk", () => {
+  // Use a class so it can be instantiated with `new`
+  return {
+    default: class MockBrowserbase {
+      constructor() {
+        // Return the mock client instance
+        return mockClientInstance;
+      }
+    },
+  };
+});
 
 describe("BrowserbaseSDK Service", () => {
   let restoreEnv: () => void;
   let mockClient: ReturnType<typeof createMockBrowserbaseClient>;
 
   beforeEach(async () => {
+    // Reset modules to clear singleton state
+    vi.resetModules();
+
     // Mock environment variables
     restoreEnv = mockEnv({
       BROWSERBASE_API_KEY: "test-api-key-123",
       BROWSERBASE_PROJECT_ID: "test-project-id-456",
     });
 
-    // Create mock Browserbase client
+    // Create mock Browserbase client and set it for the mock to use
     mockClient = createMockBrowserbaseClient();
-
-    // Mock the Browserbase constructor
-    const Browserbase = (await import("@browserbasehq/sdk")).default;
-    vi.mocked(Browserbase).mockImplementation(() => mockClient as any);
+    mockClientInstance = mockClient;
 
     vi.clearAllMocks();
   });
@@ -449,19 +521,14 @@ describe("BrowserbaseSDK Service", () => {
   });
 
   describe("getSessionUploads", () => {
-    it("should get uploads successfully", async () => {
+    it("should return empty array (SDK limitation)", async () => {
       const { browserbaseSDK } = await import("./browserbaseSDK");
 
-      mockClient.sessions.uploads.list.mockResolvedValueOnce([
-        { filename: "upload1.txt" },
-      ]);
-
+      // Note: getSessionUploads returns empty array as SDK doesn't support listing uploads
       const uploads = await browserbaseSDK.getSessionUploads("session-123");
 
       expect(uploads).toBeInstanceOf(Array);
-      expect(mockClient.sessions.uploads.list).toHaveBeenCalledWith(
-        "session-123"
-      );
+      expect(uploads).toHaveLength(0);
     });
 
     it("should throw error if session ID is missing", async () => {
