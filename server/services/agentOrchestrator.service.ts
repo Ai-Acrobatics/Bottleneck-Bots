@@ -56,6 +56,25 @@ import {
   type ResumeResult,
 } from "./memory";
 
+// Browser Automation Services
+import {
+  getMultiTabService,
+  getFileUploadService,
+  getVisualVerificationService,
+} from "./browser";
+
+// Intelligence Services
+import {
+  getFailureRecoveryService,
+  getStrategyAdaptationService,
+} from "./intelligence";
+
+// Security Services
+import {
+  getCredentialVault,
+  getExecutionControl,
+} from "./security";
+
 // ========================================
 // TYPES & INTERFACES
 // ========================================
@@ -153,6 +172,15 @@ export interface AgentState {
   resumedFromCheckpoint?: ResumeResult;
   recommendedStrategy?: any;
   patternMatch?: any;
+  // Browser Automation
+  activeTabIds?: string[];
+  pendingUploads?: string[];
+  // Intelligence
+  adaptedStrategy?: any;
+  recoveryStrategiesUsed?: string[];
+  // Security & Control
+  isPaused?: boolean;
+  credentialsUsed?: number[];
 }
 
 /**
@@ -1022,6 +1050,7 @@ export class AgentOrchestratorService {
     const MAX_RECOVERY_ATTEMPTS = 3;
     const selfCorrection = getSelfCorrectionService();
     const confidence = getConfidenceService();
+    const failureRecovery = getFailureRecoveryService();
 
     // First attempt
     let result = await this.executeTool(toolName, parameters, state, emitter);
@@ -1074,6 +1103,35 @@ export class AgentOrchestratorService {
       console.log(`[SelfCorrection] Analysis: ${analysis.rootCause}`);
       console.log(`[SelfCorrection] Confidence: ${(analysis.confidence * 100).toFixed(0)}%`);
       console.log(`[SelfCorrection] Found ${analysis.alternatives.length} alternatives`);
+
+      // ========================================
+      // INTELLIGENCE: Use failure recovery service for learning
+      // ========================================
+      try {
+        // Record the failure pattern for learning
+        failureRecovery.recordFailurePattern({
+          action: toolName,
+          error: result.error || 'Unknown error',
+          errorType: analysis.errorType,
+          pageState: {
+            url: state.context.currentUrl as string || '',
+            title: state.context.pageTitle as string || '',
+          },
+          attemptNumber: attempt,
+          previousAttempts: state.failureAttempts.map(a => ({
+            action: a.action,
+            error: a.error,
+            timestamp: a.timestamp,
+          })),
+        });
+
+        console.log(`[Intelligence] Recorded failure pattern for learning`);
+
+        // Track which strategies we've used
+        state.recoveryStrategiesUsed = state.recoveryStrategiesUsed || [];
+      } catch (recoveryError) {
+        console.warn('[Intelligence] Failure recovery error (continuing with self-correction):', recoveryError);
+      }
 
       // Emit self-correction event
       if (emitter) {
@@ -1135,6 +1193,9 @@ export class AgentOrchestratorService {
             alternative.actionType,
             { parameters: alternative.parameters }
           );
+
+          // Track recovery strategy used
+          state.recoveryStrategiesUsed?.push(alternative.strategy);
 
           if (emitter) {
             emitter.thinking({
@@ -1434,6 +1495,72 @@ export class AgentOrchestratorService {
       console.warn('[Memory] Pre-execution setup error (continuing):', memoryError);
     }
 
+    // ========================================
+    // BROWSER AUTOMATION: Initialize services
+    // ========================================
+    const multiTabService = getMultiTabService();
+    const fileUploadService = getFileUploadService();
+    const visualVerificationService = getVisualVerificationService();
+    state.activeTabIds = [];
+    state.pendingUploads = [];
+
+    // ========================================
+    // INTELLIGENCE: Initialize services
+    // ========================================
+    const failureRecoveryService = getFailureRecoveryService();
+    const strategyAdaptationService = getStrategyAdaptationService();
+    state.recoveryStrategiesUsed = [];
+
+    try {
+      // Get adapted strategy based on task analysis
+      const taskType = inferTaskType(taskDescription);
+      const siteUrl = (context.url as string) || '';
+      const siteDomain = siteUrl ? new URL(siteUrl).hostname : 'unknown';
+
+      // Analyze the page first
+      const pageAnalysis = await strategyAdaptationService.analyzePage(siteUrl);
+
+      // Build execution context for strategy selection
+      const executionContext = {
+        executionId: execution.id.toString(),
+        sessionId: execution.id.toString(),
+        taskType,
+        siteUrl,
+        siteDomain,
+        currentAction: taskDescription,
+        pageState: pageAnalysis,
+      };
+
+      const adaptedStrategy = strategyAdaptationService.selectStrategy(executionContext);
+      state.adaptedStrategy = adaptedStrategy;
+      console.log(`[Intelligence] Selected strategy: ${adaptedStrategy.strategyId} (confidence: ${adaptedStrategy.confidence.toFixed(2)})`);
+    } catch (intelligenceError) {
+      console.warn('[Intelligence] Strategy adaptation error (continuing with default):', intelligenceError);
+    }
+
+    // ========================================
+    // SECURITY: Initialize execution control
+    // ========================================
+    const executionControl = getExecutionControl();
+    const credentialVault = getCredentialVault();
+    state.isPaused = false;
+    state.credentialsUsed = [];
+
+    try {
+      // Register execution with control service
+      const registrationResult = executionControl.registerExecution(
+        execution.id.toString(),
+        userId
+      );
+      if (registrationResult.success) {
+        console.log(`[Security] Execution ${execution.id} registered with control service`);
+      } else {
+        console.warn(`[Security] Execution registration failed: ${registrationResult.error}`);
+      }
+    } catch (securityError) {
+      console.warn('[Security] Execution control setup error (continuing):', securityError);
+    }
+
     // Create SSE emitter for real-time updates
     const emitter = this.createSSEEmitter(userId, execution.id);
 
@@ -1495,6 +1622,65 @@ export class AgentOrchestratorService {
       const loopStartTime = Date.now();
 
       while (continueLoop && state.iterations < maxIterations) {
+        // ========================================
+        // SECURITY: Check execution control state
+        // ========================================
+        try {
+          const controlState = executionControl.getExecutionStatus(execution.id.toString());
+
+          if (controlState?.status === 'cancelled') {
+            console.log(`[Security] Execution ${execution.id} was cancelled`);
+            state.status = 'failed';
+            break;
+          }
+
+          if (controlState?.status === 'paused') {
+            state.isPaused = true;
+            console.log(`[Security] Execution ${execution.id} is paused, waiting...`);
+            emitter.thinking({
+              thought: 'Execution paused by user. Waiting for resume...',
+              iteration: state.iterations,
+            });
+
+            // Wait for resume (check every 2 seconds, max 5 minutes)
+            let waitTime = 0;
+            const maxWait = 5 * 60 * 1000; // 5 minutes
+            while (waitTime < maxWait) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              waitTime += 2000;
+              const newState = executionControl.getExecutionStatus(execution.id.toString());
+              if (newState?.status === 'running') {
+                state.isPaused = false;
+                console.log(`[Security] Execution ${execution.id} resumed`);
+                break;
+              }
+              if (newState?.status === 'cancelled') {
+                state.status = 'failed';
+                continueLoop = false;
+                break;
+              }
+            }
+
+            if (state.isPaused) {
+              // Timed out waiting for resume
+              console.log(`[Security] Execution ${execution.id} pause timeout, saving checkpoint`);
+              await checkpointService.createCheckpoint({
+                executionId: execution.id,
+                userId,
+                phaseName: state.plan?.phases[state.currentPhaseId - 1]?.name || 'paused',
+                stepIndex: state.iterations,
+                completedSteps: state.toolHistory.filter(t => t.success).map(t => t.toolName),
+                partialResults: state.context as Record<string, any>,
+                checkpointReason: 'manual',
+              });
+              state.status = 'failed';
+              break;
+            }
+          }
+        } catch (controlError) {
+          console.warn('[Security] Execution control check error (continuing):', controlError);
+        }
+
         // Get current action for progress tracking
         let currentAction = 'Processing...';
         let currentPhase = 'execution';

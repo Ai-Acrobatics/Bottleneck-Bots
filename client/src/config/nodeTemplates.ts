@@ -11,7 +11,7 @@ export const NODE_TEMPLATES: NodeTemplate[] = [
     defaultData: {
       type: 'navigate',
       label: 'Navigate',
-      url: 'https://example.com',
+      url: '',
       waitForLoad: true,
       timeout: 30000,
       enabled: true,

@@ -30,3 +30,15 @@ export {
   type StrategyRecommendation,
   type AdaptationEvent,
 } from './strategyAdaptation.service';
+
+// Getter functions for lazy initialization
+import { failureRecoveryService } from './failureRecovery.service';
+import { strategyAdaptationService } from './strategyAdaptation.service';
+
+export function getFailureRecoveryService() {
+  return failureRecoveryService;
+}
+
+export function getStrategyAdaptationService() {
+  return strategyAdaptationService;
+}

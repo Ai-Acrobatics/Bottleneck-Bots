@@ -28,3 +28,15 @@ export {
   type ControlEvent,
   type RateLimitConfig,
 } from './executionControl.service';
+
+// Getter functions for lazy initialization
+import { credentialVaultService } from './credentialVault.service';
+import { executionControlService } from './executionControl.service';
+
+export function getCredentialVault() {
+  return credentialVaultService;
+}
+
+export function getExecutionControl() {
+  return executionControlService;
+}

@@ -1,115 +1,12 @@
 /**
  * Rate Limiting Middleware
  * Implements token bucket algorithm for API rate limiting
+ * Uses Redis for distributed rate limiting across multiple instances
  */
 
 import type { Request, Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "./authMiddleware";
-
-/**
- * Rate limit bucket for tracking API usage
- */
-interface RateLimitBucket {
-  tokens: number;
-  lastRefill: number;
-}
-
-/**
- * In-memory rate limit storage
- * PLACEHOLDER: Replace with Redis for production multi-instance deployments
- */
-class RateLimitStore {
-  private buckets: Map<string, RateLimitBucket> = new Map();
-
-  /**
-   * Get current token count for a key
-   */
-  getTokens(
-    key: string,
-    maxTokens: number,
-    refillRate: number,
-    refillInterval: number
-  ): number {
-    const bucket = this.buckets.get(key);
-    const now = Date.now();
-
-    if (!bucket) {
-      // Initialize new bucket
-      this.buckets.set(key, {
-        tokens: maxTokens - 1, // Consume 1 token for current request
-        lastRefill: now,
-      });
-      return maxTokens - 1;
-    }
-
-    // Calculate tokens to add based on time elapsed
-    const timeSinceRefill = now - bucket.lastRefill;
-    const intervalsElapsed = Math.floor(timeSinceRefill / refillInterval);
-    const tokensToAdd = intervalsElapsed * refillRate;
-
-    // Refill tokens (capped at maxTokens)
-    const newTokens = Math.min(bucket.tokens + tokensToAdd, maxTokens);
-
-    // Update bucket
-    bucket.tokens = newTokens - 1; // Consume 1 token for current request
-    bucket.lastRefill = now;
-
-    this.buckets.set(key, bucket);
-
-    return bucket.tokens;
-  }
-
-  /**
-   * Check if request should be rate limited
-   */
-  isRateLimited(
-    key: string,
-    maxTokens: number,
-    refillRate: number,
-    refillInterval: number
-  ): boolean {
-    const remainingTokens = this.getTokens(key, maxTokens, refillRate, refillInterval);
-    return remainingTokens < 0;
-  }
-
-  /**
-   * Get remaining tokens for a key
-   */
-  getRemainingTokens(
-    key: string,
-    maxTokens: number,
-    refillRate: number,
-    refillInterval: number
-  ): number {
-    const bucket = this.buckets.get(key);
-    if (!bucket) return maxTokens;
-
-    const now = Date.now();
-    const timeSinceRefill = now - bucket.lastRefill;
-    const intervalsElapsed = Math.floor(timeSinceRefill / refillInterval);
-    const tokensToAdd = intervalsElapsed * refillRate;
-
-    return Math.min(bucket.tokens + tokensToAdd, maxTokens);
-  }
-
-  /**
-   * Clear old buckets (cleanup)
-   */
-  cleanup(maxAge: number = 3600000): void {
-    const now = Date.now();
-    for (const [key, bucket] of Array.from(this.buckets.entries())) {
-      if (now - bucket.lastRefill > maxAge) {
-        this.buckets.delete(key);
-      }
-    }
-  }
-}
-
-// Singleton rate limit store
-const rateLimitStore = new RateLimitStore();
-
-// Cleanup old buckets every hour
-setInterval(() => rateLimitStore.cleanup(), 3600000);
+import { redisService } from "../../../services/redis.service";
 
 /**
  * Rate limit configuration
@@ -121,6 +18,7 @@ interface RateLimitConfig {
   skipSuccessfulRequests?: boolean; // Don't count successful requests
   skipFailedRequests?: boolean; // Don't count failed requests
   keyGenerator?: (req: Request) => string; // Custom key generator
+  useSliding?: boolean; // Use sliding window instead of token bucket
 }
 
 /**
@@ -130,10 +28,12 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
   windowMs: 60000, // 1 minute
   maxRequests: 100,
   message: "Too many requests, please try again later",
+  useSliding: false,
 };
 
 /**
  * Create rate limit middleware
+ * Now uses Redis for distributed rate limiting
  *
  * Usage:
  * ```typescript
@@ -156,36 +56,37 @@ export function rateLimit(config: Partial<RateLimitConfig> = {}) {
         ? `apikey:${req.apiKey.id}`
         : `ip:${req.ip}`;
 
-      // Check if rate limited
-      const isLimited = rateLimitStore.isRateLimited(
-        key,
-        options.maxRequests,
-        1, // Refill 1 token per interval
-        options.windowMs / options.maxRequests // Interval between refills
-      );
-
-      // Get remaining tokens for headers
-      const remaining = rateLimitStore.getRemainingTokens(
-        key,
-        options.maxRequests,
-        1,
-        options.windowMs / options.maxRequests
-      );
+      // Use sliding window or token bucket
+      const result = options.useSliding
+        ? await redisService.checkSlidingWindowRateLimit(
+            key,
+            options.maxRequests,
+            options.windowMs
+          )
+        : await redisService.checkRateLimit(
+            key,
+            options.maxRequests,
+            1, // Refill 1 token per interval
+            options.windowMs / options.maxRequests // Interval between refills
+          );
 
       // Set rate limit headers
       res.setHeader("X-RateLimit-Limit", options.maxRequests.toString());
-      res.setHeader("X-RateLimit-Remaining", Math.max(0, remaining).toString());
-      res.setHeader(
-        "X-RateLimit-Reset",
-        new Date(Date.now() + options.windowMs).toISOString()
-      );
+      res.setHeader("X-RateLimit-Remaining", result.remaining.toString());
+      res.setHeader("X-RateLimit-Reset", new Date(result.resetAt).toISOString());
 
-      if (isLimited) {
+      // Add Redis mode header for debugging
+      const status = redisService.getStatus();
+      res.setHeader("X-RateLimit-Mode", status.mode);
+
+      if (!result.allowed) {
         res.status(429).json({
           error: "Too Many Requests",
           message: options.message,
           code: "RATE_LIMIT_EXCEEDED",
-          retryAfter: Math.ceil(options.windowMs / 1000),
+          retryAfter: result.retryAfter,
+          remaining: 0,
+          resetAt: new Date(result.resetAt).toISOString(),
         });
         return;
       }
@@ -201,8 +102,7 @@ export function rateLimit(config: Partial<RateLimitConfig> = {}) {
 
 /**
  * Per-API-key rate limiter based on plan limits
- *
- * Uses rate limits from the API key record
+ * Uses Redis for distributed rate limiting
  */
 export async function apiKeyRateLimit(
   req: AuthenticatedRequest,
@@ -241,76 +141,83 @@ export async function apiKeyRateLimit(
       return;
     }
 
-    // Check per-minute rate limit
-    const minuteKey = `apikey:${req.apiKey.id}:minute`;
-    const isMinuteLimited = rateLimitStore.isRateLimited(
-      minuteKey,
+    // Check per-minute rate limit using Redis
+    const minuteResult = await redisService.checkRateLimit(
+      `apikey:${req.apiKey.id}:minute`,
       apiKeyRecord.rateLimitPerMinute,
       1,
       60000 / apiKeyRecord.rateLimitPerMinute
     );
 
-    if (isMinuteLimited) {
+    if (!minuteResult.allowed) {
       res.status(429).json({
         error: "Too Many Requests",
         message: "Per-minute rate limit exceeded",
         code: "RATE_LIMIT_MINUTE_EXCEEDED",
         limit: apiKeyRecord.rateLimitPerMinute,
         window: "1 minute",
+        retryAfter: minuteResult.retryAfter,
+        remaining: 0,
+        resetAt: new Date(minuteResult.resetAt).toISOString(),
       });
       return;
     }
 
-    // Check per-hour rate limit
-    const hourKey = `apikey:${req.apiKey.id}:hour`;
-    const isHourLimited = rateLimitStore.isRateLimited(
-      hourKey,
+    // Check per-hour rate limit using Redis
+    const hourResult = await redisService.checkRateLimit(
+      `apikey:${req.apiKey.id}:hour`,
       apiKeyRecord.rateLimitPerHour,
       1,
       3600000 / apiKeyRecord.rateLimitPerHour
     );
 
-    if (isHourLimited) {
+    if (!hourResult.allowed) {
       res.status(429).json({
         error: "Too Many Requests",
         message: "Per-hour rate limit exceeded",
         code: "RATE_LIMIT_HOUR_EXCEEDED",
         limit: apiKeyRecord.rateLimitPerHour,
         window: "1 hour",
+        retryAfter: hourResult.retryAfter,
+        remaining: 0,
+        resetAt: new Date(hourResult.resetAt).toISOString(),
       });
       return;
     }
 
-    // Check per-day rate limit
-    const dayKey = `apikey:${req.apiKey.id}:day`;
-    const isDayLimited = rateLimitStore.isRateLimited(
-      dayKey,
+    // Check per-day rate limit using Redis
+    const dayResult = await redisService.checkRateLimit(
+      `apikey:${req.apiKey.id}:day`,
       apiKeyRecord.rateLimitPerDay,
       1,
       86400000 / apiKeyRecord.rateLimitPerDay
     );
 
-    if (isDayLimited) {
+    if (!dayResult.allowed) {
       res.status(429).json({
         error: "Too Many Requests",
         message: "Per-day rate limit exceeded",
         code: "RATE_LIMIT_DAY_EXCEEDED",
         limit: apiKeyRecord.rateLimitPerDay,
         window: "1 day",
+        retryAfter: dayResult.retryAfter,
+        remaining: 0,
+        resetAt: new Date(dayResult.resetAt).toISOString(),
       });
       return;
     }
 
     // Add rate limit info to headers
-    const minuteRemaining = rateLimitStore.getRemainingTokens(
-      minuteKey,
-      apiKeyRecord.rateLimitPerMinute,
-      1,
-      60000 / apiKeyRecord.rateLimitPerMinute
-    );
-
     res.setHeader("X-RateLimit-Limit-Minute", apiKeyRecord.rateLimitPerMinute.toString());
-    res.setHeader("X-RateLimit-Remaining-Minute", Math.max(0, minuteRemaining).toString());
+    res.setHeader("X-RateLimit-Remaining-Minute", minuteResult.remaining.toString());
+    res.setHeader("X-RateLimit-Limit-Hour", apiKeyRecord.rateLimitPerHour.toString());
+    res.setHeader("X-RateLimit-Remaining-Hour", hourResult.remaining.toString());
+    res.setHeader("X-RateLimit-Limit-Day", apiKeyRecord.rateLimitPerDay.toString());
+    res.setHeader("X-RateLimit-Remaining-Day", dayResult.remaining.toString());
+
+    // Add Redis mode header
+    const status = redisService.getStatus();
+    res.setHeader("X-RateLimit-Mode", status.mode);
 
     next();
   } catch (error) {
@@ -321,7 +228,7 @@ export async function apiKeyRateLimit(
 
 /**
  * Global rate limit for unauthenticated requests
- * 60 requests per minute per IP
+ * 60 requests per minute per IP using Redis
  */
 export const globalRateLimit = rateLimit({
   windowMs: 60000,
@@ -329,3 +236,44 @@ export const globalRateLimit = rateLimit({
   message: "Too many requests from this IP, please try again later",
   keyGenerator: (req) => `ip:${req.ip}`,
 });
+
+/**
+ * Strict rate limit for sensitive endpoints
+ * 10 requests per minute using sliding window
+ */
+export const strictRateLimit = rateLimit({
+  windowMs: 60000,
+  maxRequests: 10,
+  message: "Rate limit exceeded for this endpoint",
+  useSliding: true,
+});
+
+/**
+ * Burst rate limit for endpoints that need to handle traffic spikes
+ * 200 requests per minute with token bucket
+ */
+export const burstRateLimit = rateLimit({
+  windowMs: 60000,
+  maxRequests: 200,
+  message: "Too many requests, please slow down",
+});
+
+/**
+ * Get current rate limit status for a key
+ * Useful for showing users their remaining quota
+ */
+export async function getRateLimitStatus(key: string, config: RateLimitConfig) {
+  const result = await redisService.checkRateLimit(
+    key,
+    config.maxRequests + 1, // Don't consume a token
+    1,
+    config.windowMs / config.maxRequests
+  );
+
+  return {
+    limit: config.maxRequests,
+    remaining: result.remaining,
+    resetAt: new Date(result.resetAt).toISOString(),
+    mode: redisService.getStatus().mode,
+  };
+}

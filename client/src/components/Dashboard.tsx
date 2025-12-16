@@ -4,7 +4,6 @@ import { trpc } from '../lib/trpc';
 import { useTourStore } from '@/stores/tourStore';
 // Gemini service removed - will be implemented server-side via tRPC
 import { MissionStatus } from './MissionStatus';
-import { executeStep } from '../services/mockAutomation';
 import { sendSlackAlert } from '../services/slackService';
 import { AgentStatus, AgentTask, AgentStep, LogEntry, IntegrationStatus, SlackConfig, ClientContext, User, TeamActivity, Asset, SeoConfig, SupportTicket, AgentInstance, SettingsTab, DriveFile } from '../types';
 import { GlassPane } from './GlassPane';

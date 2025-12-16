@@ -199,7 +199,7 @@ router.post(
 
 /**
  * GET /api/v1/templates/categories
- * Get list of template categories
+ * Get list of template categories from existing templates
  */
 router.get(
   "/meta/categories",
@@ -212,34 +212,24 @@ router.get(
       throw ApiError.serviceUnavailable("Database unavailable");
     }
 
-    // PLACEHOLDER: Get unique categories from templates
-    // For now, returning mock categories
-    const categories = [
-      {
-        id: "web-scraping",
-        name: "Web Scraping",
-        description: "Extract data from websites",
-        count: 15,
-      },
-      {
-        id: "form-filling",
-        name: "Form Filling",
-        description: "Automate form submissions",
-        count: 8,
-      },
-      {
-        id: "testing",
-        name: "Testing",
-        description: "Automated testing workflows",
-        count: 12,
-      },
-      {
-        id: "monitoring",
-        name: "Monitoring",
-        description: "Website and app monitoring",
-        count: 10,
-      },
-    ];
+    // Get all templates and extract unique categories
+    const templates = await db
+      .select({ category: automationTemplates.category })
+      .from(automationTemplates);
+
+    // Count templates per category
+    const categoryCounts = templates.reduce<Record<string, number>>((acc, t) => {
+      const cat = t.category || 'uncategorized';
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Format categories for response
+    const categories = Object.entries(categoryCounts).map(([id, templateCount]) => ({
+      id,
+      name: id.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      count: templateCount,
+    }));
 
     res.json({ data: categories });
   })

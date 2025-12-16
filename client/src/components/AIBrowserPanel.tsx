@@ -26,7 +26,7 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
   const [result, setResult] = useState<any>(null);
 
   // Execute form state
-  const [executeUrl, setExecuteUrl] = useState('https://google.com');
+  const [executeUrl, setExecuteUrl] = useState('');
   const [executeInstruction, setExecuteInstruction] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [onePasswordEmail, setOnePasswordEmail] = useState('');
@@ -254,7 +254,7 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                     id="execute-url"
                     value={executeUrl}
                     onChange={(e) => setExecuteUrl(e.target.value)}
-                    placeholder="https://example.com"
+                    placeholder="Enter URL to navigate"
                     className="text-sm"
                   />
                 </div>
@@ -342,7 +342,7 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                     id="observe-url"
                     value={observeUrl}
                     onChange={(e) => setObserveUrl(e.target.value)}
-                    placeholder="https://example.com/form"
+                    placeholder="Enter URL to observe"
                     className="text-sm"
                   />
                 </div>
@@ -388,7 +388,7 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                     id="extract-url"
                     value={extractUrl}
                     onChange={(e) => setExtractUrl(e.target.value)}
-                    placeholder="https://example.com/contact"
+                    placeholder="Enter URL to extract from"
                     className="text-sm"
                   />
                 </div>

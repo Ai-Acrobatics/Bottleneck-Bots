@@ -35,3 +35,20 @@ export {
   type DOMChange,
   type ScreenshotComparison,
 } from './visualVerification.service';
+
+// Getter functions for lazy initialization
+import { multiTabService } from './multiTab.service';
+import { fileUploadService } from './fileUpload.service';
+import { visualVerificationService } from './visualVerification.service';
+
+export function getMultiTabService() {
+  return multiTabService;
+}
+
+export function getFileUploadService() {
+  return fileUploadService;
+}
+
+export function getVisualVerificationService() {
+  return visualVerificationService;
+}

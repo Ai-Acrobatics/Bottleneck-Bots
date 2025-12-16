@@ -26,10 +26,15 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test tests/e2e/smoke",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report test-results/html"
+    "test:e2e:report": "playwright show-report test-results/html",
+    "test:load:smoke": "k6 run tests/load/api-smoke.test.js",
+    "test:load": "k6 run tests/load/api-load.test.js",
+    "test:load:stress": "k6 run tests/load/api-stress.test.js",
+    "test:load:spike": "k6 run tests/load/api-spike.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
+    "@aws-sdk/client-cloudfront": "^3.952.0",
     "@aws-sdk/client-s3": "^3.952.0",
     "@aws-sdk/s3-request-presigner": "^3.952.0",
     "@browserbasehq/sdk": "^2.6.0",

@@ -31,12 +31,15 @@ import {
   Settings,
   Users,
   Megaphone,
-  CreditCard
+  CreditCard,
+  LifeBuoy,
+  Shield
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { CommandPalette } from './CommandPalette';
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -47,6 +50,11 @@ const menuItems = [
   { icon: Megaphone, label: "AI Campaigns", path: "/ai-campaigns" },
   { icon: CreditCard, label: "Credits", path: "/credits" },
   { icon: Settings, label: "Settings", path: "/settings" },
+  { icon: LifeBuoy, label: "Support", path: "/support" },
+];
+
+const adminOnlyItems = [
+  { icon: Shield, label: "Admin", path: "/admin" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -116,6 +124,7 @@ export default function DashboardLayout({
         } as CSSProperties
       }
     >
+      <CommandPalette />
       <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
         {children}
       </DashboardLayoutContent>
@@ -138,7 +147,8 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const allMenuItems = [...menuItems, ...adminOnlyItems];
+  const activeMenuItem = allMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -253,6 +263,24 @@ function DashboardLayoutContent({
                     >
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-emerald-600" : ""}`}
+                      />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+              {user?.role === "admin" && adminOnlyItems.map(item => {
+                const isActive = location === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      onClick={() => setLocation(item.path)}
+                      tooltip={item.label}
+                      className={`h-10 transition-all font-normal`}
+                    >
+                      <item.icon
+                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                       />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
