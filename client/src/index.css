@@ -596,28 +596,33 @@
   }
 
   .skeleton {
-    @apply bg-muted rounded animate-pulse;
+    @apply bg-muted rounded;
     animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .skeleton-text {
-    @apply skeleton h-4 w-full;
+    @apply bg-muted rounded h-4 w-full;
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .skeleton-heading {
-    @apply skeleton h-8 w-3/4;
+    @apply bg-muted rounded h-8 w-3/4;
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .skeleton-avatar {
-    @apply skeleton h-10 w-10 rounded-full;
+    @apply bg-muted h-10 w-10 rounded-full;
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .skeleton-button {
-    @apply skeleton h-10 w-24;
+    @apply bg-muted rounded h-10 w-24;
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .skeleton-card {
-    @apply skeleton h-32 w-full;
+    @apply bg-muted rounded h-32 w-full;
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   /* Semantic Color Utilities */

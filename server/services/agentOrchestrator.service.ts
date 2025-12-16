@@ -1109,19 +1109,28 @@ export class AgentOrchestratorService {
       // ========================================
       try {
         // Record the failure pattern for learning
+        // Map the errorType enum to the string format expected by failureRecovery
+        const errorTypeStr = analysis.errorType.toLowerCase().replace(/_/g, '_') as import('./intelligence/failureRecovery.service').ErrorType;
+
         failureRecovery.recordFailurePattern({
+          executionId: state.executionId.toString(),
+          sessionId: state.executionId.toString(),
           action: toolName,
-          error: result.error || 'Unknown error',
-          errorType: analysis.errorType,
+          errorMessage: result.error || 'Unknown error',
+          errorType: errorTypeStr,
+          timestamp: new Date(),
           pageState: {
             url: state.context.currentUrl as string || '',
             title: state.context.pageTitle as string || '',
           },
           attemptNumber: attempt,
+          // Map selfCorrection's FailureAttempt to failureRecovery's FailureAttempt
           previousAttempts: state.failureAttempts.map(a => ({
             action: a.action,
+            strategy: String(a.strategy), // Convert enum to string
             error: a.error,
             timestamp: a.timestamp,
+            duration: 0, // We don't track duration in selfCorrection attempts
           })),
         });
 
