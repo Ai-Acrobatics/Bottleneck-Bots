@@ -119,11 +119,17 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = new Date();
     }
 
+    // Always set createdAt and updatedAt for new users
+    // This ensures timestamps are set even if database defaults fail
+    const now = new Date();
+    values.createdAt = now;
+    values.updatedAt = now;
+
     // Always update updatedAt on conflict
-    updateSet.updatedAt = new Date();
+    updateSet.updatedAt = now;
 
     if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
+      updateSet.lastSignedIn = now;
     }
 
     // Determine conflict target
@@ -199,13 +205,16 @@ export async function createUserWithPassword(data: {
   }
 
   try {
+    const now = new Date();
     const result = await db.insert(users).values({
       email: data.email,
       password: data.password,
       name: data.name || null,
       loginMethod: 'email',
       role: 'user',
-      lastSignedIn: new Date(),
+      lastSignedIn: now,
+      createdAt: now,
+      updatedAt: now,
     }).returning();
 
     return result.length > 0 ? result[0] : undefined;
@@ -225,7 +234,12 @@ export async function createUserProfile(data: InsertUserProfile): Promise<typeof
   }
 
   try {
-    const result = await db.insert(userProfiles).values(data).returning();
+    const now = new Date();
+    const result = await db.insert(userProfiles).values({
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
     return result.length > 0 ? result[0] : undefined;
   } catch (error) {
     console.error("[Database] Failed to create user profile:", error);
@@ -271,10 +285,15 @@ export async function upsertUserProfile(data: InsertUserProfile): Promise<typeof
   }
 
   try {
-    const result = await db.insert(userProfiles).values(data)
+    const now = new Date();
+    const result = await db.insert(userProfiles).values({
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    })
       .onConflictDoUpdate({
         target: userProfiles.userId,
-        set: { ...data, updatedAt: new Date() },
+        set: { ...data, updatedAt: now },
       })
       .returning();
     return result.length > 0 ? result[0] : undefined;

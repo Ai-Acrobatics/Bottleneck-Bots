@@ -14,11 +14,15 @@
 import { getDb } from "../db";
 import {
   apiTokenUsage,
+  geminiTokenUsage,
   browserbaseCosts,
+  storageCosts,
   dailyCostSummaries,
   costBudgets,
   type InsertApiTokenUsage,
+  type InsertGeminiTokenUsage,
   type InsertBrowserbaseCost,
+  type InsertStorageCost,
   type InsertDailyCostSummary,
 } from "../../drizzle/schema-costs";
 import { eq, and, gte, lte, sum, count, sql } from "drizzle-orm";
@@ -63,6 +67,63 @@ export const BROWSERBASE_PRICING = {
   screenshotCost: 0.001, // Per screenshot
 } as const;
 
+/**
+ * Gemini API pricing per 1M tokens (USD)
+ * https://ai.google.dev/pricing
+ */
+export const GEMINI_PRICING = {
+  "gemini-2.0-flash-exp": {
+    input: 0.0, // Free during preview
+    output: 0.0,
+  },
+  "gemini-2.0-flash": {
+    input: 0.10, // $0.10 per 1M input tokens
+    output: 0.40, // $0.40 per 1M output tokens
+  },
+  "gemini-1.5-flash": {
+    input: 0.075, // $0.075 per 1M input tokens
+    output: 0.30, // $0.30 per 1M output tokens
+  },
+  "gemini-1.5-flash-8b": {
+    input: 0.0375, // $0.0375 per 1M input tokens
+    output: 0.15, // $0.15 per 1M output tokens
+  },
+  "gemini-1.5-pro": {
+    input: 1.25, // $1.25 per 1M input tokens
+    output: 5.0, // $5.00 per 1M output tokens
+  },
+  "gemini-2.5-pro": {
+    input: 1.25, // $1.25 per 1M input tokens (<200k context)
+    output: 10.0, // $10.00 per 1M output tokens
+  },
+} as const;
+
+/**
+ * S3/R2 Storage pricing (estimated)
+ * https://aws.amazon.com/s3/pricing/
+ * https://developers.cloudflare.com/r2/pricing/
+ */
+export const STORAGE_PRICING = {
+  s3: {
+    storagePerGbMonth: 0.023, // $0.023/GB/month (standard)
+    putRequest: 0.000005, // $0.005 per 1,000 PUT requests
+    getRequest: 0.0000004, // $0.0004 per 1,000 GET requests
+    egressPerGb: 0.09, // $0.09/GB egress (after first 100GB)
+  },
+  r2: {
+    storagePerGbMonth: 0.015, // $0.015/GB/month
+    putRequest: 0.0000045, // $0.0045 per 1,000 PUT requests (Class A)
+    getRequest: 0.00000036, // $0.00036 per 1,000 GET requests (Class B)
+    egressPerGb: 0.0, // Free egress
+  },
+  gcs: {
+    storagePerGbMonth: 0.020, // $0.020/GB/month (standard)
+    putRequest: 0.000005, // $0.005 per 1,000 operations (Class A)
+    getRequest: 0.0000004, // $0.0004 per 1,000 operations (Class B)
+    egressPerGb: 0.12, // $0.12/GB egress (standard)
+  },
+} as const;
+
 // ========================================
 // TYPES
 // ========================================
@@ -90,6 +151,28 @@ export interface BrowserbaseSessionData {
   debugUrl?: string;
   recordingUrl?: string;
   status: "active" | "completed" | "failed" | "timeout";
+}
+
+export interface GeminiTokenUsageData {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface GeminiCostCalculation {
+  inputCost: number;
+  outputCost: number;
+  totalCost: number;
+}
+
+export interface StorageOperationData {
+  operationId?: string;
+  provider: "s3" | "r2" | "gcs";
+  bucket: string;
+  operationType: "upload" | "download" | "delete" | "list";
+  objectKey?: string;
+  sizeBytes: number;
+  contentType?: string;
+  status: "success" | "failed" | "pending";
 }
 
 export interface BudgetStatus {
@@ -156,6 +239,66 @@ export class CostTrackingService {
       outputTokens: usage.output_tokens || 0,
       cacheCreationTokens: usage.cache_creation_input_tokens || 0,
       cacheReadTokens: usage.cache_read_input_tokens || 0,
+    };
+  }
+
+  /**
+   * Calculate cost from Gemini token usage based on model pricing
+   */
+  calculateGeminiCost(
+    model: string,
+    tokens: GeminiTokenUsageData
+  ): GeminiCostCalculation {
+    // Get pricing for the model (default to gemini-2.0-flash if not found)
+    const pricing = GEMINI_PRICING[model as keyof typeof GEMINI_PRICING] || GEMINI_PRICING["gemini-2.0-flash"];
+
+    // Calculate costs (pricing is per 1M tokens)
+    const inputCost = (tokens.inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (tokens.outputTokens / 1_000_000) * pricing.output;
+    const totalCost = inputCost + outputCost;
+
+    return {
+      inputCost,
+      outputCost,
+      totalCost,
+    };
+  }
+
+  /**
+   * Calculate storage operation cost
+   */
+  calculateStorageCost(
+    provider: "s3" | "r2" | "gcs",
+    operationType: "upload" | "download" | "delete" | "list",
+    sizeBytes: number
+  ): { requestCost: number; transferCost: number; totalCost: number } {
+    const pricing = STORAGE_PRICING[provider] || STORAGE_PRICING.s3;
+    const sizeMb = sizeBytes / (1024 * 1024);
+    const sizeGb = sizeMb / 1024;
+
+    let requestCost = 0;
+    let transferCost = 0;
+
+    switch (operationType) {
+      case "upload":
+        requestCost = pricing.putRequest;
+        break;
+      case "download":
+        requestCost = pricing.getRequest;
+        transferCost = sizeGb * pricing.egressPerGb;
+        break;
+      case "delete":
+        requestCost = 0; // DELETE requests are free
+        break;
+      case "list":
+        requestCost = pricing.getRequest;
+        break;
+    }
+
+    return {
+      requestCost,
+      transferCost,
+      totalCost: requestCost + transferCost,
     };
   }
 
@@ -267,6 +410,107 @@ export class CostTrackingService {
   }
 
   /**
+   * Track Gemini API call cost
+   */
+  async trackGeminiCall(params: {
+    userId: number;
+    executionId?: number;
+    requestId?: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    promptType?: string;
+    toolsUsed?: string[];
+    responseTime?: number;
+    finishReason?: string;
+  }): Promise<void> {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    // Calculate costs
+    const tokens: GeminiTokenUsageData = {
+      inputTokens: params.inputTokens,
+      outputTokens: params.outputTokens,
+    };
+    const costs = this.calculateGeminiCost(params.model, tokens);
+    const totalTokens = params.inputTokens + params.outputTokens;
+
+    // Insert Gemini token usage record
+    await db.insert(geminiTokenUsage).values({
+      userId: params.userId,
+      executionId: params.executionId,
+      requestId: params.requestId,
+      model: params.model,
+      inputTokens: params.inputTokens,
+      outputTokens: params.outputTokens,
+      totalTokens,
+      inputCost: costs.inputCost.toFixed(6),
+      outputCost: costs.outputCost.toFixed(6),
+      totalCost: costs.totalCost.toFixed(6),
+      promptType: params.promptType,
+      toolsUsed: params.toolsUsed ? JSON.stringify(params.toolsUsed) : null,
+      responseTime: params.responseTime,
+      finishReason: params.finishReason,
+    });
+
+    // Update daily summary
+    await this.updateDailySummary(params.userId, new Date());
+
+    // Check budget limits
+    await this.checkBudgetLimits(params.userId);
+  }
+
+  /**
+   * Track storage operation cost (S3/R2)
+   */
+  async trackStorageOperation(params: {
+    userId: number;
+    executionId?: number;
+    storageData: StorageOperationData;
+  }): Promise<void> {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const { storageData } = params;
+    const sizeMb = storageData.sizeBytes / (1024 * 1024);
+
+    // Calculate costs
+    const costs = this.calculateStorageCost(
+      storageData.provider,
+      storageData.operationType,
+      storageData.sizeBytes
+    );
+
+    // Get storage pricing for provider
+    const pricing = STORAGE_PRICING[storageData.provider] || STORAGE_PRICING.s3;
+
+    // Insert storage cost record
+    await db.insert(storageCosts).values({
+      userId: params.userId,
+      executionId: params.executionId,
+      operationId: storageData.operationId,
+      provider: storageData.provider,
+      bucket: storageData.bucket,
+      operationType: storageData.operationType,
+      objectKey: storageData.objectKey,
+      sizeBytes: storageData.sizeBytes,
+      sizeMb: sizeMb.toFixed(4),
+      storageCostPerGb: pricing.storagePerGbMonth.toFixed(6),
+      transferCostPerGb: pricing.egressPerGb.toFixed(6),
+      requestCost: costs.requestCost.toFixed(8),
+      totalCost: costs.totalCost.toFixed(6),
+      contentType: storageData.contentType,
+      status: storageData.status,
+    });
+
+    // Update daily summary
+    await this.updateDailySummary(params.userId, new Date());
+
+    // Check budget limits
+    await this.checkBudgetLimits(params.userId);
+  }
+
+  /**
    * Update daily cost summary for a user
    */
   async updateDailySummary(userId: number, date: Date): Promise<void> {
@@ -297,6 +541,23 @@ export class CostTrackingService {
         )
       );
 
+    // Aggregate Gemini API costs for the day
+    const geminiStats = await db
+      .select({
+        totalCalls: count(),
+        totalInputTokens: sum(geminiTokenUsage.inputTokens),
+        totalOutputTokens: sum(geminiTokenUsage.outputTokens),
+        geminiCost: sum(geminiTokenUsage.totalCost),
+      })
+      .from(geminiTokenUsage)
+      .where(
+        and(
+          eq(geminiTokenUsage.userId, userId),
+          gte(geminiTokenUsage.createdAt, dayStart),
+          lte(geminiTokenUsage.createdAt, dayEnd)
+        )
+      );
+
     // Aggregate Browserbase costs for the day
     const browserbaseStats = await db
       .select({
@@ -313,12 +574,30 @@ export class CostTrackingService {
         )
       );
 
-    const apiCost = Number(apiStats[0]?.apiCost || 0);
-    const browserbaseCost = Number(browserbaseStats[0]?.browserbaseCost || 0);
-    const totalCost = apiCost + browserbaseCost;
+    // Aggregate Storage costs for the day
+    const storageStats = await db
+      .select({
+        totalOperations: count(),
+        totalMb: sum(storageCosts.sizeMb),
+        storageCost: sum(storageCosts.totalCost),
+      })
+      .from(storageCosts)
+      .where(
+        and(
+          eq(storageCosts.userId, userId),
+          gte(storageCosts.createdAt, dayStart),
+          lte(storageCosts.createdAt, dayEnd)
+        )
+      );
 
-    // Get cost breakdown by model
-    const costByModel = await db
+    const apiCost = Number(apiStats[0]?.apiCost || 0);
+    const geminiCost = Number(geminiStats[0]?.geminiCost || 0);
+    const browserbaseCostValue = Number(browserbaseStats[0]?.browserbaseCost || 0);
+    const storageCostValue = Number(storageStats[0]?.storageCost || 0);
+    const totalCost = apiCost + geminiCost + browserbaseCostValue + storageCostValue;
+
+    // Get cost breakdown by Claude model
+    const claudeCostByModel = await db
       .select({
         model: apiTokenUsage.model,
         cost: sum(apiTokenUsage.totalCost),
@@ -333,10 +612,37 @@ export class CostTrackingService {
       )
       .groupBy(apiTokenUsage.model);
 
+    // Get cost breakdown by Gemini model
+    const geminiCostByModel = await db
+      .select({
+        model: geminiTokenUsage.model,
+        cost: sum(geminiTokenUsage.totalCost),
+      })
+      .from(geminiTokenUsage)
+      .where(
+        and(
+          eq(geminiTokenUsage.userId, userId),
+          gte(geminiTokenUsage.createdAt, dayStart),
+          lte(geminiTokenUsage.createdAt, dayEnd)
+        )
+      )
+      .groupBy(geminiTokenUsage.model);
+
     const costByModelJson: Record<string, number> = {};
-    costByModel.forEach(row => {
+    claudeCostByModel.forEach(row => {
       costByModelJson[row.model] = Number(row.cost || 0);
     });
+    geminiCostByModel.forEach(row => {
+      costByModelJson[row.model] = Number(row.cost || 0);
+    });
+
+    // Build cost by provider breakdown
+    const costByProviderJson: Record<string, number> = {
+      anthropic: apiCost,
+      google: geminiCost,
+      browserbase: browserbaseCostValue,
+      storage: storageCostValue,
+    };
 
     // Upsert daily summary
     const existingSummary = await db
@@ -355,16 +661,29 @@ export class CostTrackingService {
       await db
         .update(dailyCostSummaries)
         .set({
+          // Claude API stats
           totalApiCalls: Number(apiStats[0]?.totalCalls || 0),
           totalInputTokens: Number(apiStats[0]?.totalInputTokens || 0),
           totalOutputTokens: Number(apiStats[0]?.totalOutputTokens || 0),
           totalCacheTokens: Number(apiStats[0]?.totalCacheTokens || 0),
           apiCostUsd: apiCost.toFixed(4),
+          // Gemini API stats
+          totalGeminiCalls: Number(geminiStats[0]?.totalCalls || 0),
+          totalGeminiInputTokens: Number(geminiStats[0]?.totalInputTokens || 0),
+          totalGeminiOutputTokens: Number(geminiStats[0]?.totalOutputTokens || 0),
+          geminiCostUsd: geminiCost.toFixed(6),
+          // Browserbase stats
           totalSessions: Number(browserbaseStats[0]?.totalSessions || 0),
           totalSessionMinutes: Number(browserbaseStats[0]?.totalMinutes || 0).toFixed(2),
-          browserbaseCostUsd: browserbaseCost.toFixed(4),
+          browserbaseCostUsd: browserbaseCostValue.toFixed(4),
+          // Storage stats
+          totalStorageOperations: Number(storageStats[0]?.totalOperations || 0),
+          totalStorageMb: Number(storageStats[0]?.totalMb || 0).toFixed(4),
+          storageCostUsd: storageCostValue.toFixed(6),
+          // Totals
           totalCostUsd: totalCost.toFixed(4),
           costByModel: costByModelJson,
+          costByProvider: costByProviderJson,
           updatedAt: new Date(),
         })
         .where(eq(dailyCostSummaries.id, existingSummary[0].id));
@@ -373,16 +692,29 @@ export class CostTrackingService {
       await db.insert(dailyCostSummaries).values({
         userId,
         date: dayStart,
+        // Claude API stats
         totalApiCalls: Number(apiStats[0]?.totalCalls || 0),
         totalInputTokens: Number(apiStats[0]?.totalInputTokens || 0),
         totalOutputTokens: Number(apiStats[0]?.totalOutputTokens || 0),
         totalCacheTokens: Number(apiStats[0]?.totalCacheTokens || 0),
         apiCostUsd: apiCost.toFixed(4),
+        // Gemini API stats
+        totalGeminiCalls: Number(geminiStats[0]?.totalCalls || 0),
+        totalGeminiInputTokens: Number(geminiStats[0]?.totalInputTokens || 0),
+        totalGeminiOutputTokens: Number(geminiStats[0]?.totalOutputTokens || 0),
+        geminiCostUsd: geminiCost.toFixed(6),
+        // Browserbase stats
         totalSessions: Number(browserbaseStats[0]?.totalSessions || 0),
         totalSessionMinutes: Number(browserbaseStats[0]?.totalMinutes || 0).toFixed(2),
-        browserbaseCostUsd: browserbaseCost.toFixed(4),
+        browserbaseCostUsd: browserbaseCostValue.toFixed(4),
+        // Storage stats
+        totalStorageOperations: Number(storageStats[0]?.totalOperations || 0),
+        totalStorageMb: Number(storageStats[0]?.totalMb || 0).toFixed(4),
+        storageCostUsd: storageCostValue.toFixed(6),
+        // Totals
         totalCostUsd: totalCost.toFixed(4),
         costByModel: costByModelJson,
+        costByProvider: costByProviderJson,
       });
     }
   }
@@ -589,13 +921,19 @@ export class CostTrackingService {
   }): Promise<{
     totalCost: number;
     apiCost: number;
+    geminiCost: number;
     browserbaseCost: number;
+    storageCost: number;
     totalApiCalls: number;
+    totalGeminiCalls: number;
     totalSessions: number;
+    totalStorageOperations: number;
     totalTokens: number;
+    totalGeminiTokens: number;
     averageCostPerExecution: number;
     costByDay: Array<{ date: Date; cost: number }>;
     costByModel: Record<string, number>;
+    costByProvider: Record<string, number>;
   }> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
@@ -616,20 +954,36 @@ export class CostTrackingService {
     // Aggregate totals
     let totalCost = 0;
     let apiCost = 0;
+    let geminiCost = 0;
     let browserbaseCost = 0;
+    let storageCost = 0;
     let totalApiCalls = 0;
+    let totalGeminiCalls = 0;
     let totalSessions = 0;
+    let totalStorageOperations = 0;
     let totalTokens = 0;
+    let totalGeminiTokens = 0;
     const costByModel: Record<string, number> = {};
+    const costByProvider: Record<string, number> = {
+      anthropic: 0,
+      google: 0,
+      browserbase: 0,
+      storage: 0,
+    };
 
     const costByDay = summaries.map(summary => {
       const dayCost = Number(summary.totalCostUsd);
       totalCost += dayCost;
       apiCost += Number(summary.apiCostUsd);
+      geminiCost += Number(summary.geminiCostUsd || 0);
       browserbaseCost += Number(summary.browserbaseCostUsd);
+      storageCost += Number(summary.storageCostUsd || 0);
       totalApiCalls += summary.totalApiCalls;
+      totalGeminiCalls += summary.totalGeminiCalls || 0;
       totalSessions += summary.totalSessions;
+      totalStorageOperations += summary.totalStorageOperations || 0;
       totalTokens += summary.totalInputTokens + summary.totalOutputTokens + summary.totalCacheTokens;
+      totalGeminiTokens += (summary.totalGeminiInputTokens || 0) + (summary.totalGeminiOutputTokens || 0);
 
       // Aggregate cost by model
       if (summary.costByModel) {
@@ -639,24 +993,39 @@ export class CostTrackingService {
         });
       }
 
+      // Aggregate cost by provider
+      if (summary.costByProvider) {
+        const providerCosts = summary.costByProvider as Record<string, number>;
+        Object.entries(providerCosts).forEach(([provider, cost]) => {
+          costByProvider[provider] = (costByProvider[provider] || 0) + cost;
+        });
+      }
+
       return {
         date: summary.date,
         cost: dayCost,
       };
     });
 
-    const averageCostPerExecution = totalApiCalls > 0 ? totalCost / totalApiCalls : 0;
+    const totalExecutions = totalApiCalls + totalGeminiCalls;
+    const averageCostPerExecution = totalExecutions > 0 ? totalCost / totalExecutions : 0;
 
     return {
       totalCost,
       apiCost,
+      geminiCost,
       browserbaseCost,
+      storageCost,
       totalApiCalls,
+      totalGeminiCalls,
       totalSessions,
+      totalStorageOperations,
       totalTokens,
+      totalGeminiTokens,
       averageCostPerExecution,
       costByDay,
       costByModel,
+      costByProvider,
     };
   }
 }
