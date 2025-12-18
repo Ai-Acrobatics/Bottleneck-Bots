@@ -20,6 +20,7 @@ import { UserManagement } from '@/pages/admin/UserManagement';
 import { SystemHealth } from '@/pages/admin/SystemHealth';
 import { AuditLog } from '@/pages/admin/AuditLog';
 import { ConfigCenter } from '@/pages/admin/ConfigCenter';
+import { CostsPage } from '@/pages/admin/CostsPage';
 import DashboardLayout from './DashboardLayout';
 import { Toaster } from '@/components/ui/sonner';
 import { FeaturesPage } from '@/components/FeaturesPage';
@@ -49,6 +50,7 @@ export function Routes() {
           {/* Admin routes */}
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />
+          <Route path="/admin/costs" component={CostsPage} />
           <Route path="/admin/system" component={SystemHealth} />
           <Route path="/admin/audit" component={AuditLog} />
           <Route path="/admin/config" component={ConfigCenter} />

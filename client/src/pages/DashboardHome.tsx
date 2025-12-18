@@ -27,7 +27,7 @@ export default function DashboardHome() {
         />
         <h1 className="text-3xl font-bold tracking-tight mt-4">Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Welcome to your GHL Agency AI Dashboard
+          Welcome to your Bottleneck Bot Dashboard
         </p>
       </div>
 

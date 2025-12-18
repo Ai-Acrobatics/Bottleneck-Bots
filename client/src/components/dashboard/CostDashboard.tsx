@@ -29,6 +29,33 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
+import {
   DollarSign,
   TrendingUp,
   Cpu,
@@ -37,6 +64,7 @@ import {
   AlertTriangle,
   BarChart3,
   Zap,
+  Settings,
 } from "lucide-react";
 
 type TimePeriod = "day" | "week" | "month" | "quarter" | "year";
@@ -65,6 +93,148 @@ function formatNumber(num: number): string {
     return `${(num / 1_000).toFixed(1)}K`;
   }
   return num.toLocaleString();
+}
+
+/**
+ * Budget Settings Dialog
+ */
+interface BudgetSettingsDialogProps {
+  budget: {
+    hasBudget: boolean;
+    dailyLimit?: number;
+    weeklyLimit?: number;
+    monthlyLimit?: number;
+    alertThreshold?: number;
+    autoStopOnLimit?: boolean;
+  };
+  onSave: (data: {
+    dailyBudget?: number;
+    weeklyBudget?: number;
+    monthlyBudget?: number;
+    alertThreshold: number;
+    autoStopOnLimit: boolean;
+  }) => void;
+}
+
+function BudgetSettingsDialog({ budget, onSave }: BudgetSettingsDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [dailyBudget, setDailyBudget] = useState(budget.dailyLimit?.toString() || "");
+  const [weeklyBudget, setWeeklyBudget] = useState(budget.weeklyLimit?.toString() || "");
+  const [monthlyBudget, setMonthlyBudget] = useState(budget.monthlyLimit?.toString() || "");
+  const [alertThreshold, setAlertThreshold] = useState((budget.alertThreshold || 80).toString());
+  const [autoStopOnLimit, setAutoStopOnLimit] = useState(budget.autoStopOnLimit || false);
+
+  const setBudgetMutation = trpc.costs.setBudget.useMutation({
+    onSuccess: () => {
+      setOpen(false);
+    },
+  });
+
+  const handleSave = () => {
+    const data = {
+      dailyBudget: dailyBudget ? parseFloat(dailyBudget) : undefined,
+      weeklyBudget: weeklyBudget ? parseFloat(weeklyBudget) : undefined,
+      monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : undefined,
+      alertThreshold: parseFloat(alertThreshold) || 80,
+      autoStopOnLimit,
+    };
+
+    setBudgetMutation.mutate(data);
+    onSave(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <Settings className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Budget Settings</DialogTitle>
+          <DialogDescription>
+            Set spending limits and configure budget alerts. Leave fields empty to disable that budget limit.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="daily-budget">Daily Budget ($)</Label>
+            <Input
+              id="daily-budget"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 10.00"
+              value={dailyBudget}
+              onChange={(e) => setDailyBudget(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="weekly-budget">Weekly Budget ($)</Label>
+            <Input
+              id="weekly-budget"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 50.00"
+              value={weeklyBudget}
+              onChange={(e) => setWeeklyBudget(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="monthly-budget">Monthly Budget ($)</Label>
+            <Input
+              id="monthly-budget"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 200.00"
+              value={monthlyBudget}
+              onChange={(e) => setMonthlyBudget(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="alert-threshold">Alert Threshold (%)</Label>
+            <Input
+              id="alert-threshold"
+              type="number"
+              step="1"
+              min="1"
+              max="100"
+              placeholder="80"
+              value={alertThreshold}
+              onChange={(e) => setAlertThreshold(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Receive alerts when spending reaches this percentage of your budget
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="auto-stop">Auto-stop on limit</Label>
+              <p className="text-xs text-muted-foreground">
+                Automatically disable API access when budget limit is reached
+              </p>
+            </div>
+            <Switch
+              id="auto-stop"
+              checked={autoStopOnLimit}
+              onCheckedChange={setAutoStopOnLimit}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={setBudgetMutation.isLoading}>
+            {setBudgetMutation.isLoading ? "Saving..." : "Save Budget"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -129,12 +299,24 @@ function BudgetStatus({ budget }: { budget: {
   monthlyRemaining?: number;
   isOverBudget: boolean;
   shouldAlert: boolean;
+  alertThreshold?: number;
+  autoStopOnLimit?: boolean;
 } }) {
+  const utils = trpc.useUtils();
+
+  const handleBudgetSave = () => {
+    // Refetch budget data after save
+    utils.costs.getBudget.invalidate();
+  };
+
   if (!budget.hasBudget) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">Budget Status</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Budget Status</CardTitle>
+            <BudgetSettingsDialog budget={budget} onSave={handleBudgetSave} />
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm">
@@ -154,19 +336,24 @@ function BudgetStatus({ budget }: { budget: {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Budget Status</CardTitle>
-          {budget.isOverBudget && (
-            <Badge variant="destructive" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              Over Budget
-            </Badge>
-          )}
-          {!budget.isOverBudget && budget.shouldAlert && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              Near Limit
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm font-medium">Budget Status</CardTitle>
+            <BudgetSettingsDialog budget={budget} onSave={handleBudgetSave} />
+          </div>
+          <div className="flex items-center gap-2">
+            {budget.isOverBudget && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Over Budget
+              </Badge>
+            )}
+            {!budget.isOverBudget && budget.shouldAlert && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Near Limit
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -259,6 +446,155 @@ function ProviderBreakdown({ costByProvider }: { costByProvider: Record<string, 
 }
 
 /**
+ * Cost Trends Chart Component
+ * Displays cost trends over time with stacked areas for each provider
+ */
+function CostTrendsChart({
+  trends
+}: {
+  trends: Array<{
+    period: Date;
+    totalCost: number;
+    apiCost: number;
+    geminiCost: number;
+    browserbaseCost: number;
+    storageCost: number;
+    totalApiCalls: number;
+    totalGeminiCalls: number;
+    totalSessions: number;
+    totalStorageOperations: number;
+    totalTokens: number;
+    totalGeminiTokens: number;
+  }>
+}) {
+  // Chart configuration for colors and labels
+  const chartConfig = {
+    apiCost: {
+      label: "Claude API",
+      color: "hsl(24, 100%, 60%)", // Orange
+    },
+    geminiCost: {
+      label: "Gemini API",
+      color: "hsl(217, 91%, 60%)", // Blue
+    },
+    browserbaseCost: {
+      label: "Browserbase",
+      color: "hsl(142, 71%, 45%)", // Green
+    },
+    storageCost: {
+      label: "Storage",
+      color: "hsl(271, 81%, 56%)", // Purple
+    },
+  } satisfies ChartConfig;
+
+  // Transform data for the chart
+  const chartData = trends.map((trend) => ({
+    date: new Date(trend.period).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
+    }),
+    apiCost: Number(trend.apiCost.toFixed(4)),
+    geminiCost: Number(trend.geminiCost.toFixed(4)),
+    browserbaseCost: Number(trend.browserbaseCost.toFixed(4)),
+    storageCost: Number(trend.storageCost.toFixed(4)),
+  }));
+
+  // Custom tooltip formatter for currency
+  const formatTooltipValue = (value: number) => formatCurrency(value);
+
+  return (
+    <Card className="col-span-full">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Cost Trends</CardTitle>
+        <CardDescription>Daily cost breakdown by service provider</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+          <AreaChart
+            data={chartData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id="fillApiCost" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(24, 100%, 60%)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(24, 100%, 60%)" stopOpacity={0.1} />
+              </linearGradient>
+              <linearGradient id="fillGeminiCost" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.1} />
+              </linearGradient>
+              <linearGradient id="fillBrowserbaseCost" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.1} />
+              </linearGradient>
+              <linearGradient id="fillStorageCost" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(271, 81%, 56%)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(271, 81%, 56%)" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              className="text-xs"
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              className="text-xs"
+              tickFormatter={(value) => `$${value.toFixed(2)}`}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(value) => `Date: ${value}`}
+                  formatter={(value) => formatTooltipValue(value as number)}
+                />
+              }
+            />
+            <Area
+              type="monotone"
+              dataKey="storageCost"
+              stackId="1"
+              stroke="hsl(271, 81%, 56%)"
+              fill="url(#fillStorageCost)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="browserbaseCost"
+              stackId="1"
+              stroke="hsl(142, 71%, 45%)"
+              fill="url(#fillBrowserbaseCost)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="geminiCost"
+              stackId="1"
+              stroke="hsl(217, 91%, 60%)"
+              fill="url(#fillGeminiCost)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="apiCost"
+              stackId="1"
+              stroke="hsl(24, 100%, 60%)"
+              fill="url(#fillApiCost)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * Main Cost Dashboard Component
  */
 export function CostDashboard() {
@@ -286,6 +622,12 @@ export function CostDashboard() {
 
   // Fetch budget status
   const { data: budget } = trpc.costs.getBudget.useQuery();
+
+  // Fetch cost trends
+  const { data: costTrends } = trpc.costs.getCostTrends.useQuery({
+    period,
+    groupBy: "day",
+  });
 
   if (overviewLoading) {
     return (
@@ -373,6 +715,9 @@ export function CostDashboard() {
             {budget && <BudgetStatus budget={budget} />}
             <ProviderBreakdown costByProvider={costByProvider} />
           </div>
+          {costTrends && costTrends.trends.length > 0 && (
+            <CostTrendsChart trends={costTrends.trends} />
+          )}
         </TabsContent>
 
         <TabsContent value="claude" className="space-y-4">

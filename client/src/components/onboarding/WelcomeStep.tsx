@@ -125,7 +125,7 @@ export function WelcomeStep({ data, onNext, onBack, isFirstStep }: WelcomeStepPr
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-slate-800 mb-3">Welcome to GHL Agency AI</h2>
+        <h2 className="text-3xl font-bold text-slate-800 mb-3">Welcome to Bottleneck Bot</h2>
         <p className="text-slate-600 text-lg">
           Let's start by getting to know you and your business
         </p>
