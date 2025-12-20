@@ -5,10 +5,23 @@
  * for ingestion into the RAG system for agent training.
  */
 
-// pdf-parse is a CommonJS module - use namespace import for ESM compatibility
-import * as pdfParseModule from 'pdf-parse';
-// Handle both ESM and CJS module formats
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+// pdf-parse is loaded dynamically to avoid serverless compatibility issues
+// (pdfjs-dist uses browser APIs like DOMMatrix that aren't available in Node.js serverless)
+let pdfParse: any = null;
+
+async function getPdfParser() {
+  if (pdfParse) return pdfParse;
+
+  try {
+    // Dynamic import to avoid loading at startup
+    const pdfParseModule = await import('pdf-parse');
+    pdfParse = pdfParseModule.default || pdfParseModule;
+    return pdfParse;
+  } catch (error) {
+    console.error('[DocumentParser] Failed to load pdf-parse:', error);
+    throw new Error('PDF parsing is not available in this environment');
+  }
+}
 
 export interface ParsedDocument {
   text: string;
@@ -34,7 +47,9 @@ class DocumentParserService {
    */
   async parsePdf(buffer: Buffer, options: ParseOptions = {}): Promise<ParsedDocument> {
     try {
-      const data = await pdfParse(buffer, {
+      // Load pdf-parse dynamically
+      const parser = await getPdfParser();
+      const data = await parser(buffer, {
         max: options.maxPages || 0, // 0 means all pages
       });
 
