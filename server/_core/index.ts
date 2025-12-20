@@ -52,6 +52,17 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 export async function createApp() {
   const app = express();
 
+  // Ultra-fast health check - MUST be before all middleware to avoid cold start delays
+  // This ensures load balancers and monitoring get instant responses
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "healthy",
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+    });
+  });
+
   // Sentry middleware must be the first middleware
   setupSentryMiddleware(app);
 
@@ -107,15 +118,6 @@ export async function createApp() {
     app.use(express.json({ limit: "50mb" }));
     app.use(express.urlencoded({ limit: "50mb", extended: true }));
   }
-  // Simple health check at /api/health (no auth required)
-  app.get("/api/health", (req, res) => {
-    res.json({
-      status: "healthy",
-      version: "1.0.0",
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || "development",
-    });
-  });
 
   // OAuth callback under /api/oauth/callback (for integrations, not user auth)
   registerOAuthRoutes(app);
