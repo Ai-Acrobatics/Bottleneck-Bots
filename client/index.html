@@ -73,13 +73,41 @@
     }
     </script>
 
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <!-- Google Tag Manager (Recommended) - Replace GTM-XXXXXXX with your GTM ID -->
+    <!-- Uncomment to use GTM instead of gtag.js -->
+    <!--
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-XXXXXXX');</script>
+    -->
+
+    <!-- Google Ads & Analytics (gtag.js) - Replace with your IDs -->
+    <!-- GA4 Measurement ID: G-XXXXXXXXXX -->
+    <!-- Google Ads Conversion ID: AW-XXXXXXXXX -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-XXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX');
+
+      // Initialize consent mode (GDPR compliance)
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'wait_for_update': 500
+      });
+
+      // Configure Google Ads
+      gtag('config', 'AW-XXXXXXXXX', {
+        'allow_enhanced_conversions': true
+      });
+
+      // Configure GA4 (optional - add if you want separate GA4 tracking)
+      // gtag('config', 'G-XXXXXXXXXX', {
+      //   'send_page_view': true
+      // });
     </script>
 
     <!-- Meta Pixel Code -->
@@ -98,6 +126,12 @@
   </head>
 
   <body>
+    <!-- Google Tag Manager (noscript) - Uncomment if using GTM -->
+    <!--
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXXXXX"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    -->
+
     <!-- Meta Pixel noscript fallback (must be in body, not head) -->
     <noscript><img height="1" width="1" style="display:none"
       src="https://www.facebook.com/tr?id=XXXXXXXXXXXXXXXXX&ev=PageView&noscript=1"

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { GlassPane } from './GlassPane';
+import { trackConversion, ConversionEvent } from '@/lib/analytics';
 
 interface LoginScreenProps {
   onAuthenticated: (tier: 'STARTER' | 'GROWTH' | 'WHITELABEL', needsOnboarding?: boolean) => void;
@@ -76,6 +77,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onAuthenticated, onBac
 // Success - determine tier and onboarding status
       const tier = 'WHITELABEL'; // Default tier, could be from response in the future
       const needsOnboarding = isSignUp || data.user?.onboardingCompleted === false;
+
+      // Track conversion if this is a signup
+      if (isSignUp) {
+        trackConversion(ConversionEvent.REGISTRATION_COMPLETE, {
+          method: 'email',
+          tier: tier,
+          value: 497,
+          currency: 'USD',
+        });
+      }
 
       // Call onAuthenticated with tier and onboarding flag
       onAuthenticated(tier, needsOnboarding);

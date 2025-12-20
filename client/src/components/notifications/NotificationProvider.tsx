@@ -194,6 +194,9 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 
   // Convert agent logs to notifications
   useEffect(() => {
+    // Ensure logs is an array
+    if (!Array.isArray(logs)) return;
+
     const newLogs = logs.filter(
       (log) => !previousLogsRef.current.some((prevLog) => prevLog.id === log.id)
     );

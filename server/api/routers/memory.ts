@@ -13,7 +13,7 @@
 import { z } from 'zod';
 import { publicProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
-import { getMemorySystem, memoryCleanupScheduler } from '../../services/memory';
+import { getMemorySystem, getAgentMemory, getReasoningBank, memoryCleanupScheduler } from '../../services/memory';
 
 // ========================================
 // ZOD SCHEMAS
@@ -149,23 +149,19 @@ export const memoryRouter = router({
     .input(createMemorySchema)
     .mutation(async ({ input }) => {
       try {
-        const memorySystem = getMemorySystem();
-        const entryId = await memorySystem.searchMemory({}).then(async () => {
-          // Use the agentMemory service directly for creating entries
-          const agentMemory = (await import('../../services/memory')).getAgentMemory();
-          return await agentMemory.storeContext(
-            input.sessionId,
-            input.key,
-            input.value,
-            {
-              agentId: input.agentId,
-              userId: input.userId,
-              metadata: input.metadata,
-              ttl: input.ttl,
-              embedding: input.embedding,
-            }
-          );
-        });
+        const agentMemory = getAgentMemory();
+        const entryId = await agentMemory.storeContext(
+          input.sessionId,
+          input.key,
+          input.value,
+          {
+            agentId: input.agentId,
+            userId: input.userId,
+            metadata: input.metadata,
+            ttl: input.ttl,
+            embedding: input.embedding,
+          }
+        );
 
         return {
           success: true,
@@ -274,7 +270,6 @@ export const memoryRouter = router({
     .input(updateMemorySchema)
     .mutation(async ({ input }) => {
       try {
-        const { getAgentMemory } = await import('../../services/memory');
         const agentMemory = getAgentMemory();
 
         await agentMemory.updateContext(
@@ -561,7 +556,6 @@ export const memoryRouter = router({
             };
 
             // Update the newest entry with merged metadata
-            const { getAgentMemory } = await import('../../services/memory');
             const agentMemory = getAgentMemory();
             await agentMemory.updateContext(
               newest.sessionId,

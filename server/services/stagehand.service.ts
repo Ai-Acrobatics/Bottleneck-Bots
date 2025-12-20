@@ -33,6 +33,43 @@ export interface StagehandConfig {
   timeout?: number;
   userId?: number;
   executionId?: number;
+  // Browserbase session settings (Stagehand v3)
+  browserSettings?: {
+    viewport?: { width: number; height: number };
+    blockAds?: boolean;
+    solveCaptchas?: boolean;
+    recordSession?: boolean;
+    advancedStealth?: boolean; // Scale Plan only
+    captchaImageSelector?: string;
+    captchaInputSelector?: string;
+  };
+  // Session configuration
+  keepAlive?: boolean;
+  proxies?: boolean;
+  region?: string; // e.g., 'us-west-2'
+  // DOM stabilization (ms to wait for elements to be interactive)
+  domSettleTimeout?: number;
+  // User metadata for tracking
+  userMetadata?: Record<string, string>;
+}
+
+export interface ActOptions {
+  variables?: Record<string, string>;
+  timeout?: number;
+  context?: string; // Additional context for similar elements (Stagehand v3 best practice)
+}
+
+export interface ExtractOptions {
+  model?: string;
+  timeout?: number;
+  selector?: string; // CSS or XPath to focus on specific area (reduces tokens)
+}
+
+export interface ObserveOptions {
+  instruction?: string;
+  model?: string;
+  timeout?: number;
+  selector?: string; // XPath to focus on specific page area
 }
 
 export interface TabInfo {
@@ -245,6 +282,13 @@ export class StagehandService {
 
   /**
    * Create a new Stagehand session
+   *
+   * Stagehand v3 Configuration:
+   * - browserSettings: viewport, stealth, CAPTCHA, recording
+   * - cacheDir: action caching for performance
+   * - domSettleTimeout: DOM stabilization wait time
+   * - proxies: residential proxy support
+   * - region: geographic deployment location
    */
   public async createSession(config?: Partial<StagehandConfig>): Promise<StagehandSession> {
     const mergedConfig = { ...this.defaultConfig, ...config };
@@ -260,20 +304,69 @@ export class StagehandService {
     }
 
     try {
-      console.log('[StagehandService] Creating new session...');
+      console.log('[StagehandService] Creating new session with Stagehand v3 configuration...');
+
+      // Build browserbaseSessionCreateParams (Stagehand v3)
+      const browserbaseParams: Record<string, unknown> = {
+        projectId: process.env.BROWSERBASE_PROJECT_ID,
+      };
+
+      // Apply browser settings
+      if (mergedConfig.browserSettings) {
+        browserbaseParams.browserSettings = {
+          viewport: mergedConfig.browserSettings.viewport || { width: 1920, height: 1080 },
+          blockAds: mergedConfig.browserSettings.blockAds ?? true,
+          solveCaptchas: mergedConfig.browserSettings.solveCaptchas ?? true, // Enabled by default
+          recordSession: mergedConfig.browserSettings.recordSession ?? true, // Enabled by default
+          advancedStealth: mergedConfig.browserSettings.advancedStealth,
+          captchaImageSelector: mergedConfig.browserSettings.captchaImageSelector,
+          captchaInputSelector: mergedConfig.browserSettings.captchaInputSelector,
+        };
+      }
+
+      // Apply session configuration
+      if (mergedConfig.keepAlive !== undefined) {
+        browserbaseParams.keepAlive = mergedConfig.keepAlive;
+      }
+      if (mergedConfig.proxies !== undefined) {
+        browserbaseParams.proxies = mergedConfig.proxies;
+      }
+      if (mergedConfig.region) {
+        browserbaseParams.region = mergedConfig.region;
+      }
+      if (mergedConfig.timeout) {
+        browserbaseParams.timeout = mergedConfig.timeout;
+      }
+
+      // Apply user metadata for tracking
+      if (mergedConfig.userMetadata || mergedConfig.userId) {
+        browserbaseParams.userMetadata = {
+          ...mergedConfig.userMetadata,
+          userId: mergedConfig.userId?.toString(),
+          executionId: mergedConfig.executionId?.toString(),
+        };
+      }
 
       const stagehand = new Stagehand({
         env: 'BROWSERBASE',
         apiKey: process.env.BROWSERBASE_API_KEY,
         projectId: process.env.BROWSERBASE_PROJECT_ID,
         verbose: mergedConfig.verbose,
+        // Model configuration
         model: {
           modelName: modelConfig.modelName,
           apiKey: modelConfig.apiKey,
         },
+        // Action caching for performance (Stagehand v3 best practice)
+        cacheDir: mergedConfig.cacheDir || './stagehand-cache',
+        // DOM stabilization timeout (500ms for static, up to 5000ms for dynamic content)
+        domSettleTimeout: mergedConfig.domSettleTimeout || 1000,
+        // Browserbase session configuration
+        browserbaseSessionCreateParams: browserbaseParams,
       } as any);
 
       await stagehand.init();
+      console.log('[StagehandService] Stagehand v3 initialized with caching enabled');
 
       const context = stagehand.context;
       const pages = context.pages();
@@ -431,11 +524,21 @@ export class StagehandService {
 
   /**
    * Extract structured data from the page using AI
+   *
+   * BEST PRACTICE (Stagehand v3):
+   * - Use .describe() on Zod schema fields for context
+   * - Apply selector to reduce token usage by up to 10x
+   * - For pagination, use 60-second timeouts
+   * - Use z.string() for variable formats like prices with currency
+   * - Use z.string().url() for link extraction
+   *
+   * @param schema - Zod schema or JSON schema object for extraction
    */
   public async extract<T = unknown>(
     sessionId: string,
     instruction: string,
-    schema: Record<string, unknown>
+    schema: unknown, // Zod schema or JSON schema - Stagehand accepts both
+    options?: ExtractOptions
   ): Promise<ExtractResult<T>> {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -446,7 +549,22 @@ export class StagehandService {
       this.updateActivity(session);
       console.log(`[StagehandService] Extracting data: ${instruction}`);
 
-      const result = await session.stagehand.extract(instruction, schema);
+      // Build extraction options (Stagehand v3)
+      const extractOptions: Record<string, unknown> = {};
+      if (options?.model) {
+        extractOptions.model = options.model;
+      }
+      if (options?.timeout) {
+        extractOptions.timeout = options.timeout;
+      }
+      if (options?.selector) {
+        // Using selector reduces token usage and improves accuracy
+        extractOptions.selector = options.selector;
+        console.log(`[StagehandService] Using selector to reduce token usage: ${options.selector}`);
+      }
+
+      // Stagehand accepts both Zod schemas and JSON schemas
+      const result = await session.stagehand.extract(instruction, schema as any, extractOptions);
 
       console.log(`[StagehandService] Extraction completed:`, result);
 
@@ -466,8 +584,24 @@ export class StagehandService {
 
   /**
    * Observe available actions on the current page
+   *
+   * BEST PRACTICE (Stagehand v3):
+   * - Use specific, descriptive instructions (not vague like "find buttons")
+   * - Use observe() for planning, then execute discovered actions with act()
+   * - Plan then execute is 2-3x faster than separate calls
+   * - Combine with extract() to reduce token usage by up to 10x
+   * - Validate elements before critical operations
+   *
+   * PRIMARY USE CASES:
+   * - Exploration: discover buttons, forms, links
+   * - Planning: map multi-step workflows
+   * - Caching: store discovered actions for reuse
+   * - Validation: verify elements exist before acting
    */
-  public async observe(sessionId: string, instruction?: string): Promise<ObserveResult> {
+  public async observe(
+    sessionId: string,
+    instructionOrOptions?: string | ObserveOptions
+  ): Promise<ObserveResult> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return { success: false, observations: [], error: 'Session not found' };
@@ -475,11 +609,34 @@ export class StagehandService {
 
     try {
       this.updateActivity(session);
-      console.log(`[StagehandService] Observing page: ${instruction || 'general observation'}`);
 
-      const observations = await session.stagehand.observe(
-        instruction || 'What actions are available on this page?'
-      );
+      // Handle both string instruction and options object for backward compatibility
+      let instruction: string;
+      let options: ObserveOptions | undefined;
+
+      if (typeof instructionOrOptions === 'string') {
+        instruction = instructionOrOptions;
+      } else {
+        options = instructionOrOptions;
+        instruction = options?.instruction || 'What actions are available on this page?';
+      }
+
+      console.log(`[StagehandService] Observing page: ${instruction}`);
+
+      // Build observe options (Stagehand v3)
+      const observeOptions: Record<string, unknown> = {};
+      if (options?.model) {
+        observeOptions.model = options.model;
+      }
+      if (options?.timeout) {
+        observeOptions.timeout = options.timeout;
+      }
+      if (options?.selector) {
+        observeOptions.selector = options.selector;
+        console.log(`[StagehandService] Using selector for focused observation: ${options.selector}`);
+      }
+
+      const observations = await session.stagehand.observe(instruction, observeOptions);
 
       console.log(`[StagehandService] Found ${observations.length} observations`);
 

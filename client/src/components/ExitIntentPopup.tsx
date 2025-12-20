@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Rocket, Clock, Gift } from 'lucide-react';
 import { Button } from './ui/button';
+import { trackConversion, ConversionEvent } from '@/lib/analytics';
 
 interface ExitIntentPopupProps {
   onSignUp: () => void;
@@ -45,16 +46,11 @@ export const ExitIntentPopup: React.FC<ExitIntentPopupProps> = ({ onSignUp }) =>
   const handleSignUp = () => {
     setIsVisible(false);
     onSignUp();
-    // Track conversion
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'exit_intent_conversion', {
-        event_category: 'engagement',
-        event_label: 'exit_intent_signup'
-      });
-    }
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Lead', { content_name: 'exit_intent' });
-    }
+    // Track conversion using centralized analytics
+    trackConversion(ConversionEvent.EXIT_INTENT_CONVERSION, {
+      content_name: 'exit_intent_popup',
+      source: 'exit_intent',
+    });
   };
 
   if (!isVisible) return null;

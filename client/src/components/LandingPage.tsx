@@ -3,9 +3,11 @@ import { Button } from './ui/button';
 import { ArrowRight, CheckCircle2, Zap, Globe, Mail, Phone, BarChart3, Shield, Users, Clock, DollarSign, TrendingUp, Target, Sparkles, Crown, Rocket, Brain, Play, Menu, X } from 'lucide-react';
 import { SkipLink } from './SkipLink';
 import { ExitIntentPopup } from './ExitIntentPopup';
+import { CookieConsent } from './CookieConsent';
 import { CountdownTimer } from './CountdownTimer';
 import { TrustBadges, TrustBadgesInline } from './TrustBadges';
 import { LiveChat } from './LiveChat';
+import { useConversionTracking } from '@/hooks/useConversionTracking';
 
 
 // Optimized image component with lazy loading and CLS prevention
@@ -36,11 +38,26 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToFeatures }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { trackCTAClick, trackPricingView } = useConversionTracking();
 
   const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
     setIsMobileMenuOpen(false);
+
+    // Track pricing section views
+    if (sectionId === 'pricing') {
+      trackPricingView({ source: 'navigation' });
+    }
+  };
+
+  // Enhanced onLogin handler with conversion tracking
+  const handleCTAClick = (location: string) => {
+    trackCTAClick({
+      button_location: location,
+      source: 'landing_page',
+    });
+    onLogin();
   };
 
   return (
@@ -60,20 +77,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               <Sparkles className="w-4 h-4 sm:w-7 sm:h-7 text-white fill-white relative z-10" aria-hidden="true" />
             </div>
             <div>
-              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 bg-clip-text text-transparent">Bottleneck Bot</span>
-              <div className="hidden sm:block text-xs text-gray-600 font-semibold -mt-1">Buy Back Your Freedom</div>
+              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 bg-clip-text text-transparent">GHL Agency AI</span>
+              <div className="hidden sm:block text-[11px] text-gray-600 font-semibold -mt-1">Buy Back Your Freedom</div>
             </div>
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-gray-700">
             {onNavigateToFeatures && (
-              <a href="#" onClick={(e) => { e.preventDefault(); onNavigateToFeatures(); }} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-3 py-2 min-h-[44px] inline-flex items-center">Features</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); onNavigateToFeatures(); }} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-2 py-1">Features</a>
             )}
-            <a href="#problem" onClick={(e) => scrollToSection(e, 'problem')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-3 py-2 min-h-[44px] inline-flex items-center">The Problem</a>
-            <a href="#solution" onClick={(e) => scrollToSection(e, 'solution')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-3 py-2 min-h-[44px] inline-flex items-center">The Solution</a>
-            <a href="#proof" onClick={(e) => scrollToSection(e, 'proof')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-3 py-2 min-h-[44px] inline-flex items-center">Proof</a>
-            <a href="#pricing" onClick={(e) => scrollToSection(e, 'pricing')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-3 py-2 min-h-[44px] inline-flex items-center">Investment</a>
+            <a href="#problem" onClick={(e) => scrollToSection(e, 'problem')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-2 py-1">The Problem</a>
+            <a href="#solution" onClick={(e) => scrollToSection(e, 'solution')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-2 py-1">The Solution</a>
+            <a href="#proof" onClick={(e) => scrollToSection(e, 'proof')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-2 py-1">Proof</a>
+            <a href="#pricing" onClick={(e) => scrollToSection(e, 'pricing')} className="hover:text-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 rounded-md px-2 py-1">Investment</a>
           </div>
 
           {/* Mobile Menu Button */}
@@ -86,17 +103,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
             {isMobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
           </button>
 
-          {/* CTA Buttons - Hidden on mobile (in hamburger menu instead) */}
-          <div className="hidden lg:flex items-center gap-2 sm:gap-4">
-            <Button variant="ghost" onClick={onLogin} className="font-semibold text-sm text-gray-700 hover:text-emerald-600 px-4 min-h-[44px] min-w-[44px]">
-              Log In
-            </Button>
-            <Button onClick={onLogin} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg rounded-full px-6 text-sm font-bold relative overflow-hidden group min-h-[44px]">
-              <span className="relative z-10 flex items-center gap-2">
-                Start Free <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </Button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile CTA Buttons - visible below lg breakpoint */}
+            <div className="flex lg:hidden items-center gap-2 sm:gap-4">
+              <Button variant="ghost" onClick={() => handleCTAClick('header_mobile_login')} className="font-semibold text-xs sm:text-sm text-gray-700 hover:text-emerald-600 px-2 sm:px-4 min-h-[44px]">
+                Log In
+              </Button>
+              <Button onClick={() => handleCTAClick('header_mobile_start_free')} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg rounded-full px-3 sm:px-6 text-xs sm:text-sm font-bold relative overflow-hidden group min-h-[44px]">
+                <span className="relative z-10 flex items-center gap-1 sm:gap-2">
+                  Start Free <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </Button>
+            </div>
+            {/* Desktop CTA Buttons - visible at lg breakpoint and above */}
+            <div className="hidden lg:flex items-center gap-2 sm:gap-4">
+              <Button variant="ghost" onClick={() => handleCTAClick('header_desktop_login')} className="font-semibold text-xs sm:text-sm text-gray-700 hover:text-emerald-600 px-2 sm:px-4">
+                Log In
+              </Button>
+              <Button onClick={() => handleCTAClick('header_desktop_start_free')} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg rounded-full px-3 sm:px-6 text-xs sm:text-sm font-bold relative overflow-hidden group">
+                <span className="relative z-10 flex items-center gap-1 sm:gap-2">
+                  Start Free <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -112,10 +143,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               <a href="#proof" onClick={(e) => scrollToSection(e, 'proof')} className="text-sm font-medium text-gray-700 hover:text-emerald-600 py-3 px-4 min-h-[44px] flex items-center rounded-md hover:bg-gray-50 transition-colors">Proof</a>
               <a href="#pricing" onClick={(e) => scrollToSection(e, 'pricing')} className="text-sm font-medium text-gray-700 hover:text-emerald-600 py-3 px-4 min-h-[44px] flex items-center rounded-md hover:bg-gray-50 transition-colors">Investment</a>
               <hr className="border-gray-200" />
-              <Button variant="ghost" onClick={onLogin} className="font-semibold text-sm text-gray-700 hover:text-emerald-600 justify-start">
+              <Button variant="ghost" onClick={() => handleCTAClick('mobile_menu_login')} className="font-semibold text-sm text-gray-700 hover:text-emerald-600 justify-start">
                 Log In
               </Button>
-              <Button onClick={onLogin} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white rounded-full font-bold">
+              <Button onClick={() => handleCTAClick('mobile_menu_start_free')} className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white rounded-full font-bold">
                 Start Free <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
               </Button>
             </nav>
@@ -167,7 +198,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
           {/* CTA Buttons - Classic Direct Response */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-400 px-4">
             <Button
-              onClick={onLogin}
+              onClick={() => handleCTAClick('hero_claim_freedom')}
               size="lg"
               className="w-full sm:w-auto bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white shadow-lg hover:shadow-xl rounded-full px-6 sm:px-10 h-12 sm:h-16 text-base sm:text-xl font-black relative overflow-hidden group animate-gradient animate-bounce-subtle active:scale-95 transition-transform"
             >
@@ -192,14 +223,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
           </div>
 
           {/* Social Proof Element */}
-          <div className="text-center text-sm text-gray-600 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 px-4">
+          <div className="text-center text-xs sm:text-sm text-gray-600 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 px-4">
             <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
               {[...Array(5)].map((_, i) => (
                 <span key={i} className="text-yellow-400 text-base sm:text-lg">★</span>
               ))}
               <span className="font-bold text-gray-900 ml-1 sm:ml-2">5.0</span>
             </div>
-            <p className="font-medium text-sm">
+            <p className="font-medium">
               <span className="font-bold text-emerald-600">487 agency owners</span> have reclaimed their time and sanity
             </p>
           </div>
@@ -222,7 +253,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
       {/* Trusted By Social Proof Bar */}
       <section className="py-8 sm:py-12 bg-gray-50 border-b border-gray-200">
         <div className="container mx-auto px-4 sm:px-6">
-          <p className="text-center text-sm text-gray-500 font-medium mb-6 uppercase tracking-wider">Trusted by 487+ agencies worldwide</p>
+          <p className="text-center text-xs sm:text-sm text-gray-500 font-medium mb-6 uppercase tracking-wider">Trusted by 487+ agencies worldwide</p>
           <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12 opacity-60 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500">
             {/* Logo-style company representations */}
             <div className="flex items-center gap-2 text-gray-600">
@@ -791,7 +822,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               </div>
 
               <Button
-                onClick={onLogin}
+                onClick={() => handleCTAClick('pricing_starter')}
                 variant="outline"
                 className="w-full rounded-full h-12 font-bold border-2 border-gray-300 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
               >
@@ -842,7 +873,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               </div>
 
               <Button
-                onClick={onLogin}
+                onClick={() => handleCTAClick('pricing_growth')}
                 className="w-full bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 hover:from-emerald-700 hover:via-green-600 hover:to-teal-600 text-white rounded-full h-12 font-black shadow-lg hover:shadow-xl transition-shadow"
               >
                 <Rocket className="w-4 h-4 mr-2" />
@@ -887,7 +918,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               </div>
 
               <Button
-                onClick={onLogin}
+                onClick={() => handleCTAClick('pricing_professional')}
                 variant="outline"
                 className="w-full rounded-full h-12 font-bold border-2 border-blue-400 hover:border-blue-500 hover:bg-blue-50 text-blue-700 transition-colors"
               >
@@ -937,7 +968,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               </div>
 
               <Button
-                onClick={onLogin}
+                onClick={() => handleCTAClick('pricing_enterprise')}
                 variant="outline"
                 className="w-full rounded-full h-12 font-bold border-2 border-amber-400 hover:border-amber-500 hover:bg-amber-50 text-amber-700 transition-colors"
               >
@@ -1089,7 +1120,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
           </p>
 
           <Button
-            onClick={onLogin}
+            onClick={() => handleCTAClick('final_cta_reclaim_life')}
             size="lg"
             className="bg-white hover:bg-gray-100 text-emerald-800 shadow-2xl rounded-full px-8 sm:px-16 h-14 sm:h-20 text-lg sm:text-2xl font-black mb-4 sm:mb-6 group animate-bounce-subtle active:scale-95 transition-transform"
           >
@@ -1157,7 +1188,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
             </div>
           </div>
           <div className="border-t border-gray-300 pt-6 sm:pt-8 text-center text-xs sm:text-sm">
-            <p>&copy; 2025 Bottleneck Bot. All rights reserved. Built for agency owners who refuse to sacrifice their lives for their business.</p>
+            <p>&copy; 2025 GHL Agency AI. All rights reserved. Built for agency owners who refuse to sacrifice their lives for their business.</p>
           </div>
         </div>
       </footer>
@@ -1230,6 +1261,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
         }
       `}</style>
 
+      {/* Cookie Consent Banner */}
+      <CookieConsent />
 
       {/* Live Chat Widget */}
       <LiveChat />

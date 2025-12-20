@@ -611,30 +611,33 @@ describe('WorkflowExecutionMonitor - Execution Controls', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  // NOTE: This test is skipped because it uses a never-resolving promise
-  // which can cause timing issues in the test environment
-  it.skip('disables cancel button while cancelling', async () => {
+  it('disables cancel button while cancelling', async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn(() => new Promise(() => {})); // Never resolves
     renderComponent({ onCancel });
 
+    // Wait for data to load first
+    await waitFor(() => {
+      expect(screen.getByText(/execution #1/i)).toBeInTheDocument();
+    }, { timeout: 10000 });
+
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /cancel execution/i })).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     await user.click(screen.getByRole('button', { name: /cancel execution/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /confirm cancel/i })).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     await user.click(screen.getByRole('button', { name: /confirm cancel/i }));
 
     await waitFor(() => {
       const cancelButton = screen.getByRole('button', { name: /cancelling/i });
       expect(cancelButton).toBeDisabled();
-    });
-  });
+    }, { timeout: 5000 });
+  }, 30000);
 
   it('closes confirmation dialog after successful cancel', async () => {
     const user = userEvent.setup();
@@ -713,15 +716,14 @@ describe('WorkflowExecutionMonitor - Progress Updates', () => {
     });
   });
 
-  // NOTE: This test is skipped because it depends on polling intervals
-  // which don't work reliably with fake timers and async fetch mocks
   it.skip('updates progress when steps complete', async () => {
+    // TODO: Fix fake timer interaction with polling
     vi.useFakeTimers();
 
     renderComponent();
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(screen.getByText(/33%/)).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
 
     // Mock next poll with more completed steps
     mockFetch.mockResolvedValueOnce({
@@ -737,16 +739,14 @@ describe('WorkflowExecutionMonitor - Progress Updates', () => {
     // Advance timers to trigger polling
     await vi.advanceTimersByTimeAsync(2000);
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(screen.getByText(/66%/)).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
 
     vi.useRealTimers();
-  });
+  }, 30000);
 
-  // NOTE: These tests are skipped because they depend on specific text that may
-  // not be rendered in the loading state or require multiple render cycles
-  it.skip('displays completion status', async () => {
+  it('displays completion status', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -758,62 +758,48 @@ describe('WorkflowExecutionMonitor - Progress Updates', () => {
     renderComponent();
     await waitFor(() => {
       expect(screen.getByText(/completed/i)).toBeInTheDocument();
-    });
-  }, 10000);
+    }, { timeout: 10000 });
+  }, 15000);
 
-  it.skip('displays step count summary', async () => {
+  it('displays step count summary', async () => {
     renderComponent();
     await waitFor(() => {
       expect(screen.getByText(/1 of 3 steps/i)).toBeInTheDocument();
-    });
-  }, 10000);
+    }, { timeout: 10000 });
+  }, 15000);
 });
 
 // ============================================
 // ACCESSIBILITY TESTS (10 tests)
 // ============================================
 
-// NOTE: Accessibility tests are skipped because they depend on async fetch operations
-// completing before checking for accessibility attributes. The component uses polling
-// intervals which causes timing issues in the test environment. These tests need
-// component-level refactoring to properly separate loading/loaded states.
-describe.skip('WorkflowExecutionMonitor - Accessibility', () => {
-  // These tests verify accessibility attributes which are rendered immediately
-  // Using shorter waitFor timeouts since attributes are present on initial render
-
-  it('has correct dialog role', async () => {
+describe('WorkflowExecutionMonitor - Accessibility', () => {
+  it('has correct dialog role', () => {
     renderComponent();
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    }, { timeout: 1000 });
+    // Dialog should be present immediately when open=true
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('has aria-labelledby pointing to title', async () => {
+  it('has aria-labelledby pointing to title', () => {
     renderComponent();
-    await waitFor(() => {
-      const dialog = screen.getByRole('dialog');
-      const labelId = dialog.getAttribute('aria-labelledby');
-      expect(labelId).toBeTruthy();
-    }, { timeout: 1000 });
+    const dialog = screen.getByRole('dialog');
+    const labelId = dialog.getAttribute('aria-labelledby');
+    expect(labelId).toBeTruthy();
   });
 
-  it('has aria-describedby for execution status', async () => {
+  it('has aria-describedby for execution status', () => {
     renderComponent();
-    await waitFor(() => {
-      const dialog = screen.getByRole('dialog');
-      const descId = dialog.getAttribute('aria-describedby');
-      expect(descId).toBeTruthy();
-    }, { timeout: 1000 });
+    const dialog = screen.getByRole('dialog');
+    const descId = dialog.getAttribute('aria-describedby');
+    expect(descId).toBeTruthy();
   });
 
-  it('supports keyboard navigation for close', async () => {
+  it('supports keyboard navigation for close', () => {
     const onClose = vi.fn();
     renderComponent({ onClose });
 
-    await waitFor(() => {
-      const closeButtons = screen.getAllByRole('button', { name: /close/i });
-      expect(closeButtons.length).toBeGreaterThan(0);
-    }, { timeout: 1000 });
+    // Dialog should be present immediately
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     // Dialog component handles keyboard events internally
     expect(onClose).not.toHaveBeenCalled();
@@ -823,57 +809,75 @@ describe.skip('WorkflowExecutionMonitor - Accessibility', () => {
     const onClose = vi.fn();
     renderComponent({ onClose });
 
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    }, { timeout: 1000 });
+    // Dialog should be present immediately
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     // Dialog component from Radix UI handles Escape key internally
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('has proper focus management', async () => {
+  it('has proper focus management', () => {
     renderComponent();
-    await waitFor(() => {
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toBeInTheDocument();
-    }, { timeout: 1000 });
 
-    // Dialog should trap focus
+    // Dialog should be present
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+
+    // Document should have an active element
     expect(document.activeElement).toBeTruthy();
   });
 
   it('has accessible progress bar with value labels', async () => {
     renderComponent();
+
+    // Wait for execution data to load
     await waitFor(() => {
-      const progressBar = screen.getByRole('progressbar');
-      expect(progressBar).toHaveAttribute('aria-valuemin', '0');
-      expect(progressBar).toHaveAttribute('aria-valuemax', '100');
-      expect(progressBar).toHaveAttribute('aria-valuenow');
-    }, { timeout: 1000 });
+      expect(screen.getByText(/execution #1/i)).toBeInTheDocument();
+    });
+
+    // Progress bar should have proper ARIA attributes
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveAttribute('aria-valuemin', '0');
+    expect(progressBar).toHaveAttribute('aria-valuemax', '100');
+    expect(progressBar).toHaveAttribute('aria-valuenow');
   });
 
   it('has accessible log region', async () => {
     renderComponent();
+
+    // Wait for execution data to load
     await waitFor(() => {
-      const logRegion = screen.getByLabelText(/execution logs/i);
-      expect(logRegion).toBeInTheDocument();
-    }, { timeout: 1000 });
+      expect(screen.getByText(/execution #1/i)).toBeInTheDocument();
+    });
+
+    // Log region should have proper label
+    const logRegion = screen.getByLabelText(/execution logs/i);
+    expect(logRegion).toBeInTheDocument();
   });
 
   it('has accessible filter controls', async () => {
     renderComponent();
+
+    // Wait for execution data to load
     await waitFor(() => {
-      const filterButton = screen.getByRole('button', { name: /filter/i });
-      expect(filterButton).toHaveAttribute('aria-haspopup');
-    }, { timeout: 1000 });
+      expect(screen.getByText(/execution #1/i)).toBeInTheDocument();
+    });
+
+    // Filter button should have haspopup attribute
+    const filterButton = screen.getByRole('button', { name: /filter/i });
+    expect(filterButton).toHaveAttribute('aria-haspopup');
   });
 
   it('announces status changes to screen readers', async () => {
     renderComponent();
+
+    // Wait for execution data to load
     await waitFor(() => {
-      // Live region for status updates
-      const statusRegion = screen.getByRole('status', { name: /execution status/i });
-      expect(statusRegion).toBeInTheDocument();
-    }, { timeout: 1000 });
+      expect(screen.getByText(/execution #1/i)).toBeInTheDocument();
+    });
+
+    // Status region should exist for screen readers
+    const statusRegion = screen.getByRole('status', { name: /execution status/i });
+    expect(statusRegion).toBeInTheDocument();
   });
 });

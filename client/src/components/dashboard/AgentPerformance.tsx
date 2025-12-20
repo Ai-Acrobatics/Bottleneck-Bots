@@ -27,6 +27,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ExecutionItemProps {
   execution: {
@@ -218,6 +219,29 @@ export function AgentPerformance({
     }
   );
 
+  // Get task details if taskId is provided
+  const taskQuery = trpc.agencyTasks.get.useQuery(
+    { id: taskId || 0 },
+    {
+      enabled: !!taskId,
+    }
+  );
+
+  // Mutation for executing/replaying tasks
+  const executeMutation = trpc.agencyTasks.execute.useMutation({
+    onSuccess: () => {
+      toast.success('Task execution started');
+      if (taskId) {
+        metricsQuery.refetch();
+      } else {
+        statsQuery.refetch();
+      }
+    },
+    onError: (error) => {
+      toast.error(`Failed to start task: ${error.message}`);
+    },
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     if (taskId) {
@@ -229,13 +253,17 @@ export function AgentPerformance({
   };
 
   const handleReplay = (id: number) => {
-    console.log('Replay execution:', id);
-    // TODO: Implement replay functionality
+    if (!taskId) {
+      toast.error('Cannot replay: task ID not available');
+      return;
+    }
+    // Execute the task again using the same task ID
+    executeMutation.mutate({ id: taskId });
   };
 
   const handleView = (id: number) => {
-    console.log('View execution:', id);
-    // TODO: Navigate to execution details
+    // Navigate to execution details - could be expanded to show details in a modal
+    toast.info('Execution details view coming soon');
   };
 
   const isLoading = taskId ? metricsQuery.isLoading : statsQuery.isLoading;

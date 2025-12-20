@@ -20,7 +20,6 @@ import { trpc } from '@/lib/trpc';
 import {
   Layers,
   Loader2,
-  Pause,
   X,
   Play,
   AlertCircle,
@@ -46,12 +45,11 @@ interface TaskQueueItemProps {
     isRunning?: boolean;
     queuePosition?: number;
   };
-  onPause?: (id: number) => void;
   onCancel?: (id: number) => void;
   onStart?: (id: number) => void;
 }
 
-function TaskQueueItem({ task, onPause, onCancel, onStart }: TaskQueueItemProps) {
+function TaskQueueItem({ task, onCancel, onStart }: TaskQueueItemProps) {
   const priorityConfig = {
     critical: {
       color: 'text-red-600 dark:text-red-500',
@@ -173,17 +171,6 @@ function TaskQueueItem({ task, onPause, onCancel, onStart }: TaskQueueItemProps)
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
-          {isRunning && onPause && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onPause(task.id)}
-              className="h-8 w-8 p-0"
-              title="Pause task"
-            >
-              <Pause className="h-4 w-4" />
-            </Button>
-          )}
           {isPending && onStart && (
             <Button
               variant="ghost"
@@ -250,11 +237,8 @@ export function TaskQueue({ className, maxItems = 5 }: TaskQueueProps) {
     },
   });
 
-  const handlePause = (id: number) => {
-    // TODO: Implement pause functionality when backend supports it
-    console.log('Pause task:', id);
-    toast.info('Pause functionality coming soon');
-  };
+  // Removed pause functionality - not supported by backend
+  // Tasks can only be cancelled or started
 
   const handleCancel = (id: number) => {
     if (confirm('Are you sure you want to cancel this task?')) {
@@ -399,7 +383,6 @@ export function TaskQueue({ className, maxItems = 5 }: TaskQueueProps) {
                   isRunning: task.isRunning,
                   queuePosition: task.queuePosition,
                 }}
-                onPause={handlePause}
                 onCancel={handleCancel}
                 onStart={handleStart}
               />

@@ -13,6 +13,7 @@ import { router, publicProcedure, protectedProcedure } from "../../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { ragService } from "../../services/rag.service";
 import { platformDetectionService } from "../../services/platformDetection.service";
+import { documentParserService } from "../../services/document-parser.service";
 import { getDb } from "../../db";
 import { documentationSources, documentationChunks } from "../../../drizzle/schema-rag";
 import { eq, desc, sql, and } from "drizzle-orm";
@@ -66,6 +67,95 @@ export const ragRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to ingest document: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
+   * Upload and ingest a document file (PDF, TXT, HTML, Markdown)
+   * Accepts base64-encoded file content
+   * Parses the document and ingests it into the RAG system for agent training
+   */
+  uploadDocument: protectedProcedure
+    .input(
+      z.object({
+        fileContent: z.string().min(1, "File content is required"), // Base64 encoded
+        filename: z.string().min(1, "Filename is required"),
+        mimeType: z.string().optional(),
+        platform: z.string().min(1).max(50).default("general"),
+        category: z.string().min(1).max(50).default("training"),
+        title: z.string().optional(), // Will use filename if not provided
+        // Chunking options
+        maxTokens: z.number().min(100).max(2000).optional(),
+        overlapTokens: z.number().min(0).max(500).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Decode base64 content to buffer
+        const buffer = Buffer.from(input.fileContent, "base64");
+
+        // Check file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024;
+        if (buffer.length > maxSize) {
+          throw new TRPCError({
+            code: "PAYLOAD_TOO_LARGE",
+            message: "File size exceeds maximum of 10MB",
+          });
+        }
+
+        // Parse the document using the document parser service
+        const parsed = await documentParserService.parse(
+          buffer,
+          input.mimeType,
+          input.filename
+        );
+
+        // Check if we extracted any meaningful content
+        if (!parsed.text || parsed.text.length < 10) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Could not extract text from document. File may be empty or corrupted.",
+          });
+        }
+
+        // Use the title from input, parsed metadata, or filename
+        const title = input.title || parsed.metadata.title || input.filename;
+
+        // Ingest the parsed content into RAG system
+        const result = await ragService.ingest({
+          platform: input.platform,
+          category: input.category,
+          title,
+          content: parsed.text,
+          sourceType: parsed.metadata.format as "markdown" | "html" | "pdf" | "docx",
+          userId: ctx.user.id,
+          chunkingOptions: {
+            maxTokens: input.maxTokens,
+            overlapTokens: input.overlapTokens,
+          },
+        });
+
+        console.log(
+          `[RAG Router] Document uploaded: ${input.filename} (${parsed.metadata.format}) - ${result.chunkCount} chunks`
+        );
+
+        return {
+          success: true,
+          sourceId: result.sourceId,
+          chunkCount: result.chunkCount,
+          totalTokens: result.totalTokens,
+          metadata: parsed.metadata,
+          message: `Successfully processed "${title}" (${parsed.metadata.format}): ${result.chunkCount} chunks, ${parsed.metadata.wordCount} words`,
+        };
+      } catch (error) {
+        console.error("[RAG Router] Upload failed:", error);
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to upload document: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
     }),

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { X, Cookie, Shield } from 'lucide-react';
+import { updateAnalyticsConsent } from '@/lib/analytics';
 
 export const CookieConsent: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -19,25 +20,15 @@ export const CookieConsent: React.FC = () => {
   const handleAccept = () => {
     localStorage.setItem('cookieConsent', 'accepted');
     setIsVisible(false);
-    // Enable analytics
-    if (typeof window !== 'undefined') {
-      (window as any).gtag?.('consent', 'update', {
-        analytics_storage: 'granted',
-        ad_storage: 'granted',
-      });
-    }
+    // Enable analytics using centralized function
+    updateAnalyticsConsent(true);
   };
 
   const handleDecline = () => {
     localStorage.setItem('cookieConsent', 'declined');
     setIsVisible(false);
-    // Disable analytics
-    if (typeof window !== 'undefined') {
-      (window as any).gtag?.('consent', 'update', {
-        analytics_storage: 'denied',
-        ad_storage: 'denied',
-      });
-    }
+    // Disable analytics using centralized function
+    updateAnalyticsConsent(false);
   };
 
   if (!isVisible) return null;

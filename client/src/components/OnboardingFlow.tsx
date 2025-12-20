@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { GlassPane } from './GlassPane';
 import { trpc } from '../lib/trpc';
 import { cn } from '../lib/utils';
+import { trackConversion, ConversionEvent } from '@/lib/analytics';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -174,6 +175,13 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           goals,
           otherGoal,
           ghlApiKey,
+        });
+
+        // Track onboarding completion
+        trackConversion(ConversionEvent.ONBOARDING_COMPLETE, {
+          company: companyName,
+          industry: industry,
+          revenue: monthlyRevenue,
         });
 
         // Simulate setup process for better UX

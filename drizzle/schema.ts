@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, integer, boolean, jsonb, index } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
@@ -11,13 +11,35 @@ export const users = pgTable("users", {
    * Use this for relations between tables.
    */
   id: serial("id").primaryKey(),
+
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).unique(),
   googleId: varchar("googleId", { length: 64 }).unique(),
-  password: text("password"), // Hashed password for email/password login
+
+  /**
+   * Hashed password for email/password login
+   * MUST be hashed using bcryptjs before storage:
+   *   import bcrypt from 'bcryptjs';
+   *   const hashedPassword = await bcrypt.hash(password, 10);
+   * Required when loginMethod is 'email', optional for OAuth logins
+   */
+  password: text("password"),
+
   name: text("name"),
-  email: varchar("email", { length: 320 }).unique(),
-  loginMethod: varchar("loginMethod", { length: 64 }),
+
+  /**
+   * Email address - primary identifier for email/password authentication
+   * Required and unique across all users
+   */
+  email: varchar("email", { length: 320 }).notNull().unique(),
+
+  /**
+   * Login method used by the user
+   * Values: 'email' | 'google' | 'manus'
+   * Determines which authentication flow to use
+   */
+  loginMethod: varchar("loginMethod", { length: 64 }).default("email").notNull(),
+
   role: varchar("role", { length: 20 }).default("user").notNull(),
   onboardingCompleted: boolean("onboardingCompleted").default(false).notNull(),
   suspendedAt: timestamp("suspendedAt"), // When the user account was suspended (null = active)
@@ -25,7 +47,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index on email for fast login lookups
+  emailIdx: index("users_email_idx").on(table.email),
+  // Index on loginMethod for filtering users by auth type
+  loginMethodIdx: index("users_login_method_idx").on(table.loginMethod),
+  // Composite index for email + loginMethod (efficient for login queries)
+  emailLoginMethodIdx: index("users_email_login_method_idx").on(table.email, table.loginMethod),
+}));
 
 /**
  * User business profiles for onboarding data collection
@@ -653,3 +682,21 @@ export {
   type CostBudget,
   type InsertCostBudget,
 } from "./schema-costs";
+
+// Authentication Enhancement
+export {
+  passwordResetTokens,
+  emailVerificationTokens,
+  loginAttempts,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
+  type EmailVerificationToken,
+  type InsertEmailVerificationToken,
+  type LoginAttempt,
+  type InsertLoginAttempt,
+  type EmailPasswordCredentials,
+  type UserRegistration,
+  type PasswordResetRequest,
+  type PasswordResetConfirm,
+  type EmailVerificationRequest,
+} from "./schema-auth";

@@ -156,10 +156,9 @@ describe('NotificationSounds', () => {
   });
 
   it('handles missing AudioContext gracefully', () => {
-    // Completely remove AudioContext to simulate unsupported browser
-    const savedAudioContext = global.AudioContext;
+    // Save original and remove AudioContext
+    const originalAC = global.AudioContext;
     delete (global as any).AudioContext;
-    delete (window as any).AudioContext;
 
     const soundsWithoutAudio = new (NotificationSounds as any)();
 
@@ -168,7 +167,7 @@ describe('NotificationSounds', () => {
       soundsWithoutAudio.play('success');
     }).not.toThrow();
 
-    // Restore for other tests
-    global.AudioContext = savedAudioContext;
+    // Restore
+    global.AudioContext = originalAC;
   });
 });

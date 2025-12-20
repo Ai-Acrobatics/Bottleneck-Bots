@@ -31,6 +31,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trpc } from '@/lib/trpc';
+import { toast } from 'sonner';
 
 interface ActionButtonProps {
   icon: React.ReactNode;
@@ -194,31 +196,54 @@ export function QuickActions({
     },
   ];
 
-  // Mock recent tasks - in a real app, this would come from local storage or API
-  const recentTasks = [
+  // Fetch recent task executions from API
+  const { data: executionsData, isLoading: isLoadingExecutions } = trpc.analytics.getExecutionStats.useQuery(
+    { period: 'week' },
     {
-      id: 1,
-      name: 'Daily CRM Sync',
-      timestamp: '2 hours ago',
-      status: 'success' as const,
+      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchOnWindowFocus: true,
+    }
+  );
+
+  // Fetch recent tasks from agencyTasks
+  const { data: tasksData } = trpc.agencyTasks.list.useQuery(
+    {
+      limit: 3,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+      statuses: ['completed', 'failed'],
     },
     {
-      id: 2,
-      name: 'Lead Enrichment',
-      timestamp: '5 hours ago',
-      status: 'success' as const,
+      refetchInterval: 30000,
+      refetchOnWindowFocus: true,
+    }
+  );
+
+  // Mutation for executing/rerunning tasks
+  const executeMutation = trpc.agencyTasks.execute.useMutation({
+    onSuccess: () => {
+      toast.success('Task execution started');
     },
-    {
-      id: 3,
-      name: 'Website Monitoring',
-      timestamp: 'Yesterday',
-      status: 'failed' as const,
+    onError: (error) => {
+      toast.error(`Failed to start task: ${error.message}`);
     },
-  ];
+  });
+
+  // Convert tasks to recent task format
+  const recentTasks = tasksData?.tasks.map((task) => ({
+    id: task.id,
+    name: task.title,
+    timestamp: new Date(task.updatedAt).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    status: (task.status === 'completed' ? 'success' : task.status === 'failed' ? 'failed' : 'success') as 'success' | 'failed',
+  })) || [];
 
   const handleRerun = (taskId: number) => {
-    console.log('Rerun task:', taskId);
-    // TODO: Implement rerun functionality
+    executeMutation.mutate({ id: taskId });
   };
 
   return (

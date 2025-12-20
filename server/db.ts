@@ -345,4 +345,21 @@ export async function getPool(): Promise<pg.Pool | null> {
   return _pool;
 }
 
+export async function updateUserLastSignIn(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot update user last sign in: database not available");
+    return;
+  }
+
+  try {
+    await db.update(users)
+      .set({ lastSignedIn: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  } catch (error) {
+    console.error("[Database] Failed to update user last sign in:", error);
+    throw error;
+  }
+}
+
 // TODO: add feature queries here as your schema grows.
