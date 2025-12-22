@@ -17,6 +17,7 @@ const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ d
 const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 const TermsOfService = lazy(() => import('./pages/TermsOfService').then(m => ({ default: m.TermsOfService })));
+const OAuthCallback = lazy(() => import('./components/OAuthPopup').then(m => ({ default: m.OAuthCallback })));
 
 // Loading spinner component
 const LoadingSpinner = () => (
@@ -28,7 +29,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY' | 'PRIVACY' | 'TERMS' | 'FEATURES';
+type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY' | 'PRIVACY' | 'TERMS' | 'FEATURES' | 'OAUTH_CALLBACK';
 type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 
 // Admin email for preview access
@@ -49,6 +50,20 @@ function App() {
 
   // Check if current user is admin
   const isAdmin = user?.email === ADMIN_EMAIL;
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/api/oauth/callback') {
+      setCurrentView('OAUTH_CALLBACK');
+    } else if (path === '/auth/callback') {
+      const params = new URLSearchParams(window.location.search);
+      const sessionToken = params.get('sessionToken');
+      if (sessionToken) {
+        document.cookie = `app_session_id=${sessionToken}; path=/; max-age=31536000;`;
+        refetchUser();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -124,6 +139,10 @@ function App() {
             )}
 
             <Suspense fallback={<LoadingSpinner />}>
+              {currentView === 'OAUTH_CALLBACK' && (
+                <OAuthCallback />
+              )}
+
               {currentView === 'ALEX_RAMOZY' && (
                 <AlexRamozyPage onDemoClick={() => setCurrentView('LOGIN')} />
               )}

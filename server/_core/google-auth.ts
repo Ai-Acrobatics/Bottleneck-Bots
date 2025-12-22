@@ -154,11 +154,8 @@ export function registerGoogleAuthRoutes(app: Express) {
 
             console.log('[Google Auth] Session token created');
 
-            const cookieOptions = getSessionCookieOptions(req);
-            res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-
-            console.log('[Google Auth] Authentication successful, redirecting to /');
-            res.redirect("/");
+            console.log('[Google Auth] Authentication successful, redirecting to /auth/callback');
+            res.redirect(`/auth/callback?sessionToken=${sessionToken}`);
         } catch (error) {
             console.error("[Google Auth] Callback failed:", error);
             if (axios.isAxiosError(error)) {
