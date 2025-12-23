@@ -328,8 +328,8 @@ class SDKServer {
         await db.upsertUser({
           openId: userInfo.openId,
           name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          email: userInfo.email ?? `${userInfo.openId}@oauth.local`,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? "manus",
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
@@ -350,8 +350,9 @@ class SDKServer {
     // Only call upsertUser if user has openId or googleId (not for email-only users)
     if (user.openId || user.googleId) {
       await db.upsertUser({
-        openId: user.openId,
-        googleId: user.googleId,
+        openId: user.openId ?? undefined,
+        googleId: user.googleId ?? undefined,
+        email: user.email,
         lastSignedIn: signedInAt,
       });
     }

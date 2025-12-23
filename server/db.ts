@@ -84,16 +84,19 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = {};
+    const values: Partial<InsertUser> & { email: string } = {
+      email: user.email ?? `${user.openId ?? user.googleId}@oauth.local`,
+    };
     if (user.openId) values.openId = user.openId;
     if (user.googleId) values.googleId = user.googleId;
 
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "password", "googleId", "openId"] as const;
-    type TextField = (typeof textFields)[number];
+    // Handle nullable text fields (excluding email which is required)
+    const nullableFields = ["name", "password", "googleId", "openId"] as const;
+    type NullableField = (typeof nullableFields)[number];
 
-    const assignNullable = (field: TextField) => {
+    const assignNullable = (field: NullableField) => {
       const value = user[field];
       if (value === undefined) return;
       const normalized = value ?? null;
@@ -101,7 +104,19 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet[field] = normalized;
     };
 
-    textFields.forEach(assignNullable);
+    nullableFields.forEach(assignNullable);
+
+    // Handle email (required, non-null) - only update if explicitly provided
+    if (user.email !== undefined) {
+      values.email = user.email;
+      updateSet.email = user.email;
+    }
+
+    // Handle loginMethod (required with default)
+    if (user.loginMethod !== undefined) {
+      values.loginMethod = user.loginMethod;
+      updateSet.loginMethod = user.loginMethod;
+    }
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
