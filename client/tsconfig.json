@@ -1,0 +1,47 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./dist",
+    "baseUrl": "..",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "paths": {
+      // Internal client paths (relative to root)
+      "@/*": ["./client/src/*"],
+      "@components/*": ["./client/src/components/*"],
+      "@hooks/*": ["./client/src/hooks/*"],
+      "@lib/*": ["./client/src/lib/*"],
+      "@pages/*": ["./client/src/pages/*"],
+      "@utils/*": ["./client/src/utils/*"],
+      "@stores/*": ["./client/src/stores/*"],
+      "@api/*": ["./client/src/api/*"],
+      "@types/*": ["./client/src/types/*"],
+
+      // Shared package (relative to root)
+      "@shared": ["./shared/_core/index.ts"],
+      "@shared/*": ["./shared/*"],
+      "@shared/const": ["./shared/const.ts"],
+      "@shared/types": ["./shared/types.ts"],
+
+      // Workspace package reference
+      "@bottleneck-bots/shared": ["./shared/_core/index.ts"]
+    }
+  },
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./src/**/*.d.ts",
+    "../drizzle/**/*.ts",
+    "../server/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
+}

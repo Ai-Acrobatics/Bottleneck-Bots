@@ -1,0 +1,23 @@
+{
+  "name": "@bottleneck-bots/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./_core/index.ts",
+  "exports": {
+    ".": "./_core/index.ts",
+    "./api/*": "./api/*.ts",
+    "./auth/*": "./auth/*.ts",
+    "./lib/*": "./lib/*.ts",
+    "./services/*": "./services/*.ts",
+    "./types/*": "./types/*.ts",
+    "./workers/*": "./workers/*.ts",
+    "./workflows/*": "./workflows/*.ts"
+  },
+  "dependencies": {
+    "@bottleneck-bots/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

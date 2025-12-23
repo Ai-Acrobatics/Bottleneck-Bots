@@ -1,0 +1,16 @@
+# pnpm workspace configuration for Bottleneck-Bots monorepo
+packages:
+  # Main application packages
+  - 'server'
+  - 'client'
+  - 'shared'
+
+  # Package directories
+  - 'packages/*'
+  - 'apps/*'
+
+  # Utilities and tooling
+  - 'stubs/*'
+
+  # MCP integrations
+  - 'mcp-server-browserbase'

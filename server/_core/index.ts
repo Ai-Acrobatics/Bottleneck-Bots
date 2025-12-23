@@ -14,6 +14,7 @@ import { createContext } from "./context";
 // Only import serveStatic statically - setupVite is loaded dynamically for development only
 import { serveStatic } from "./vite";
 import { webhookEndpointsRouter } from "../api/webhookEndpoints";
+import stripeWebhookRouter from "../api/webhooks/stripe";
 import { schedulerRunnerService } from "../services/schedulerRunner.service";
 import { memoryCleanupScheduler } from "../services/memory";
 import { getDb } from "../db";
@@ -131,6 +132,8 @@ export async function createApp() {
   registerSSERoutes(app);
   // Webhook endpoints (public, token-authenticated)
   app.use("/api/webhooks", webhookEndpointsRouter);
+  // Stripe webhook route
+  app.use("/api/webhooks/stripe", stripeWebhookRouter);
 
   // Mount REST API v1 routes (includes /api/v1/health, /api/v1/tasks, etc.)
   const restApi = createRestApi();

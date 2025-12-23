@@ -56,12 +56,27 @@
       "@testing-library/jest-dom"
     ],
     "paths": {
-      "@/*": [
-        "./client/src/*"
-      ],
-      "@shared/*": [
-        "./shared/*"
-      ]
+      // Client aliases
+      "@/*": ["./client/src/*"],
+
+      // Shared package aliases
+      "@shared": ["./shared/_core/index.ts"],
+      "@shared/*": ["./shared/*"],
+      "@shared/const": ["./shared/const.ts"],
+      "@shared/types": ["./shared/types.ts"],
+
+      // Server package aliases
+      "@server": ["./server/_core/index.ts"],
+      "@server/*": ["./server/*"],
+      "@server/api/*": ["./server/api/*"],
+      "@server/auth/*": ["./server/auth/*"],
+      "@server/lib/*": ["./server/lib/*"],
+      "@server/services/*": ["./server/services/*"],
+
+      // Workspace package aliases (for imports like @bottleneck-bots/shared)
+      "@bottleneck-bots/shared": ["./shared/_core/index.ts"],
+      "@bottleneck-bots/server": ["./server/_core/index.ts"],
+      "@bottleneck-bots/client": ["./client/src/main.tsx"]
     }
   }
 }

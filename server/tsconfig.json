@@ -1,0 +1,43 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./dist",
+    "baseUrl": "..",
+    "lib": ["esnext"],
+    "types": ["node"],
+    "paths": {
+      // Internal server paths (relative to root)
+      "@/*": ["./server/*"],
+      "@server/*": ["./server/*"],
+      "@api/*": ["./server/api/*"],
+      "@auth/*": ["./server/auth/*"],
+      "@lib/*": ["./server/lib/*"],
+      "@services/*": ["./server/services/*"],
+      "@mcp/*": ["./server/mcp/*"],
+      "@routes/*": ["./server/routes/*"],
+      "@providers/*": ["./server/providers/*"],
+
+      // Shared package (relative to root)
+      "@shared": ["./shared/_core/index.ts"],
+      "@shared/*": ["./shared/*"],
+      "@shared/const": ["./shared/const.ts"],
+      "@shared/types": ["./shared/types.ts"],
+
+      // Workspace package reference
+      "@bottleneck-bots/shared": ["./shared/_core/index.ts"]
+    }
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../drizzle/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "templates/**/*"
+  ]
+}

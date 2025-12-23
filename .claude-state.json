@@ -1,0 +1,40 @@
+{
+  "version": "2.0",
+  "project": "Bottleneck-Bots",
+  "lastUpdated": "2025-12-23T22:30:00Z",
+  "expiresAt": "2025-12-27T20:55:00Z",
+  "swarmId": "bubba_multiproject_001",
+  "swarmStatus": "active",
+  "currentWork": {
+    "description": "Merge Manus Replica + Claude-Flow + Bottleneck Bots into unified platform",
+    "status": "in_progress",
+    "phase": "Phase 1 - Foundation & Setup"
+  },
+  "agents": {
+    "Tyler-TypeScript": {"tasks": ["BB-001", "BB-002"], "status": "ready"},
+    "Archie-Architect": {"tasks": ["BB-004"], "status": "ready"},
+    "Marcus-Orchestrator": {"tasks": ["BB-005"], "status": "completed"},
+    "Tessa-Tester": {"tasks": ["BB-006"], "status": "ready"},
+    "Helena-Memory": {"tasks": ["BB-003"], "status": "ready"}
+  },
+  "taskRegistry": {
+    "BB-001": {"title": "Configure pnpm workspaces", "owner": "Tyler-TypeScript", "status": "completed", "blockers": [], "completedAt": "2025-12-23T20:55:00Z"},
+    "BB-002": {"title": "Set up path aliases", "owner": "Tyler-TypeScript", "status": "completed", "blockers": [], "completedAt": "2025-12-23T21:15:00Z"},
+    "BB-003": {"title": "State file created", "owner": "Helena-Memory", "status": "completed", "blockers": []},
+    "BB-004": {"title": "Merge Manus Replica system prompt", "owner": "Archie-Architect", "status": "completed", "blockers": []},
+    "BB-005": {"title": "Integrate Claude-Flow MCP tools", "owner": "Marcus-Orchestrator", "status": "completed", "blockers": [], "completedAt": "2025-12-23T22:30:00Z", "deliverables": ["docs/CLAUDE_FLOW_INTEGRATION.md"]},
+    "BB-006": {"title": "Verify OAuth flow e2e", "owner": "Tessa-Tester", "status": "completed", "blockers": []}
+  },
+  "completedPhases": [
+    "Phase 5 - SSE Integration",
+    "Swarm Coordinator Integration",
+    "Browserbase & Stagehand Integration",
+    "Knowledge & Training System",
+    "MCP Integration Dashboard",
+    "Database Migrations"
+  ],
+  "autonomousMode": true,
+  "coordinationNamespace": "tasks",
+  "taskKey": "bottleneck-bots-tasks",
+  "resumeInstructions": "Check namespace='tasks' key='bottleneck-bots-tasks' for task assignments. Agents auto-coordinate via Claude Flow memory."
+}

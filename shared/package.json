@@ -1,0 +1,15 @@
+{
+  "name": "@bottleneck-bots/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./_core/index.ts",
+  "exports": {
+    ".": "./_core/index.ts",
+    "./const": "./const.ts",
+    "./types": "./types.ts"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
