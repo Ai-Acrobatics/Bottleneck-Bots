@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-dotenv.config({ override: true });
+// Don't override existing env vars (allows Vercel env vars to take precedence)
+dotenv.config();
 
 // Disable pino-pretty transport to prevent bundling issues in production/serverless
 // This must be set BEFORE any Stagehand imports happen
