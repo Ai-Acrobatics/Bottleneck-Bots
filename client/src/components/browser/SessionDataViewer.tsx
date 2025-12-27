@@ -32,7 +32,7 @@ export function SessionDataViewer({ sessionId, className = '' }: SessionDataView
       enabled: Boolean(sessionId),
       select: (data) => {
         // Filter to only this session and get extracted data
-        const session = data?.find((s: any) => s.sessionId === sessionId);
+        const session = data?.find((s: any) => s.sessionId === sessionId) as any;
         return session?.extractedData || [];
       },
     }

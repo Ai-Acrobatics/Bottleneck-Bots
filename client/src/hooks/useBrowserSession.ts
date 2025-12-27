@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
  * Provides real-time updates via WebSocket and backend data
  */
 export function useBrowserSession(sessionId: string | undefined) {
-  const { connectionState, subscribe } = useWebSocketStore();
+  const { connectionState } = useWebSocketStore();
   const [realtimeSession, setRealtimeSession] = useState<any>(null);
 
   // Fetch session history/logs from Stagehand
@@ -48,48 +48,17 @@ export function useBrowserSession(sessionId: string | undefined) {
     }
   );
 
-  // Subscribe to WebSocket updates for this session
+  // TODO: Add WebSocket subscription for real-time session updates
+  // The subscribe method needs to be implemented in websocketStore
   useEffect(() => {
     if (!sessionId) return;
-
-    const handlers = {
-      'browser:navigation': (data: any) => {
-        if (data.sessionId === sessionId) {
-          setRealtimeSession((prev: any) => ({ ...prev, url: data.url }));
-        }
-      },
-      'browser:action': (data: any) => {
-        if (data.sessionId === sessionId) {
-          setRealtimeSession((prev: any) => ({
-            ...prev,
-            lastAction: data.action,
-            lastActionTime: data.timestamp,
-          }));
-        }
-      },
-      'browser:data:extracted': (data: any) => {
-        if (data.sessionId === sessionId) {
-          setRealtimeSession((prev: any) => ({
-            ...prev,
-            lastExtraction: data,
-          }));
-        }
-      },
-      'browser:session:closed': (data: any) => {
-        if (data.sessionId === sessionId) {
-          setRealtimeSession((prev: any) => ({ ...prev, status: 'closed' }));
-        }
-      },
-    };
-
-    const unsubscribe = subscribe(handlers);
-    return () => unsubscribe();
-  }, [sessionId, subscribe]);
+    // Placeholder for future WebSocket subscription
+  }, [sessionId]);
 
   // Convert Stagehand history to log format
   const logs = historyQuery.data?.history?.map((entry: any, index: number) => ({
     timestamp: entry.timestamp || new Date().toISOString(),
-    level: entry.result?.error ? 'error' : 'info',
+    level: (entry.result?.error ? 'error' : 'info') as 'error' | 'info' | 'warn' | 'debug',
     message: `${entry.method}: ${entry.result?.error || 'Success'}`,
     data: entry.args || entry.result,
   })) || [];

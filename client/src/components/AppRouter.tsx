@@ -5,7 +5,7 @@ import { trpc } from '@/lib/trpc';
 // Lazy load pages
 const Login = lazy(() => import('@/pages/Login'));
 const Signup = lazy(() => import('@/pages/Signup'));
-const OnboardingFlow = lazy(() => import('./OnboardingFlow'));
+const OnboardingFlow = lazy(() => import('./OnboardingFlow').then(m => ({ default: m.OnboardingFlow })));
 const Dashboard = lazy(() => import('./Dashboard').then(m => ({ default: m.Dashboard })));
 const LandingPage = lazy(() => import('./LandingPage').then(m => ({ default: m.LandingPage })));
 const FeaturesPage = lazy(() => import('./FeaturesPage').then(m => ({ default: m.FeaturesPage })));
@@ -44,15 +44,12 @@ export function AppRouter() {
   // Redirect logic for authenticated users
   if (user) {
     // If user is on landing or auth pages, redirect to dashboard or onboarding
-    if (location === '/' || location === '/landing' || location === '/login' || location === '/signup') {
+    const publicRoutes = ['/', '/landing', '/login', '/signup'];
+    if (publicRoutes.includes(location)) {
       if (user.onboardingCompleted === false) {
-        if (location !== '/onboarding') {
-          setLocation('/onboarding');
-        }
+        setLocation('/onboarding');
       } else {
-        if (location !== '/dashboard') {
-          setLocation('/dashboard');
-        }
+        setLocation('/dashboard');
       }
     }
   } else {

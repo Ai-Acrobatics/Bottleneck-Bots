@@ -212,9 +212,9 @@ export function ChatPanel({ className }: ChatPanelProps) {
 
       if (isObserve) {
         result = await observeMutation.mutateAsync({
-          url: startUrl || undefined,
+          url: startUrl || '',
           instruction: input,
-        });
+        } as any);
 
         updateMessage(actionId, { actionStatus: 'completed' });
 
@@ -226,10 +226,10 @@ export function ChatPanel({ className }: ChatPanelProps) {
         }
       } else if (isExtract) {
         result = await extractMutation.mutateAsync({
-          url: startUrl || undefined,
+          url: startUrl || '',
           instruction: input,
           schemaType: 'custom',
-        });
+        } as any);
 
         updateMessage(actionId, { actionStatus: 'completed' });
 
@@ -240,9 +240,9 @@ export function ChatPanel({ className }: ChatPanelProps) {
       } else {
         // Default: use chat for general instructions
         result = await chatMutation.mutateAsync({
-          instruction: input,
+          messages: [{ role: 'user' as const, content: input }],
           startUrl: startUrl || undefined,
-        });
+        }) as any;
 
         // Update session if we got one
         if (result.sessionId && result.liveViewUrl) {

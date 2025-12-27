@@ -162,8 +162,8 @@ export function FloatingChat({ className }: FloatingChatProps) {
 
     try {
       const result = await chatMutation.mutateAsync({
-        instruction: input,
-      });
+        messages: [{ role: 'user' as const, content: input }],
+      }) as any;
 
       if (result.sessionId && result.liveViewUrl) {
         setSession(result.sessionId, result.liveViewUrl);

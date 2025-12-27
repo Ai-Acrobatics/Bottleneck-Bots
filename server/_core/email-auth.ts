@@ -302,7 +302,7 @@ router.get("/verify-reset-token", async (req, res) => {
     }
 
     const { passwordResetTokens } = await import("../../drizzle/schema-auth");
-    const { gt, eq, and } = await import("drizzle-orm");
+    const { gt, and, isNull } = await import("drizzle-orm");
     const bcrypt = await import("bcryptjs");
 
     // Get all unexpired, unused tokens
@@ -312,7 +312,7 @@ router.get("/verify-reset-token", async (req, res) => {
       .where(
         and(
           gt(passwordResetTokens.expiresAt, new Date()),
-          eq(passwordResetTokens.usedAt, null)
+          isNull(passwordResetTokens.usedAt)
         )
       )
       .limit(100);

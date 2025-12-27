@@ -14,8 +14,8 @@ async function getPdfParser() {
 
   try {
     // Dynamic import to avoid loading at startup
-    const pdfParseModule = await import('pdf-parse');
-    pdfParse = pdfParseModule.default || pdfParseModule;
+    const pdfParseModule = await import('pdf-parse') as any;
+    pdfParse = pdfParseModule.default ?? pdfParseModule;
     return pdfParse;
   } catch (error) {
     console.error('[DocumentParser] Failed to load pdf-parse:', error);

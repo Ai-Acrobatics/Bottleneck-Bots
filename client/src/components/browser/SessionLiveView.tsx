@@ -42,7 +42,7 @@ interface SessionLiveViewProps {
 }
 
 export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
-  const { liveView, logs, connectionState, isLoading, error, refetch } =
+  const { session: liveView, logs, connectionState, isLoading, error, refetch } =
     useBrowserSession(sessionId);
   const { isConnected } = useWebSocketStore();
 
@@ -505,9 +505,9 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
                   }`}
                 >
                   <span className="text-slate-500">{log.timestamp}</span> {log.message}
-                  {log.metadata && (
+                  {log.data && (
                     <div className="text-xs opacity-75 mt-1">
-                      {JSON.stringify(log.metadata, null, 2)}
+                      {JSON.stringify(log.data, null, 2)}
                     </div>
                   )}
                 </div>
