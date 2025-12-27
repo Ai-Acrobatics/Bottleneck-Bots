@@ -163,7 +163,7 @@ export const FeaturesPage: React.FC<FeaturesPageProps> = ({ onGetStarted, onNavi
               <Sparkles className="w-4 h-4 sm:w-7 sm:h-7 text-white fill-white relative z-10" aria-hidden="true" />
             </div>
             <div>
-              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 bg-clip-text text-transparent">Bottleneck Bot</span>
+              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 bg-clip-text text-transparent">Bottleneck Bots</span>
               <div className="hidden sm:block text-[11px] text-gray-400 font-semibold -mt-1">Powerful Features</div>
             </div>
           </div>
@@ -412,7 +412,7 @@ export const FeaturesPage: React.FC<FeaturesPageProps> = ({ onGetStarted, onNavi
             </div>
           </div>
           <div className="border-t border-gray-800 pt-6 sm:pt-8 text-center text-xs sm:text-sm">
-            <p>&copy; 2025 Bottleneck Bot. All rights reserved.</p>
+            <p>&copy; 2025 Bottleneck Bots. All rights reserved.</p>
           </div>
         </div>
       </footer>

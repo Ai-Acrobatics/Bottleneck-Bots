@@ -77,7 +77,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
               <Sparkles className="w-4 h-4 sm:w-7 sm:h-7 text-white fill-white relative z-10" aria-hidden="true" />
             </div>
             <div>
-              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 bg-clip-text text-transparent">GHL Agency AI</span>
+              <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 bg-clip-text text-transparent">Bottleneck Bots</span>
               <div className="hidden sm:block text-[11px] text-gray-600 font-semibold -mt-1">Buy Back Your Freedom</div>
             </div>
           </div>

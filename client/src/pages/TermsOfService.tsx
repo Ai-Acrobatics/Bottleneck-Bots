@@ -35,14 +35,14 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">1. Agreement to Terms</h2>
             <p className="text-slate-600 mb-4">
-              By accessing or using Bottleneck Bot's services, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access our services.
+              By accessing or using Bottleneck Bots's services, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access our services.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">2. Description of Services</h2>
             <p className="text-slate-600 mb-4">
-              Bottleneck Bot provides an AI-powered platform for agency automation, including but not limited to:
+              Bottleneck Bots provides an AI-powered platform for agency automation, including but not limited to:
             </p>
             <ul className="list-disc pl-6 text-slate-600 mb-4">
               <li>AI agent management and deployment</li>
@@ -107,7 +107,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">6. Intellectual Property</h2>
             <p className="text-slate-600 mb-4">
-              Bottleneck Bot and its licensors retain all rights to the service, including software, designs, and content. You are granted a limited, non-exclusive license to use the service for your business purposes.
+              Bottleneck Bots and its licensors retain all rights to the service, including software, designs, and content. You are granted a limited, non-exclusive license to use the service for your business purposes.
             </p>
             <p className="text-slate-600 mb-4">
               You retain ownership of your data and content. By using our service, you grant us a license to process your data as necessary to provide the services.
@@ -148,7 +148,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">11. Indemnification</h2>
             <p className="text-slate-600 mb-4">
-              You agree to indemnify and hold harmless Bottleneck Bot and its affiliates from any claims, damages, or expenses arising from your use of the services or violation of these terms.
+              You agree to indemnify and hold harmless Bottleneck Bots and its affiliates from any claims, damages, or expenses arising from your use of the services or violation of these terms.
             </p>
           </section>
 
@@ -179,7 +179,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
               <li><strong>Governing Law:</strong> These terms are governed by the laws of Delaware, USA.</li>
               <li><strong>Severability:</strong> If any provision is unenforceable, the remaining provisions remain in effect.</li>
               <li><strong>Waiver:</strong> Failure to enforce any right does not constitute a waiver.</li>
-              <li><strong>Entire Agreement:</strong> These terms constitute the entire agreement between you and Bottleneck Bot.</li>
+              <li><strong>Entire Agreement:</strong> These terms constitute the entire agreement between you and Bottleneck Bots.</li>
             </ul>
           </section>
 
@@ -190,7 +190,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
             </p>
             <div className="bg-slate-50 p-4 rounded-lg">
               <p className="text-slate-700">
-                <strong>Bottleneck Bot</strong><br />
+                <strong>Bottleneck Bots</strong><br />
                 Email: support@bottleneckbots.com<br />
                 Website: https://www.bottleneckbots.com
               </p>
@@ -202,7 +202,7 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
 
       {/* Footer */}
       <footer className="bg-slate-100 py-8 text-center text-sm text-slate-600">
-        <p>&copy; 2025 Bottleneck Bot. All rights reserved.</p>
+        <p>&copy; 2025 Bottleneck Bots. All rights reserved.</p>
       </footer>
     </div>
   );

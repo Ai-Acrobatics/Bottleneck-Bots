@@ -35,7 +35,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
           <section className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">1. Introduction</h2>
             <p className="text-slate-600 mb-4">
-              Bottleneck Bot ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.
+              Bottleneck Bots ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.
             </p>
           </section>
 
@@ -157,7 +157,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
             </p>
             <div className="bg-slate-50 p-4 rounded-lg">
               <p className="text-slate-700">
-                <strong>Bottleneck Bot</strong><br />
+                <strong>Bottleneck Bots</strong><br />
                 Email: support@bottleneckbots.com<br />
                 Website: https://www.bottleneckbots.com
               </p>
@@ -169,7 +169,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
 
       {/* Footer */}
       <footer className="bg-slate-100 py-8 text-center text-sm text-slate-600">
-        <p>&copy; 2025 Bottleneck Bot. All rights reserved.</p>
+        <p>&copy; 2025 Bottleneck Bots. All rights reserved.</p>
       </footer>
     </div>
   );

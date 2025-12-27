@@ -128,7 +128,7 @@ export function CompletionStep({ data, onComplete, onBack, isLoading }: Completi
             You're All Set!
           </h2>
           <p className="text-slate-600 text-lg max-w-2xl mx-auto">
-            Your Bottleneck Bot workspace is ready. Let's start automating!
+            Your Bottleneck Bots workspace is ready. Let's start automating!
           </p>
         </div>
 

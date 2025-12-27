@@ -165,7 +165,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-bold text-slate-800 text-xl">Welcome to Bottleneck Bot</h1>
+              <h1 className="font-bold text-slate-800 text-xl">Welcome to Bottleneck Bots</h1>
               <p className="text-sm text-slate-500">Let's get you set up in just a few steps</p>
             </div>
           </div>

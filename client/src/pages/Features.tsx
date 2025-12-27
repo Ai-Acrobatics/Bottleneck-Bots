@@ -1,7 +1,7 @@
 /**
  * Features & Benefits Page
  *
- * Comprehensive showcase of Bottleneck Bot features, benefits,
+ * Comprehensive showcase of Bottleneck Bots features, benefits,
  * and capabilities with modern animations and visual effects.
  */
 
@@ -61,7 +61,7 @@ export function Features({ onBack, onGetStarted }: FeaturesProps) {
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold">Bottleneck Bot</span>
+            <span className="text-lg font-bold">Bottleneck Bots</span>
           </div>
           <Button
             onClick={onGetStarted}
@@ -96,7 +96,7 @@ export function Features({ onBack, onGetStarted }: FeaturesProps) {
               Features & Benefits
             </h1>
             <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Discover how Bottleneck Bot transforms your agency operations with intelligent automation, real-time insights, and seamless GoHighLevel integration.
+              Discover how Bottleneck Bots transforms your agency operations with intelligent automation, real-time insights, and seamless GoHighLevel integration.
             </p>
           </motion.div>
         </div>
@@ -308,7 +308,7 @@ export function Features({ onBack, onGetStarted }: FeaturesProps) {
                 Ready to Transform Your Agency?
               </h2>
               <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto">
-                Start your free trial today and see why leading agencies trust Bottleneck Bot for their automation needs.
+                Start your free trial today and see why leading agencies trust Bottleneck Bots for their automation needs.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button
@@ -336,7 +336,7 @@ export function Features({ onBack, onGetStarted }: FeaturesProps) {
       {/* Footer */}
       <footer className="py-12 border-t border-gray-800">
         <div className="container mx-auto px-4 sm:px-6 text-center text-gray-500 text-sm">
-          <p>&copy; 2025 Bottleneck Bot. All rights reserved.</p>
+          <p>&copy; 2025 Bottleneck Bots. All rights reserved.</p>
         </div>
       </footer>
     </div>
