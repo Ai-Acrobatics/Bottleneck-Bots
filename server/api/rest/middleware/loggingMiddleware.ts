@@ -146,11 +146,26 @@ export function performanceMonitor(
 ): void {
   req.startTime = Date.now();
 
-  // Add timing header on response
-  res.on("finish", () => {
+  // Override writeHead to add timing header before response is sent
+  const originalWriteHead = res.writeHead.bind(res);
+  res.writeHead = function (
+    statusCode: number,
+    statusMessage?: string | any,
+    headers?: any
+  ): Response {
     const duration = Date.now() - (req.startTime || Date.now());
-    res.setHeader("X-Response-Time", `${duration}ms`);
-  });
+
+    // Only set header if not already sent
+    if (!res.headersSent) {
+      res.setHeader("X-Response-Time", `${duration}ms`);
+    }
+
+    // Handle overloaded signature: writeHead(statusCode, headers)
+    if (typeof statusMessage === 'object') {
+      return originalWriteHead(statusCode, statusMessage);
+    }
+    return originalWriteHead(statusCode, statusMessage, headers);
+  } as any;
 
   next();
 }

@@ -1188,7 +1188,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin, onNavigateToF
             </div>
           </div>
           <div className="border-t border-gray-300 pt-6 sm:pt-8 text-center text-xs sm:text-sm">
-            <p>&copy; 2025 GHL Agency AI. All rights reserved. Built for agency owners who refuse to sacrifice their lives for their business.</p>
+            <p>&copy; 2025 Bottleneck Bots. All rights reserved. Built for agency owners who refuse to sacrifice their lives for their business.</p>
           </div>
         </div>
       </footer>

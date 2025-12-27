@@ -23,7 +23,7 @@ import {
   type UserRegistration,
   type EmailPasswordCredentials,
 } from "../../drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 
 // ========================================
 // Configuration
@@ -196,7 +196,7 @@ export async function resetPassword(token: string, newPassword: string) {
   const [resetToken] = await db
     .select()
     .from(passwordResetTokens)
-    .where(and(gt(passwordResetTokens.expiresAt, new Date()), eq(passwordResetTokens.usedAt, null)))
+    .where(and(gt(passwordResetTokens.expiresAt, new Date()), isNull(passwordResetTokens.usedAt)))
     .limit(100); // Get all unexpired tokens
 
   if (!resetToken) {
@@ -261,7 +261,7 @@ export async function verifyEmail(token: string) {
   const [verificationToken] = await db
     .select()
     .from(emailVerificationTokens)
-    .where(and(gt(emailVerificationTokens.expiresAt, new Date()), eq(emailVerificationTokens.verifiedAt, null)))
+    .where(and(gt(emailVerificationTokens.expiresAt, new Date()), isNull(emailVerificationTokens.verifiedAt)))
     .limit(100);
 
   if (!verificationToken) {
