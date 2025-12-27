@@ -14,7 +14,7 @@
 
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { db } from "../db";
+import { getDb } from "../db";
 import {
   users,
   passwordResetTokens,
@@ -43,6 +43,11 @@ const MAX_LOGIN_ATTEMPTS_PER_HOUR = 5;
  * Automatically hashes the password and creates an email verification token
  */
 export async function registerUser(data: UserRegistration) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   // Hash the password
   const hashedPassword = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
@@ -79,6 +84,11 @@ export async function loginWithEmailPassword(
   ipAddress: string,
   userAgent?: string
 ): Promise<{ success: true; user: typeof users.$inferSelect } | { success: false; reason: string }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, reason: "database_unavailable" };
+  }
+
   const email = credentials.email.toLowerCase().trim();
 
   // Check rate limiting
@@ -140,6 +150,11 @@ export async function loginWithEmailPassword(
  * Returns the unhashed token to send via email
  */
 export async function createPasswordResetToken(email: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   const [user] = await db
     .select()
     .from(users)
@@ -172,6 +187,11 @@ export async function createPasswordResetToken(email: string) {
  * Reset password using a valid token
  */
 export async function resetPassword(token: string, newPassword: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   // Find valid token
   const [resetToken] = await db
     .select()
@@ -209,6 +229,11 @@ export async function resetPassword(token: string, newPassword: string) {
  * Create an email verification token
  */
 async function createEmailVerificationToken(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   const token = crypto.randomBytes(32).toString("hex");
   const hashedToken = await bcrypt.hash(token, BCRYPT_ROUNDS);
 
@@ -228,6 +253,11 @@ async function createEmailVerificationToken(userId: number) {
  * Verify email using token
  */
 export async function verifyEmail(token: string) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   const [verificationToken] = await db
     .select()
     .from(emailVerificationTokens)
@@ -266,6 +296,12 @@ async function trackLoginAttempt(
   failureReason: string | null,
   userAgent?: string
 ) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Auth] Cannot track login attempt: database not available");
+    return;
+  }
+
   await db.insert(loginAttempts).values({
     email: email.toLowerCase().trim(),
     ipAddress,
@@ -279,6 +315,11 @@ async function trackLoginAttempt(
  * Check recent login attempts for rate limiting
  */
 async function checkLoginAttempts(email: string, ipAddress: string): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    return 0; // Default to allowing attempts if DB is unavailable
+  }
+
   const oneHourAgo = new Date();
   oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 

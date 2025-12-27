@@ -397,7 +397,7 @@ export const AIBrowserPanel: React.FC<AIBrowserPanelProps> = ({ onLog }) => {
                   <Label htmlFor="extract-type" className="text-xs">Data Type</Label>
                   <Select value={extractType} onValueChange={(v: any) => setExtractType(v)}>
                     <SelectTrigger id="extract-type" className="text-sm">
-                      <SelectValue />
+                      <SelectValue placeholder="Select type..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="contactInfo">Contact Information</SelectItem>

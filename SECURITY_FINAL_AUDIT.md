@@ -546,8 +546,8 @@ res.setHeader("Access-Control-Expose-Headers", "X-RateLimit-*, X-Response-Time, 
 **Recommendation:** For authenticated endpoints, use specific origin whitelist:
 ```typescript
 const allowedOrigins = [
-  'https://bottleneckbot.com',
-  'https://www.bottleneckbot.com',
+  'https://bottleneckbots.com',
+  'https://www.bottleneckbots.com',
   process.env.APP_URL
 ].filter(Boolean);
 
@@ -819,8 +819,8 @@ if (process.env.NODE_ENV === 'production') {
 ```typescript
 const ALLOWED_ORIGINS = [
   process.env.APP_URL,
-  'https://bottleneckbot.com',
-  'https://www.bottleneckbot.com',
+  'https://bottleneckbots.com',
+  'https://www.bottleneckbots.com',
 ].filter(Boolean);
 
 export function corsMiddleware(req, res, next) {
@@ -1025,7 +1025,7 @@ After addressing the 2 high-priority issues, the platform will achieve excellent
 ## Appendix B: Security Contact
 
 For security issues, please report to:
-- **Email:** security@bottleneckbot.com (if available)
+- **Email:** security@bottleneckbots.com (if available)
 - **GitHub:** Security Advisory (for open source components)
 
 **Response Time:** Critical issues within 24 hours, high priority within 72 hours.

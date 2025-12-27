@@ -332,8 +332,8 @@ This project is proprietary software. All rights reserved.
 ## 🆘 Support
 
 For technical support or questions:
-- **Email:** support@bottleneckbot.com
-- **Documentation:** https://docs.bottleneckbot.com
+- **Email:** support@bottleneckbots.com
+- **Documentation:** https://docs.bottleneckbots.com
 - **GitHub Issues:** https://github.com/Julianb233/bottleneck-bot/issues
 
 ---

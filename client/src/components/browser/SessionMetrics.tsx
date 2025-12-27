@@ -174,7 +174,7 @@ export function SessionMetrics({ sessions, isLoading, onRefresh }: SessionMetric
           <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
             <SelectTrigger className="w-[140px]">
               <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue />
+              <SelectValue placeholder="Time range..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="1h">Last Hour</SelectItem>

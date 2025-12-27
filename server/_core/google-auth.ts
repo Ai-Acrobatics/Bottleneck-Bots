@@ -163,7 +163,10 @@ export function registerGoogleAuthRoutes(app: Express) {
 
             // Set session cookie directly instead of passing token in URL (security fix)
             const cookieOptions = getSessionCookieOptions(req);
-            res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+            res.cookie(COOKIE_NAME, sessionToken, {
+                ...cookieOptions,
+                maxAge: ONE_YEAR_MS, // Cookie must have maxAge to persist across browser sessions
+            });
 
             console.log('[Google Auth] Authentication successful, redirecting to dashboard');
             res.redirect('/dashboard');

@@ -7,6 +7,7 @@ export function useCredits() {
   const getTransactionHistory = trpc.credits.getTransactionHistory.useQuery;
   const getUsageStats = trpc.credits.getUsageStats.useQuery;
   const purchaseCredits = trpc.credits.purchaseCredits.useMutation();
+  const createCheckoutSession = trpc.credits.createCheckoutSession.useMutation();
   const getPackages = trpc.credits.getPackages.useQuery;
   const createPackage = trpc.credits.createPackage.useMutation();
   const updatePackage = trpc.credits.updatePackage.useMutation();
@@ -19,6 +20,7 @@ export function useCredits() {
     getTransactionHistory,
     getUsageStats,
     purchaseCredits,
+    createCheckoutSession,
     getPackages,
     createPackage,
     updatePackage,

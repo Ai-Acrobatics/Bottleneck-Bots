@@ -20,17 +20,12 @@ import {
 } from '@/components/ui/tooltip';
 import {
   Monitor,
-  Play,
-  Pause,
   Camera,
   Download,
   ArrowLeft,
   ArrowRight,
   RotateCw,
   Navigation,
-  Type,
-  MousePointerClick,
-  Activity,
   Wifi,
   WifiOff,
   Maximize2,
@@ -52,7 +47,6 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
   const { isConnected } = useWebSocketStore();
 
   // Local state
-  const [isRecording, setIsRecording] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [navigationUrl, setNavigationUrl] = useState('');
   const [actionType, setActionType] = useState<BrowserActionType>('click');
@@ -225,26 +219,7 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
     }
   }, [sessionId, screenshotMutation]);
 
-  // Recording handlers
-  const toggleRecording = useCallback(async () => {
-    try {
-      if (isRecording) {
-        // PLACEHOLDER: Stop recording API call
-        toast.info('Stopping recording...');
-        setIsRecording(false);
-        setLiveState((prev) => ({ ...prev, isRecording: false }));
-        toast.success('Recording stopped');
-      } else {
-        // PLACEHOLDER: Start recording API call
-        toast.info('Starting recording...');
-        setIsRecording(true);
-        setLiveState((prev) => ({ ...prev, isRecording: true }));
-        toast.success('Recording started');
-      }
-    } catch (error: any) {
-      toast.error(`Recording failed: ${error.message || 'Unknown error'}`);
-    }
-  }, [isRecording]);
+  // Note: Recording is handled automatically by Browserbase - no manual toggle needed
 
   // Custom action handler
   const handleCustomAction = useCallback(async () => {
@@ -330,12 +305,6 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
                 )}
                 {liveState.isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
-              {liveState.isRecording && (
-                <Badge variant="destructive" className="gap-1 animate-pulse">
-                  <Activity className="h-3 w-3" />
-                  Recording
-                </Badge>
-              )}
               {onClose && (
                 <Button onClick={onClose} variant="outline" size="sm">
                   Close
@@ -439,26 +408,9 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
               </div>
             </div>
 
-            {/* Recording and Screenshot Controls */}
+            {/* Screenshot Controls */}
             <div className="flex gap-2 pt-2 border-t">
               <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={isRecording ? 'destructive' : 'outline'}
-                      size="sm"
-                      onClick={toggleRecording}
-                      className="gap-2"
-                    >
-                      {isRecording ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      {isRecording ? 'Stop' : 'Record'}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isRecording ? 'Stop recording session' : 'Start recording session'}
-                  </TooltipContent>
-                </Tooltip>
-
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="sm" onClick={handleScreenshot} className="gap-2">
@@ -524,22 +476,9 @@ export function SessionLiveView({ sessionId, onClose }: SessionLiveViewProps) {
                   <Monitor className="h-16 w-16 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400">No live view available</p>
                   <p className="text-sm text-slate-500 mt-2">
-                    {/* PLACEHOLDER: Add instructions for starting live view */}
-                    The session may not support live viewing or has ended
+                    Start a browser session to see the live view
                   </p>
                 </div>
-              </div>
-            )}
-
-            {/* Overlay Stats */}
-            {liveView?.liveViewUrl && (
-              <div className="absolute top-4 right-4 flex gap-2">
-                <Badge className="bg-black/50 backdrop-blur-sm">
-                  FPS: {liveState.fps || 0}
-                </Badge>
-                <Badge className="bg-black/50 backdrop-blur-sm">
-                  Latency: {liveState.latency || 0}ms
-                </Badge>
               </div>
             )}
           </div>

@@ -205,4 +205,140 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// POST /api/auth/forgot-password - Request password reset
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Import password reset helpers
+    const { createPasswordResetToken } = await import("../auth/email-password");
+
+    try {
+      const { token, expiresAt } = await createPasswordResetToken(email);
+
+      // TODO: Send email with reset link
+      // For now, we'll return the token in development mode
+      // In production, this should only send an email
+      const resetLink = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+
+      console.log(`[Auth] Password reset requested for: ${email}`);
+      console.log(`[Auth] Reset link: ${resetLink}`);
+      console.log(`[Auth] Token expires at: ${expiresAt}`);
+
+      // Always return success to prevent email enumeration
+      return res.json({
+        success: true,
+        message: "If an account exists with this email, you will receive password reset instructions.",
+        // In development, include the link for testing
+        ...(process.env.NODE_ENV === 'development' && { resetLink, expiresAt }),
+      });
+    } catch (error) {
+      // Don't reveal if email doesn't exist
+      console.log(`[Auth] Password reset attempt for non-existent email: ${email}`);
+      return res.json({
+        success: true,
+        message: "If an account exists with this email, you will receive password reset instructions.",
+      });
+    }
+  } catch (error) {
+    console.error("[Auth] Forgot password error:", error);
+    return res.status(500).json({ error: "Failed to process password reset request" });
+  }
+});
+
+// POST /api/auth/reset-password - Reset password with token
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token and new password are required" });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    // Import password reset helpers
+    const { resetPassword } = await import("../auth/email-password");
+
+    try {
+      await resetPassword(token, password);
+
+      console.log("[Auth] Password reset successful");
+
+      return res.json({
+        success: true,
+        message: "Password has been reset successfully. You can now login with your new password.",
+      });
+    } catch (error) {
+      console.error("[Auth] Password reset failed:", error);
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Invalid or expired reset token",
+      });
+    }
+  } catch (error) {
+    console.error("[Auth] Reset password error:", error);
+    return res.status(500).json({ error: "Failed to reset password" });
+  }
+});
+
+// GET /api/auth/verify-reset-token - Verify reset token is valid
+router.get("/verify-reset-token", async (req, res) => {
+  try {
+    const token = req.query.token as string;
+
+    if (!token) {
+      return res.status(400).json({ error: "Token is required" });
+    }
+
+    const database = await db.getDb();
+    if (!database) {
+      return res.status(500).json({ error: "Database not available" });
+    }
+
+    const { passwordResetTokens } = await import("../../drizzle/schema-auth");
+    const { gt, eq, and } = await import("drizzle-orm");
+    const bcrypt = await import("bcryptjs");
+
+    // Get all unexpired, unused tokens
+    const tokens = await database
+      .select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          gt(passwordResetTokens.expiresAt, new Date()),
+          eq(passwordResetTokens.usedAt, null)
+        )
+      )
+      .limit(100);
+
+    // Check if any token matches
+    let validToken = null;
+    for (const dbToken of tokens) {
+      const isMatch = await bcrypt.compare(token, dbToken.token);
+      if (isMatch) {
+        validToken = dbToken;
+        break;
+      }
+    }
+
+    if (!validToken) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    return res.json({
+      valid: true,
+      expiresAt: validToken.expiresAt,
+    });
+  } catch (error) {
+    console.error("[Auth] Verify reset token error:", error);
+    return res.status(500).json({ error: "Failed to verify token" });
+  }
+});
+
 export const emailAuthRouter = router;

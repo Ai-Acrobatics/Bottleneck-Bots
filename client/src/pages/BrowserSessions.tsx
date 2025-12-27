@@ -32,8 +32,11 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BrowserSessionCard } from '@/components/browser/BrowserSessionCard';
 import { SessionLogsViewer } from '@/components/browser/SessionLogsViewer';
+import { SessionDataViewer } from '@/components/browser/SessionDataViewer';
+import { SessionRecordingViewer } from '@/components/browser/SessionRecordingViewer';
 import { LiveBrowserView } from '@/components/browser/LiveBrowserView';
 import { useBrowserSessions } from '@/hooks/useBrowserSessions';
+import { useBrowserSession } from '@/hooks/useBrowserSession';
 import { useWebSocketStore } from '@/stores/websocketStore';
 import {
   Globe,
@@ -77,7 +80,15 @@ export default function BrowserSessions() {
   const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
   const [logsDialogOpen, setLogsDialogOpen] = useState(false);
   const [liveViewDialogOpen, setLiveViewDialogOpen] = useState(false);
+  const [dataDialogOpen, setDataDialogOpen] = useState(false);
+  const [recordingDialogOpen, setRecordingDialogOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState<any>(null);
+
+  // Fetch details for currently selected session
+  const {
+    recordingUrl,
+    recordingStatus
+  } = useBrowserSession(currentSession?.sessionId);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,11 +174,8 @@ export default function BrowserSessions() {
   };
 
   const handleViewRecording = (session: any) => {
-    if (session.recordingUrl) {
-      window.open(session.recordingUrl, '_blank');
-    } else {
-      toast.error('No recording available for this session');
-    }
+    setCurrentSession(session);
+    setRecordingDialogOpen(true);
   };
 
   const handleViewLogs = (session: any) => {
@@ -176,7 +184,8 @@ export default function BrowserSessions() {
   };
 
   const handleViewData = (session: any) => {
-    toast.info('Data viewer not yet implemented');
+    setCurrentSession(session);
+    setDataDialogOpen(true);
   };
 
   const handleTerminate = (session: any) => {
@@ -508,6 +517,34 @@ export default function BrowserSessions() {
             <LiveBrowserView
               sessionId={currentSession.sessionId}
               debugUrl={currentSession.debugUrl}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Data Viewer Dialog */}
+      <Dialog open={dataDialogOpen} onOpenChange={setDataDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Extracted Data</DialogTitle>
+          </DialogHeader>
+          {currentSession && (
+            <SessionDataViewer sessionId={currentSession.sessionId} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Recording Viewer Dialog */}
+      <Dialog open={recordingDialogOpen} onOpenChange={setRecordingDialogOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Session Recording</DialogTitle>
+          </DialogHeader>
+          {currentSession && (
+            <SessionRecordingViewer
+              sessionId={currentSession.sessionId}
+              recordingUrl={recordingUrl}
+              recordingStatus={recordingStatus}
             />
           )}
         </DialogContent>

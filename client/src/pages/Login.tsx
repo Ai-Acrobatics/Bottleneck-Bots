@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useLocation } from 'wouter';
 import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, '', path);
+    window.location.href = path;
+  };
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -151,16 +153,13 @@ export default function Login() {
 
               <div className="flex items-center justify-between">
                 <div className="text-sm">
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     className="text-primary hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      toast.info('Password reset feature coming soon!');
-                    }}
+                    onClick={() => navigateTo('/forgot-password')}
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
               </div>
 
@@ -218,7 +217,7 @@ export default function Login() {
               <span className="text-muted-foreground">Don't have an account? </span>
               <button
                 type="button"
-                onClick={() => setLocation('/signup')}
+                onClick={() => navigateTo('/signup')}
                 className="text-primary hover:underline font-medium"
               >
                 Sign up

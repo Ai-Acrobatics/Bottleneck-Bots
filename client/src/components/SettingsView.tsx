@@ -1,36 +1,202 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { trpc } from '@/lib/trpc';
 import { GlassPane } from './GlassPane';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
-import { Settings, Upload, FileText, Folder, HelpCircle, Save, Plus, Trash2, Check, Building, Users, Key } from 'lucide-react';
+import { toast } from 'sonner';
+import { Settings, Upload, FileText, Folder, HelpCircle, Save, Trash2, Check, Building, Users, Key, Loader2, X } from 'lucide-react';
 
 interface SettingsViewProps {
     userRole: 'OWNER' | 'MANAGER' | 'VA';
 }
 
+interface ContextFile {
+    id: string;
+    name: string;
+    size: string;
+    type: string;
+}
+
 export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
     const [activeTab, setActiveTab] = useState<'AGENCY' | 'SUBACCOUNT' | 'INSTRUCTIONS'>('AGENCY');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Mock State for Agency Settings
-    const [agencyName, setAgencyName] = useState('Zenith Ops');
+    // Fetch preferences from backend
+    const preferencesQuery = trpc.settings.getPreferences.useQuery();
+    const updatePreferencesMutation = trpc.settings.updatePreferences.useMutation({
+        onSuccess: () => {
+            toast.success('Settings saved successfully');
+            preferencesQuery.refetch();
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to save settings');
+        },
+    });
+
+    // Fetch API keys from backend
+    const apiKeysQuery = trpc.settings.listApiKeys.useQuery();
+    const integrationQuery = trpc.settings.listIntegrations.useQuery();
+
+    // Parse workflow settings from preferences
+    const workflowSettings = preferencesQuery.data?.defaultWorkflowSettings
+        ? (typeof preferencesQuery.data.defaultWorkflowSettings === 'string'
+            ? JSON.parse(preferencesQuery.data.defaultWorkflowSettings)
+            : preferencesQuery.data.defaultWorkflowSettings)
+        : {};
+
+    // Local state for form inputs (initialized from query)
+    const [agencyName, setAgencyName] = useState('');
     const [primaryColor, setPrimaryColor] = useState('#4F46E5');
+    const [whitelabelDomain, setWhitelabelDomain] = useState('');
+    const [instructions, setInstructions] = useState('');
+    const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
 
-    // Mock State for Sub-account Context
-    const [contextFiles, setContextFiles] = useState([
-        { id: '1', name: 'Brand_Guidelines_2024.pdf', size: '2.4 MB', type: 'PDF' },
-        { id: '2', name: 'Offer_Structure_V2.docx', size: '1.1 MB', type: 'DOC' }
-    ]);
-    const [instructions, setInstructions] = useState(
-        "Always maintain a professional yet approachable tone. When discussing pricing, emphasize value over cost. Never promise specific ROI figures without a disclaimer."
-    );
+    // Initialize local state when data loads
+    React.useEffect(() => {
+        if (workflowSettings) {
+            setAgencyName(workflowSettings.agencyName || '');
+            setPrimaryColor(workflowSettings.primaryColor || '#4F46E5');
+            setWhitelabelDomain(workflowSettings.whitelabelDomain || '');
+            setInstructions(workflowSettings.instructions || '');
+            setContextFiles(workflowSettings.contextFiles || []);
+        }
+    }, [preferencesQuery.data]);
+
+    // Save agency settings
+    const handleSaveAgencySettings = async () => {
+        try {
+            await updatePreferencesMutation.mutateAsync({
+                defaultWorkflowSettings: {
+                    ...workflowSettings,
+                    agencyName,
+                    primaryColor,
+                    whitelabelDomain,
+                },
+            });
+        } catch (error) {
+            // Error handled in mutation onError
+        }
+    };
+
+    // Save instructions
+    const handleSaveInstructions = async () => {
+        try {
+            await updatePreferencesMutation.mutateAsync({
+                defaultWorkflowSettings: {
+                    ...workflowSettings,
+                    instructions,
+                },
+            });
+        } catch (error) {
+            // Error handled in mutation onError
+        }
+    };
+
+    // Handle file upload
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        const file = files[0];
+        const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+
+        if (!allowedTypes.includes(file.type)) {
+            toast.error('Only PDF, DOCX, and TXT files are allowed');
+            return;
+        }
+
+        // Add file to local state (in production, would upload to S3/storage)
+        const newFile: ContextFile = {
+            id: crypto.randomUUID(),
+            name: file.name,
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            type: file.name.split('.').pop()?.toUpperCase() || 'FILE',
+        };
+
+        const updatedFiles = [...contextFiles, newFile];
+        setContextFiles(updatedFiles);
+
+        // Save to backend
+        try {
+            await updatePreferencesMutation.mutateAsync({
+                defaultWorkflowSettings: {
+                    ...workflowSettings,
+                    contextFiles: updatedFiles,
+                },
+            });
+            toast.success(`${file.name} uploaded successfully`);
+        } catch (error) {
+            // Revert on error
+            setContextFiles(contextFiles);
+        }
+
+        // Reset input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // Handle file delete
+    const handleDeleteFile = async (fileId: string) => {
+        const updatedFiles = contextFiles.filter(f => f.id !== fileId);
+        setContextFiles(updatedFiles);
+
+        try {
+            await updatePreferencesMutation.mutateAsync({
+                defaultWorkflowSettings: {
+                    ...workflowSettings,
+                    contextFiles: updatedFiles,
+                },
+            });
+            toast.success('File removed');
+        } catch (error) {
+            // Revert on error
+            setContextFiles(contextFiles);
+        }
+    };
+
+    // Handle drag and drop
+    const handleDrop = (event: React.DragEvent) => {
+        event.preventDefault();
+        const files = event.dataTransfer.files;
+        if (files && files.length > 0) {
+            // Create a fake input event
+            const fakeEvent = {
+                target: { files },
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            handleFileUpload(fakeEvent);
+        }
+    };
+
+    const handleDragOver = (event: React.DragEvent) => {
+        event.preventDefault();
+    };
+
+    // Loading state
+    if (preferencesQuery.isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+            </div>
+        );
+    }
+
+    const isSaving = updatePreferencesMutation.isPending;
 
     return (
         <div className="h-full flex flex-col gap-6 p-4 overflow-y-auto">
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+            />
+
             {/* Header */}
             <div className="flex items-center justify-between shrink-0">
                 <div>
@@ -76,12 +242,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
                         <GlassPane title="General Configuration" className="p-6 space-y-6">
                             <div className="space-y-2">
                                 <Label>Agency Name</Label>
-                                <Input value={agencyName} onChange={(e) => setAgencyName(e.target.value)} />
+                                <Input
+                                    value={agencyName}
+                                    onChange={(e) => setAgencyName(e.target.value)}
+                                    placeholder="Enter your agency name"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>Whitelabel Domain</Label>
                                 <div className="flex gap-2">
-                                    <Input placeholder="app.youragency.com" />
+                                    <Input
+                                        placeholder="app.youragency.com"
+                                        value={whitelabelDomain}
+                                        onChange={(e) => setWhitelabelDomain(e.target.value)}
+                                    />
                                     <Button variant="outline">Verify</Button>
                                 </div>
                             </div>
@@ -92,41 +266,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
                                     <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="font-mono" />
                                 </div>
                             </div>
-                            <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
-                                <Save className="w-4 h-4 mr-2" /> Save Changes
+                            <Button
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={handleSaveAgencySettings}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4 mr-2" />
+                                )}
+                                Save Changes
                             </Button>
                         </GlassPane>
 
                         <GlassPane title="API Integrations" className="p-6 space-y-6">
                             <div className="space-y-4">
+                                {/* OpenAI API */}
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 font-bold text-slate-700">
                                             <Key className="w-4 h-4 text-slate-400" /> OpenAI API
                                         </div>
-                                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Connected</Badge>
+                                        {apiKeysQuery.data?.apiKeys?.some(k => k.service === 'openai') ? (
+                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Connected</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-slate-500">Not Connected</Badge>
+                                        )}
                                     </div>
-                                    <Input type="password" value="sk-........................" disabled className="bg-white" />
+                                    {apiKeysQuery.data?.apiKeys?.some(k => k.service === 'openai') ? (
+                                        <Input type="password" value="sk-........................" disabled className="bg-white" />
+                                    ) : (
+                                        <Button variant="outline" className="w-full">Connect OpenAI</Button>
+                                    )}
                                 </div>
 
+                                {/* GoHighLevel OAuth */}
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 font-bold text-slate-700">
                                             <Key className="w-4 h-4 text-slate-400" /> GoHighLevel OAuth
                                         </div>
-                                        <Badge variant="outline" className="text-slate-500">Not Connected</Badge>
+                                        {integrationQuery.data?.integrations?.some(i => i.service === 'gohighlevel' && i.isActive) ? (
+                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Connected</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-slate-500">Not Connected</Badge>
+                                        )}
                                     </div>
                                     <Button variant="outline" className="w-full">Connect GHL Agency</Button>
                                 </div>
 
+                                {/* Twilio / LeadConnector */}
                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 font-bold text-slate-700">
                                             <Key className="w-4 h-4 text-slate-400" /> Twilio / LeadConnector
                                         </div>
-                                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Connected</Badge>
+                                        {apiKeysQuery.data?.apiKeys?.some(k => k.service === 'twilio') ? (
+                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Connected</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-slate-500">Not Connected</Badge>
+                                        )}
                                     </div>
-                                    <div className="text-xs text-slate-500">Using Sub-account default credentials.</div>
+                                    <div className="text-xs text-slate-500">
+                                        {apiKeysQuery.data?.apiKeys?.some(k => k.service === 'twilio')
+                                            ? 'Using configured Twilio credentials.'
+                                            : 'Configure Twilio API keys to enable calling.'}
+                                    </div>
                                 </div>
                             </div>
                         </GlassPane>
@@ -138,7 +344,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
                         <div className="lg:col-span-2 flex flex-col gap-6">
                             <GlassPane title="Knowledge Base & Context" className="flex-1 p-6 flex flex-col min-h-0">
-                                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer mb-6">
+                                <div
+                                    className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer mb-6"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDrop={handleDrop}
+                                    onDragOver={handleDragOver}
+                                >
                                     <Upload className="w-10 h-10 text-indigo-400 mx-auto mb-3" />
                                     <p className="font-medium text-slate-700">Drop PDF, DOCX, or TXT files here</p>
                                     <p className="text-sm text-slate-400">or click to browse</p>
@@ -148,22 +359,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
                                     <Folder className="w-4 h-4 text-slate-400" /> Active Files
                                 </h3>
                                 <div className="space-y-2 overflow-y-auto flex-1 min-h-[200px]">
-                                    {contextFiles.map(file => (
-                                        <div key={file.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm group">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 font-bold text-xs">
-                                                    {file.type}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-slate-700 text-sm">{file.name}</p>
-                                                    <p className="text-xs text-slate-400">{file.size}</p>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-red-500">
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
+                                    {contextFiles.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">No files uploaded yet</p>
+                                            <p className="text-xs">Upload documents to provide context for AI agents</p>
                                         </div>
-                                    ))}
+                                    ) : (
+                                        contextFiles.map(file => (
+                                            <div key={file.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                                        {file.type}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-slate-700 text-sm">{file.name}</p>
+                                                        <p className="text-xs text-slate-400">{file.size}</p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-slate-400 hover:text-red-500"
+                                                    onClick={() => handleDeleteFile(file.id)}
+                                                    disabled={isSaving}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </GlassPane>
                         </div>
@@ -177,9 +402,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ userRole }) => {
                                     className="flex-1 min-h-[300px] font-mono text-sm leading-relaxed resize-none p-4"
                                     value={instructions}
                                     onChange={(e) => setInstructions(e.target.value)}
+                                    placeholder="Enter instructions for AI agents..."
                                 />
-                                <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white">
-                                    <Save className="w-4 h-4 mr-2" /> Update Instructions
+                                <Button
+                                    className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    onClick={handleSaveInstructions}
+                                    disabled={isSaving}
+                                >
+                                    {isSaving ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Save className="w-4 h-4 mr-2" />
+                                    )}
+                                    Update Instructions
                                 </Button>
                             </GlassPane>
                         </div>

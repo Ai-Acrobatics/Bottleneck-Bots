@@ -22,7 +22,7 @@ import { SettingsView } from './SettingsView';
 import { SEOManager } from './SEOManager';
 import { AdManagerPanel } from './AdManagerPanel';
 import { MarketplacePanel } from './MarketplacePanel';
-import { AIBrowserPanel } from './AIBrowserPanel';
+import { OperatorView } from './browser/operator';
 import { SkipLink } from './SkipLink';
 import { ClientProfileModal } from './ClientProfileModal';
 import { AgentDashboard } from './agent/AgentDashboard';
@@ -826,7 +826,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ userTier, credits: initial
           )}
 
           {viewMode === 'AI_BROWSER' && (
-            <AIBrowserPanel onLog={(msg) => addLog('info', 'AI Browser', msg)} />
+            <OperatorView />
           )}
 
           {viewMode === 'AGENT' && (

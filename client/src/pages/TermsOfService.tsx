@@ -191,8 +191,8 @@ export const TermsOfService: React.FC<TermsOfServiceProps> = ({ onBack }) => {
             <div className="bg-slate-50 p-4 rounded-lg">
               <p className="text-slate-700">
                 <strong>Bottleneck Bot</strong><br />
-                Email: support@bottleneckbot.com<br />
-                Website: https://www.bottleneckbot.com
+                Email: support@bottleneckbots.com<br />
+                Website: https://www.bottleneckbots.com
               </p>
             </div>
           </section>

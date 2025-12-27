@@ -5,6 +5,7 @@ import { getDb } from "../../db";
 import { user_credits, credit_packages, credit_transactions } from "../../../drizzle/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { CreditService, CreditType, TransactionType } from "../../services/credit.service";
+import Stripe from "stripe";
 
 /**
  * Credits Router
@@ -52,6 +53,12 @@ const updatePackageSchema = z.object({
 const purchaseCreditsSchema = z.object({
   packageId: z.number().int(),
   paymentMethodId: z.string().optional(), // Stripe payment method ID
+});
+
+const createCheckoutSessionSchema = z.object({
+  packageId: z.number().int(),
+  successUrl: z.string().url().optional(),
+  cancelUrl: z.string().url().optional(),
 });
 
 const adjustCreditsSchema = z.object({
@@ -337,6 +344,105 @@ export const creditsRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to add credits: ${error.message}`,
+        });
+      }
+    }),
+
+  /**
+   * Create Stripe Checkout Session for credit purchase
+   * Returns a checkout URL that the user should be redirected to
+   */
+  createCheckoutSession: publicProcedure
+    .input(createCheckoutSessionSchema)
+    .mutation(async ({ input }) => {
+      // PLACEHOLDER: Replace with actual userId from auth context
+      const userId = 1;
+
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeSecretKey) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Stripe is not configured. Please contact support.",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not available",
+        });
+      }
+
+      // Get package
+      const packageResult = await db
+        .select()
+        .from(credit_packages)
+        .where(eq(credit_packages.id, input.packageId))
+        .limit(1);
+
+      if (packageResult.length === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Package not found",
+        });
+      }
+
+      const pkg = packageResult[0];
+
+      if (!pkg.isActive) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Package is not active",
+        });
+      }
+
+      try {
+        const stripe = new Stripe(stripeSecretKey, {
+          apiVersion: "2024-12-18.acacia" as any,
+        });
+
+        // Determine success and cancel URLs
+        const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const successUrl = input.successUrl || `${baseUrl}/credits?success=true`;
+        const cancelUrl = input.cancelUrl || `${baseUrl}/credits?canceled=true`;
+
+        // Create Stripe Checkout Session
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: pkg.name,
+                  description: pkg.description || `${pkg.creditAmount} ${pkg.creditType} credits`,
+                },
+                unit_amount: pkg.price, // Price in cents
+              },
+              quantity: 1,
+            },
+          ],
+          mode: "payment",
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          metadata: {
+            userId: String(userId),
+            packageId: String(pkg.id),
+            creditType: pkg.creditType,
+            creditAmount: String(pkg.creditAmount),
+          },
+        });
+
+        return {
+          checkoutUrl: session.url,
+          sessionId: session.id,
+        };
+      } catch (error: any) {
+        console.error("[Credits] Failed to create checkout session:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create checkout session: ${error.message}`,
         });
       }
     }),

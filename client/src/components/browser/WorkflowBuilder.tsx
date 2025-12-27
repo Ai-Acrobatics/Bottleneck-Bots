@@ -515,7 +515,7 @@ export function WorkflowBuilder({
                 onValueChange={(v) => setNewStepType(v as WorkflowStepType)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select step type..." />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(STEP_TYPE_CONFIG).map(([type, config]) => {

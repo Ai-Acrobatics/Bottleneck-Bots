@@ -129,11 +129,13 @@ export function createRestApi(): Express {
   // ERROR HANDLING
   // ========================================
 
-  // 404 handler for undefined routes
-  app.use(notFoundHandler);
+  // NOTE: We do NOT register notFoundHandler here because this REST API is mounted
+  // as middleware on the main Express app. The notFoundHandler would catch ALL
+  // unmatched routes (including /api/trpc/*), not just /api/v1/* routes.
+  // The main app's error handlers will catch any 404s.
 
-  // Global error handler (must be last)
-  app.use(errorHandler);
+  // Scoped error handler for /api/v1/* routes only
+  app.use("/api/v1", errorHandler);
 
   return app;
 }

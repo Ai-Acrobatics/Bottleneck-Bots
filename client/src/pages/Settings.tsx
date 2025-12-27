@@ -113,16 +113,6 @@ interface Webhook {
   createdAt: Date;
 }
 
-interface WebhookDelivery {
-  id: string;
-  webhookId: string;
-  status: 'success' | 'failure';
-  statusCode?: number;
-  timestamp: Date;
-  eventType: WebhookEventType;
-  error?: string;
-}
-
 interface Preferences {
   defaultBrowser: string;
   emailNotifications: boolean;
@@ -229,6 +219,14 @@ export const Settings: React.FC = () => {
     onError: (error) => toast.error(`Failed to delete webhook: ${error.message}`),
   });
 
+  const updateWebhookMutation = trpc.settings.updateWebhook.useMutation({
+    onSuccess: () => {
+      toast.success('Webhook updated');
+      refetchWebhooks();
+    },
+    onError: (error) => toast.error(`Failed to update webhook: ${error.message}`),
+  });
+
   const testWebhookMutation = trpc.settings.testWebhook.useMutation({
     onSuccess: (data) => {
       if (data.success) {
@@ -279,25 +277,6 @@ export const Settings: React.FC = () => {
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
   const [deleteWebhookId, setDeleteWebhookId] = useState<string | null>(null);
   const [showWebhookLogs, setShowWebhookLogs] = useState(false);
-  const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([
-    {
-      id: '1',
-      webhookId: '1',
-      status: 'success',
-      statusCode: 200,
-      timestamp: new Date(),
-      eventType: 'form_submission',
-    },
-    {
-      id: '2',
-      webhookId: '1',
-      status: 'failure',
-      statusCode: 500,
-      timestamp: new Date(Date.now() - 3600000),
-      eventType: 'form_submission',
-      error: 'Connection timeout',
-    },
-  ]);
 
   // Preferences State
   const [preferences, setPreferences] = useState<Preferences>({
@@ -394,8 +373,7 @@ export const Settings: React.FC = () => {
   };
 
   const handleToggleWebhook = async (id: string, active: boolean) => {
-    // Note: The API doesn't have a toggle endpoint, so we'd use update
-    toast.info('Webhook toggle feature will be added soon');
+    await updateWebhookMutation.mutateAsync({ id, isActive: active });
   };
 
   const handleTestWebhook = async (id: string) => {
@@ -1186,55 +1164,54 @@ export const Settings: React.FC = () => {
       <Dialog open={showWebhookLogs} onOpenChange={setShowWebhookLogs}>
         <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Webhook Delivery Logs</DialogTitle>
-            <DialogDescription>Recent webhook delivery attempts and their status</DialogDescription>
+            <DialogTitle>Webhook Delivery Summary</DialogTitle>
+            <DialogDescription>Overview of webhook delivery statistics</DialogDescription>
           </DialogHeader>
           <div className="max-h-96 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-slate-800 hover:bg-transparent">
-                  <TableHead className="text-slate-400">Timestamp</TableHead>
-                  <TableHead className="text-slate-400">Webhook</TableHead>
-                  <TableHead className="text-slate-400">Event Type</TableHead>
-                  <TableHead className="text-slate-400">Status</TableHead>
-                  <TableHead className="text-slate-400">Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {webhookDeliveries.map((delivery) => {
-                  const webhook = webhooks.find((w) => w.id === delivery.webhookId);
-                  return (
-                    <TableRow key={delivery.id} className="border-slate-800">
-                      <TableCell className="text-slate-400 text-sm">
-                        {delivery.timestamp.toLocaleString()}
+            {webhooks.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <Webhook className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No webhooks configured</p>
+                <p className="text-sm mt-1">Create a webhook to start receiving event notifications</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-800 hover:bg-transparent">
+                    <TableHead className="text-slate-400">Webhook</TableHead>
+                    <TableHead className="text-slate-400">URL</TableHead>
+                    <TableHead className="text-slate-400">Status</TableHead>
+                    <TableHead className="text-slate-400">Successful</TableHead>
+                    <TableHead className="text-slate-400">Failed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {webhooks.map((webhook) => (
+                    <TableRow key={webhook.id} className="border-slate-800">
+                      <TableCell className="font-medium text-white">{webhook.name}</TableCell>
+                      <TableCell className="font-mono text-sm text-slate-400 max-w-xs truncate">
+                        {webhook.url}
                       </TableCell>
-                      <TableCell className="text-white">{webhook?.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-slate-700/50 border-slate-600">
-                          {delivery.eventType}
+                        <Badge className={webhook.active ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-slate-500/20 text-slate-400 border-slate-500/30'}>
+                          {webhook.active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {delivery.status === 'success' ? (
-                          <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            {delivery.statusCode}
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-500/20 text-red-500 border-red-500/30">
-                            <XCircle className="w-3 h-3 mr-1" />
-                            {delivery.statusCode || 'Failed'}
-                          </Badge>
-                        )}
+                        <span className="text-green-400 font-medium">
+                          {webhook.recentDeliveries?.success || 0}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-slate-400 text-sm">
-                        {delivery.error || 'Delivered successfully'}
+                      <TableCell>
+                        <span className={webhook.recentDeliveries?.failure > 0 ? 'text-red-400 font-medium' : 'text-slate-400'}>
+                          {webhook.recentDeliveries?.failure || 0}
+                        </span>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </DialogContent>
       </Dialog>

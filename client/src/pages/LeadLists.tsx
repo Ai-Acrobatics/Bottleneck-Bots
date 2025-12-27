@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { trpcClient } from '@/lib/trpc';
 import {
   Select,
   SelectContent,
@@ -22,7 +23,7 @@ import {
 import { LeadListCard } from '@/components/leads/LeadListCard';
 import { CreditBalance } from '@/components/leads/CreditBalance';
 import { useLeadEnrichment } from '@/hooks/useLeadEnrichment';
-import { Plus, Search, Users, CheckCircle2, Coins, TrendingUp } from 'lucide-react';
+import { Plus, Search, Users, CheckCircle2, Coins, TrendingUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -35,6 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { TourPrompt } from '@/components/tour';
 
 interface LeadList {
@@ -54,6 +63,9 @@ export default function LeadLists() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [isExporting, setIsExporting] = useState(false);
 
   const { getLists, deleteList } = useLeadEnrichment();
   const { data: listsData, isLoading } = getLists({});
@@ -89,11 +101,75 @@ export default function LeadLists() {
   };
 
   const handleExport = async (listId: string) => {
+    setSelectedListId(listId);
+    setExportDialogOpen(true);
+  };
+
+  const confirmExport = async () => {
+    if (!selectedListId) return;
+
+    setIsExporting(true);
     try {
-      // TODO: Implement export functionality
-      toast.info('Export functionality coming soon');
-    } catch (error) {
-      toast.error('Failed to export lead list');
+      // Use trpcClient for imperative query
+      const exportData = await trpcClient.leadEnrichment.exportLeads.query({
+        listId: Number(selectedListId)
+      });
+
+      if (exportData) {
+        let blob: Blob;
+        let filename: string;
+
+        if (exportFormat === 'csv') {
+          // Convert to CSV
+          const leads = exportData.leads;
+          if (leads.length === 0) {
+            toast.error('No enriched leads to export');
+            setIsExporting(false);
+            setExportDialogOpen(false);
+            return;
+          }
+
+          // Create CSV headers and rows
+          const headers = ['ID', 'Raw Data', 'Enriched Data', 'Enriched At'];
+          const rows = leads.map((lead: any) => [
+            lead.id,
+            JSON.stringify(lead.rawData),
+            JSON.stringify(lead.enrichedData),
+            lead.enrichedAt,
+          ]);
+
+          const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+          ].join('\n');
+
+          blob = new Blob([csvContent], { type: 'text/csv' });
+          filename = `${exportData.list.name}-leads.csv`;
+        } else {
+          // Export as JSON
+          blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json',
+          });
+          filename = `${exportData.list.name}-leads.json`;
+        }
+
+        // Trigger download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        toast.success(`Leads exported successfully as ${exportFormat.toUpperCase()}`);
+        setExportDialogOpen(false);
+        setSelectedListId(null);
+      }
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(error.message || 'Failed to export lead list');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -279,6 +355,55 @@ export default function LeadLists() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Lead List</DialogTitle>
+            <DialogDescription>
+              Choose the format to export your enriched leads. Only enriched leads will be included in the export.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Export Format</label>
+              <Select value={exportFormat} onValueChange={(value: 'csv' | 'json') => setExportFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv">CSV (Comma Separated Values)</SelectItem>
+                  <SelectItem value="json">JSON (JavaScript Object Notation)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-lg bg-muted p-4">
+              <p className="text-sm text-muted-foreground">
+                {exportFormat === 'csv'
+                  ? 'CSV format is ideal for importing into spreadsheet applications like Excel or Google Sheets.'
+                  : 'JSON format is ideal for importing into other applications or databases.'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)} disabled={isExporting}>
+              Cancel
+            </Button>
+            <Button onClick={confirmExport} disabled={isExporting}>
+              {isExporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  Export {exportFormat.toUpperCase()}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

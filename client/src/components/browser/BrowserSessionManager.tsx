@@ -464,7 +464,7 @@ export function BrowserSessionManager({
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[140px]">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
+                  <SelectValue placeholder="Filter..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -478,7 +478,7 @@ export function BrowserSessionManager({
               <Select value={sortField} onValueChange={(v) => setSortField(v as SessionSortField)}>
                 <SelectTrigger className="w-[140px]">
                   <Clock className="h-4 w-4 mr-2" />
-                  <SelectValue />
+                  <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="createdAt">Created</SelectItem>

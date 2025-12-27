@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
+import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,7 +7,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { CreditPackageCard } from '@/components/leads/CreditPackageCard';
 import { CreditBalance } from '@/components/leads/CreditBalance';
 import { useCredits } from '@/hooks/useCredits';
-import { ArrowLeft, Coins, CreditCard, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Coins, CreditCard, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -24,29 +24,53 @@ import { FeatureTip } from '@/components/tour/FeatureTip';
 
 export default function CreditPurchase() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
 
-  const { getPackages, purchaseCredits, getTransactionHistory, getBalance } = useCredits();
+  const { getPackages, createCheckoutSession, getTransactionHistory, getBalance } = useCredits();
 
-  const { data: packagesData, isLoading: packagesLoading } = getPackages({ activeOnly: true });
-  const { data: historyData, isLoading: historyLoading } = getTransactionHistory({});
-  const { data: enrichmentBalance } = getBalance({ creditType: 'enrichment' });
-  const { data: callingBalance } = getBalance({ creditType: 'calling' });
+  const { data: packagesData, isLoading: packagesLoading, refetch: refetchPackages } = getPackages({ activeOnly: true });
+  const { data: historyData, isLoading: historyLoading, refetch: refetchHistory } = getTransactionHistory({});
+  const { data: enrichmentBalance, refetch: refetchEnrichment } = getBalance({ creditType: 'enrichment' });
+  const { data: callingBalance, refetch: refetchCalling } = getBalance({ creditType: 'calling' });
+
+  // Handle Stripe redirect success/cancel
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    if (params.get('success') === 'true') {
+      toast.success('Payment successful! Your credits have been added.');
+      // Refetch balances and history
+      refetchEnrichment();
+      refetchCalling();
+      refetchHistory();
+      // Clear the URL params
+      setLocation('/credits', { replace: true });
+    } else if (params.get('canceled') === 'true') {
+      toast.info('Payment was canceled.');
+      setLocation('/credits', { replace: true });
+    }
+  }, [searchString, setLocation, refetchEnrichment, refetchCalling, refetchHistory]);
 
   // Extract arrays from response objects
   const packages = packagesData?.packages ?? [];
   const history = historyData?.transactions ?? [];
 
-  const purchaseMutation = purchaseCredits;
+  const checkoutMutation = createCheckoutSession;
 
   const handlePurchase = async (packageId: string) => {
     try {
       setSelectedPackageId(packageId);
-      await purchaseMutation.mutateAsync({ packageId: parseInt(packageId, 10) });
-      toast.success('Credits purchased successfully!');
-      setSelectedPackageId(null);
-    } catch (error) {
-      toast.error('Failed to purchase credits');
+      const result = await checkoutMutation.mutateAsync({ packageId: parseInt(packageId, 10) });
+
+      // Redirect to Stripe Checkout
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+      } else {
+        toast.error('Failed to create checkout session');
+        setSelectedPackageId(null);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to initiate payment');
       setSelectedPackageId(null);
     }
   };
@@ -151,7 +175,7 @@ export default function CreditPurchase() {
                   key={pkg.id}
                   package={pkg}
                   onPurchase={() => handlePurchase(pkg.id)}
-                  isLoading={selectedPackageId === pkg.id && purchaseMutation.isPending}
+                  isLoading={selectedPackageId === pkg.id && checkoutMutation.isPending}
                   recommended={index === 1} // Recommend the middle package
                 />
               ))}

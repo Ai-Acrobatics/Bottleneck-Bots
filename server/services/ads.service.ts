@@ -5,7 +5,7 @@
 
 import OpenAI from 'openai';
 import { Stagehand } from '@browserbasehq/stagehand';
-import { getBrowserbaseService } from '../_core/browserbase';
+import { browserbaseSDK } from '../_core/browserbaseSDK';
 import { getDb } from '../db';
 import { integrations, jobs } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
@@ -655,8 +655,7 @@ Make each variation distinct with different angles: emotional, logical, urgency,
       const jobId = jobResult[0].id;
 
       // Create Browserbase session
-      const browserbaseService = getBrowserbaseService();
-      const session = await browserbaseService.createSession();
+      const session = await browserbaseSDK.createSession();
 
       // Initialize Stagehand
       const stagehand = new Stagehand({
