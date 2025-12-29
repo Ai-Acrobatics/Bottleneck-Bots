@@ -18,8 +18,6 @@ const OnboardingFlow = lazy(() => import('./components/OnboardingFlow').then(m =
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 const TermsOfService = lazy(() => import('./pages/TermsOfService').then(m => ({ default: m.TermsOfService })));
 const OAuthCallback = lazy(() => import('./components/OAuthPopup').then(m => ({ default: m.OAuthCallback })));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 // Loading spinner component
 const LoadingSpinner = () => (
@@ -31,7 +29,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY' | 'PRIVACY' | 'TERMS' | 'FEATURES' | 'OAUTH_CALLBACK' | 'FORGOT_PASSWORD' | 'RESET_PASSWORD';
+type ViewState = 'LANDING' | 'LOGIN' | 'ONBOARDING' | 'DASHBOARD' | 'ALEX_RAMOZY' | 'PRIVACY' | 'TERMS' | 'FEATURES' | 'OAUTH_CALLBACK';
 type UserTier = 'STARTER' | 'GROWTH' | 'WHITELABEL';
 
 // Admin email for preview access
@@ -55,57 +53,37 @@ function App() {
 
   useEffect(() => {
     const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    
+    // Handle OAuth popup callback (for integration OAuth flows)
     if (path === '/api/oauth/callback') {
       setCurrentView('OAUTH_CALLBACK');
-    } else if (path === '/forgot-password') {
-      setCurrentView('FORGOT_PASSWORD');
-    } else if (path === '/reset-password') {
-      setCurrentView('RESET_PASSWORD');
-    } else if (path === '/dashboard') {
-      // User landed on /dashboard URL (e.g., after Google OAuth redirect)
-      // The auth.me query will determine if they're authenticated
-      // If authenticated, the useEffect below will set the view to DASHBOARD
-      // If not authenticated, we'll redirect to login
-      console.log('[App] Landing on /dashboard, waiting for auth check...');
-    } else if (path === '/auth/callback') {
-      const params = new URLSearchParams(window.location.search);
+      return;
+    }
+    
+    // Handle OAuth errors redirected from server
+    const error = params.get('error');
+    if (error) {
+      console.error('[OAuth] Authentication error:', error);
+      setCurrentView('LOGIN');
+      // Clear error from URL without reloading
+      window.history.replaceState({}, '', path);
+      return;
+    }
+    
+    // Legacy support: Handle /auth/callback route (if still used)
+    // The server now sets cookies directly, but this handles any edge cases
+    if (path === '/auth/callback') {
       const sessionToken = params.get('sessionToken');
       if (sessionToken) {
-        // Set cookie with proper attributes for production HTTPS
-        const isSecure = window.location.protocol === 'https:';
-        // Use SameSite=Lax for same-origin requests (more compatible than None)
-        const sameSite = 'Lax';
-        const secureFlag = isSecure ? '; Secure' : '';
-        const cookieString = `app_session_id=${sessionToken}; path=/; max-age=31536000; SameSite=${sameSite}${secureFlag}`;
-        document.cookie = cookieString;
-        console.log('[Auth] Cookie set, refetching user...');
-
-        // Refetch user data and clean up URL
-        refetchUser()
-          .then((result) => {
-            console.log('[Auth] Refetch result:', result.data ? 'User found' : 'No user');
-            // Clean up URL by removing the sessionToken from query params
-            window.history.replaceState({}, '', '/');
-
-            // Explicitly navigate based on user data
-            if (result.data) {
-              if (result.data.onboardingCompleted === false) {
-                setCurrentView('ONBOARDING');
-              } else {
-                setCurrentView('DASHBOARD');
-              }
-            } else {
-              // Auth failed even after setting cookie - redirect to login
-              console.error('[Auth] User not found after setting cookie');
-              setCurrentView('LOGIN');
-            }
-          })
-          .catch((error) => {
-            console.error('[Auth] Refetch error:', error);
-            // Still clean up URL even on error
-            window.history.replaceState({}, '', '/');
-            setCurrentView('LOGIN');
-          });
+        document.cookie = `app_session_id=${sessionToken}; path=/; max-age=31536000; SameSite=Lax`;
+        // Clear the URL and redirect to home
+        window.history.replaceState({}, '', '/');
+        refetchUser();
+      } else {
+        // No token in callback, just redirect to home and let auth check handle it
+        window.history.replaceState({}, '', '/');
+        refetchUser();
       }
     }
   }, [refetchUser]);
@@ -118,18 +96,8 @@ function App() {
       } else {
         setCurrentView('DASHBOARD');
       }
-    } else if (!isAuthLoading && !user) {
-      // Auth check completed but no user found
-      const path = window.location.pathname;
-      if (path === '/dashboard') {
-        // User landed on /dashboard but is not authenticated - redirect to login
-        console.log('[App] Not authenticated, redirecting to login');
-        setCurrentView('LOGIN');
-        // Clean up the URL
-        window.history.replaceState({}, '', '/');
-      }
     }
-  }, [user, isAuthLoading]);
+  }, [user]);
 
   // Toggle between landing and dashboard for admin preview
   const toggleAdminPreview = () => {
@@ -257,14 +225,6 @@ function App() {
 
               {currentView === 'TERMS' && (
                 <TermsOfService onBack={() => setCurrentView('LANDING')} />
-              )}
-
-              {currentView === 'FORGOT_PASSWORD' && (
-                <ForgotPassword />
-              )}
-
-              {currentView === 'RESET_PASSWORD' && (
-                <ResetPassword />
               )}
             </Suspense>
             </TourProvider>

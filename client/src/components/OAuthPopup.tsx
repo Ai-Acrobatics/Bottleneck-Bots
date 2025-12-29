@@ -92,17 +92,41 @@ export function OAuthCallback() {
     const code = params.get('code');
     const error = params.get('error');
     const state = params.get('state');
+    const oauthStatus = params.get('oauth'); // success or error
+    const provider = params.get('provider');
+    const message = params.get('message');
 
     if (window.opener) {
-      if (error) {
+      // Handle server-side OAuth completion (integration OAuth)
+      if (oauthStatus === 'success') {
         window.opener.postMessage(
           {
-            type: 'oauth-error',
-            error: error,
+            type: 'oauth-success',
+            data: { provider, status: 'success' },
           },
           window.location.origin
         );
-      } else if (code) {
+        // Close the popup after a short delay
+        setTimeout(() => window.close(), 500);
+        return;
+      }
+
+      if (oauthStatus === 'error' || error) {
+        window.opener.postMessage(
+          {
+            type: 'oauth-error',
+            error: message || error || 'OAuth failed',
+            provider,
+          },
+          window.location.origin
+        );
+        // Close the popup after a short delay
+        setTimeout(() => window.close(), 500);
+        return;
+      }
+
+      // Handle client-side OAuth flow (code exchange)
+      if (code) {
         window.opener.postMessage(
           {
             type: 'oauth-success',
@@ -110,15 +134,24 @@ export function OAuthCallback() {
           },
           window.location.origin
         );
+        // Close the popup after a short delay
+        setTimeout(() => window.close(), 500);
       }
+    } else {
+      // No opener - user navigated directly or popup was blocked
+      // Redirect to home after showing message
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     }
   }, []);
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-slate-950">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Completing authentication...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+        <p className="text-slate-400">Completing authentication...</p>
+        <p className="text-slate-500 text-sm mt-2">This window will close automatically.</p>
       </div>
     </div>
   );

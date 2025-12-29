@@ -143,14 +143,7 @@ export function registerGoogleAuthRoutes(app: Express) {
                 lastSignedIn: new Date(),
             });
 
-            // Verify user was created/updated successfully
-            const verifyUser = await db.getUserByGoogleId(googleId);
-            if (!verifyUser) {
-                console.error('[Google Auth] CRITICAL: User upsert succeeded but user not found in database!');
-                res.redirect("/login?error=user_creation_failed");
-                return;
-            }
-            console.log('[Google Auth] User verified in database:', { userId: verifyUser.id, googleId: verifyUser.googleId });
+            console.log('[Google Auth] User upserted successfully');
 
             // Create session token using googleId as the identifier
             console.log('[Google Auth] Creating session token');
@@ -159,17 +152,17 @@ export function registerGoogleAuthRoutes(app: Express) {
                 expiresInMs: ONE_YEAR_MS,
             });
 
-            console.log('[Google Auth] Session token created, length:', sessionToken.length);
+            console.log('[Google Auth] Session token created');
 
-            // Set session cookie directly instead of passing token in URL (security fix)
+            // Set the session cookie directly on the server (more secure than passing via URL)
             const cookieOptions = getSessionCookieOptions(req);
-            res.cookie(COOKIE_NAME, sessionToken, {
-                ...cookieOptions,
-                maxAge: ONE_YEAR_MS, // Cookie must have maxAge to persist across browser sessions
-            });
+            res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-            console.log('[Google Auth] Authentication successful, redirecting to dashboard');
-            res.redirect('/dashboard');
+            console.log('[Google Auth] Session cookie set, redirecting to dashboard');
+            
+            // Redirect to dashboard (or onboarding if new user)
+            // The frontend will detect the logged-in state via trpc.auth.me
+            res.redirect('/');
         } catch (error) {
             console.error("[Google Auth] Callback failed:", error);
             if (axios.isAxiosError(error)) {

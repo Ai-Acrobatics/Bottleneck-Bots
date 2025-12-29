@@ -162,20 +162,20 @@ async function handleOAuthCallback(
     });
 
     const errorMsg = error_description || error;
-    res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=${encodeURIComponent(errorMsg as string)}`);
+    res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=${encodeURIComponent(errorMsg as string)}`);
     return;
   }
 
   // Validate required parameters
   if (!code || typeof code !== "string") {
     console.error(`[OAuth] ${provider} missing authorization code`);
-    res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Missing+authorization+code`);
+    res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Missing+authorization+code`);
     return;
   }
 
   if (!state || typeof state !== "string") {
     console.error(`[OAuth] ${provider} missing state parameter`);
-    res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Missing+state+parameter`);
+    res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Missing+state+parameter`);
     return;
   }
 
@@ -187,7 +187,7 @@ async function handleOAuthCallback(
       console.error(`[OAuth] ${provider} invalid or expired state:`, {
         state: state.substring(0, 8) + "...",
       });
-      res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Invalid+or+expired+state`);
+      res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Invalid+or+expired+state`);
       return;
     }
 
@@ -197,7 +197,7 @@ async function handleOAuthCallback(
         expected: provider,
         received: stateData.provider,
       });
-      res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Provider+mismatch`);
+      res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Provider+mismatch`);
       return;
     }
 
@@ -235,7 +235,7 @@ async function handleOAuthCallback(
         statusText: tokenResponse.statusText,
         error: errorText,
       });
-      res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Token+exchange+failed`);
+      res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Token+exchange+failed`);
       return;
     }
 
@@ -264,7 +264,7 @@ async function handleOAuthCallback(
     const db = await getDb();
     if (!db) {
       console.error(`[OAuth] ${provider} database not available`);
-      res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Database+error`);
+      res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Database+error`);
       return;
     }
 
@@ -335,7 +335,7 @@ async function handleOAuthCallback(
     });
 
     // Redirect back to settings with success
-    res.redirect(`/dashboard/settings?oauth=success&provider=${provider}`);
+    res.redirect(`/api/oauth/callback?oauth=success&provider=${provider}`);
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`[OAuth] ${provider} callback error:`, {
@@ -344,7 +344,7 @@ async function handleOAuthCallback(
       duration: `${duration}ms`,
     });
 
-    res.redirect(`/dashboard/settings?oauth=error&provider=${provider}&message=Internal+server+error`);
+    res.redirect(`/api/oauth/callback?oauth=error&provider=${provider}&message=Internal+server+error`);
   }
 }
 

@@ -371,6 +371,83 @@ class BrowserbaseSDKService {
     return this.projectId;
   }
 
+  /**
+   * Get configuration status for health checks
+   * @returns Configuration status object
+   */
+  public getConfigurationStatus(): {
+    isConfigured: boolean;
+    hasApiKey: boolean;
+    hasProjectId: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+    const hasApiKey = !!process.env.BROWSERBASE_API_KEY;
+    const hasProjectId = !!process.env.BROWSERBASE_PROJECT_ID;
+
+    if (!hasApiKey) {
+      errors.push('BROWSERBASE_API_KEY is not set');
+    }
+    if (!hasProjectId) {
+      errors.push('BROWSERBASE_PROJECT_ID is not set');
+    }
+
+    return {
+      isConfigured: hasApiKey && hasProjectId,
+      hasApiKey,
+      hasProjectId,
+      errors,
+    };
+  }
+
+  /**
+   * Health check for Browserbase service
+   * Tests connectivity and returns service status
+   * 
+   * @returns Health check result
+   */
+  public async healthCheck(): Promise<{
+    healthy: boolean;
+    status: string;
+    details: {
+      configured: boolean;
+      initialized: boolean;
+      canConnect: boolean;
+      projectId: string | null;
+      errors: string[];
+    };
+  }> {
+    const configStatus = this.getConfigurationStatus();
+    const errors: string[] = [...configStatus.errors];
+    let canConnect = false;
+
+    // Try to connect if configured
+    if (configStatus.isConfigured && this.isInitialized()) {
+      try {
+        // Try listing sessions to verify API connectivity
+        await this.listSessions();
+        canConnect = true;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`API connection test failed: ${errorMessage}`);
+      }
+    }
+
+    const healthy = configStatus.isConfigured && this.isInitialized() && canConnect;
+
+    return {
+      healthy,
+      status: healthy ? 'healthy' : 'unhealthy',
+      details: {
+        configured: configStatus.isConfigured,
+        initialized: this.isInitialized(),
+        canConnect,
+        projectId: this.projectId,
+        errors,
+      },
+    };
+  }
+
   public async listSessions(): Promise<any[]> {
     const client = this.ensureClient();
     const sessions = await client.sessions.list();

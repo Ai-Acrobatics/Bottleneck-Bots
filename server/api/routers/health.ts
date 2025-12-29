@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../../_core/trpc";
 import { circuitBreakerRegistry } from "../../lib/circuitBreaker";
+import { browserbaseSDK } from "../../_core/browserbaseSDK";
 
 /**
  * Health Router
@@ -210,6 +211,53 @@ export const healthRouter = router({
           (available.length + unavailable.length + degraded.length)) *
         100,
     };
+  }),
+
+  /**
+   * Check Browserbase service health
+   * Verifies configuration and API connectivity
+   *
+   * @example
+   * ```ts
+   * const browserHealth = await trpc.health.getBrowserbaseHealth.query();
+   * if (!browserHealth.healthy) {
+   *   console.error('Browserbase issues:', browserHealth.details.errors);
+   * }
+   * ```
+   */
+  getBrowserbaseHealth: publicProcedure.query(async () => {
+    try {
+      const health = await browserbaseSDK.healthCheck();
+      return health;
+    } catch (error) {
+      return {
+        healthy: false,
+        status: 'error',
+        details: {
+          configured: false,
+          initialized: false,
+          canConnect: false,
+          projectId: null,
+          errors: [error instanceof Error ? error.message : 'Unknown error'],
+        },
+      };
+    }
+  }),
+
+  /**
+   * Get Browserbase configuration status (without testing connectivity)
+   * Fast check for configuration validation
+   *
+   * @example
+   * ```ts
+   * const config = await trpc.health.getBrowserbaseConfig.query();
+   * if (!config.isConfigured) {
+   *   console.log('Missing:', config.errors.join(', '));
+   * }
+   * ```
+   */
+  getBrowserbaseConfig: publicProcedure.query(async () => {
+    return browserbaseSDK.getConfigurationStatus();
   }),
 
   /**
