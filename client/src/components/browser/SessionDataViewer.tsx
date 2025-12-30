@@ -25,16 +25,12 @@ interface SessionDataViewerProps {
 export function SessionDataViewer({ sessionId, className = '' }: SessionDataViewerProps) {
   const [activeTab, setActiveTab] = useState('all');
 
-  // Fetch extracted data for this session
-  const { data: extractedDataList, isLoading } = trpc.browser.listSessions.useQuery(
-    { status: undefined, limit: 100, offset: 0 },
+  // Fetch extracted data for this session using dedicated endpoint
+  const { data: extractedDataList, isLoading, refetch } = trpc.browser.getSessionExtractedData.useQuery(
+    { sessionId, limit: 50, offset: 0 },
     {
       enabled: Boolean(sessionId),
-      select: (data) => {
-        // Filter to only this session and get extracted data
-        const session = data?.find((s: any) => s.sessionId === sessionId) as any;
-        return session?.extractedData || [];
-      },
+      refetchOnWindowFocus: false,
     }
   );
 

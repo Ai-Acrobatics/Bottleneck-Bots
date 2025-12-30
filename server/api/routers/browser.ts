@@ -1629,6 +1629,59 @@ export const browserRouter = router({
     }),
 
   /**
+   * Get extracted data for a specific session
+   */
+  getSessionExtractedData: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      limit: z.number().int().min(1).max(100).default(50),
+      offset: z.number().int().min(0).default(0),
+    }))
+    .query(async ({ input, ctx }) => {
+      const userId = ctx.user.id;
+      const db = await getDb();
+
+      if (!db) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Database not initialized",
+        });
+      }
+
+      try {
+        // First find the browser session to get its integer ID
+        const [session] = await db.select()
+          .from(browserSessions)
+          .where(and(
+            eq(browserSessions.sessionId, input.sessionId),
+            eq(browserSessions.userId, userId)
+          ))
+          .limit(1);
+
+        if (!session) {
+          return [];
+        }
+
+        // Get extracted data for this session
+        const data = await db
+          .select()
+          .from(extractedData)
+          .where(eq(extractedData.sessionId, session.id))
+          .orderBy(desc(extractedData.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        return data;
+      } catch (error) {
+        console.error("[Browser] Failed to get session extracted data:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to get extracted data: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+    }),
+
+  /**
    * Get session metrics and cost
    */
   getSessionMetrics: protectedProcedure

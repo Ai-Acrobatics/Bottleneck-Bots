@@ -26,11 +26,8 @@ const {
   mockSessionMetricsService,
   mockWebsocketService,
 } = vi.hoisted(() => {
-  // Stagehand needs to be a proper class mock
-  const MockStagehandClass = vi.fn();
-  MockStagehandClass.prototype.init = vi.fn().mockResolvedValue(undefined);
-  MockStagehandClass.prototype.close = vi.fn().mockResolvedValue(undefined);
-  MockStagehandClass.prototype.page = {
+  // Create a mock page object
+  const mockPage = {
     goto: vi.fn().mockResolvedValue(undefined),
     click: vi.fn().mockResolvedValue(undefined),
     fill: vi.fn().mockResolvedValue(undefined),
@@ -44,6 +41,16 @@ const {
     url: vi.fn().mockReturnValue("https://example.com"),
     title: vi.fn().mockResolvedValue("Test Page"),
   };
+
+  // Stagehand needs to be a proper class mock with context.pages()
+  const MockStagehandClass = vi.fn();
+  MockStagehandClass.prototype.init = vi.fn().mockResolvedValue(undefined);
+  MockStagehandClass.prototype.close = vi.fn().mockResolvedValue(undefined);
+  MockStagehandClass.prototype.context = {
+    pages: vi.fn().mockReturnValue([mockPage]),
+    newPage: vi.fn().mockResolvedValue(mockPage),
+  };
+  MockStagehandClass.prototype.page = mockPage; // Also expose directly for compatibility
   MockStagehandClass.prototype.act = vi.fn().mockResolvedValue({ success: true, message: "Action completed" });
   MockStagehandClass.prototype.observe = vi.fn().mockResolvedValue([{ selector: "#element", description: "Element" }]);
   MockStagehandClass.prototype.extract = vi.fn().mockResolvedValue({ data: { key: "value" } });
@@ -51,13 +58,25 @@ const {
   return {
     mockGetDb: vi.fn(),
     mockBrowserbaseSDK: {
-      createSession: vi.fn().mockResolvedValue({ id: "session-123", connectUrl: "wss://test.browserbase.io" }),
+      createSession: vi.fn().mockResolvedValue({
+        id: "session-123",
+        connectUrl: "wss://test.browserbase.io",
+        projectId: "project-123",
+        status: "RUNNING",
+      }),
       terminateSession: vi.fn().mockResolvedValue({ success: true, sessionId: "session-123" }),
-      getSessionDebug: vi.fn().mockResolvedValue({ debuggerFullscreenUrl: "https://debug.url", pages: [] }),
-      getSessionRecording: vi.fn().mockResolvedValue({ url: "https://recording.url" }),
+      getSessionDebug: vi.fn().mockResolvedValue({
+        debuggerFullscreenUrl: "https://debug.url",
+        wsUrl: "wss://debug.url/ws",
+        pages: [{ url: "about:blank", title: "New Tab" }],
+      }),
+      getSessionRecording: vi.fn().mockResolvedValue({
+        url: "https://recording.url",
+        status: "COMPLETED",
+      }),
       getSessionLogs: vi.fn().mockResolvedValue([]),
       listSessions: vi.fn().mockResolvedValue([]),
-      getSession: vi.fn().mockResolvedValue({ id: "session-123", status: "active" }),
+      getSession: vi.fn().mockResolvedValue({ id: "session-123", status: "RUNNING" }),
     },
     MockStagehandClass,
     mockSessionMetricsService: {
@@ -65,6 +84,7 @@ const {
       trackSessionEnd: vi.fn().mockResolvedValue(undefined),
       trackOperation: vi.fn().mockResolvedValue(undefined),
       getSessionMetrics: vi.fn().mockResolvedValue({ operations: 0, duration: 0 }),
+      calculateCost: vi.fn().mockResolvedValue({ totalCost: 0.05, breakdown: { compute: 0.03, storage: 0.02 } }),
     },
     mockWebsocketService: {
       broadcastToUser: vi.fn(),
