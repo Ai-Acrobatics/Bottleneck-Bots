@@ -18,57 +18,93 @@ import {
 } from "../../../client/src/__tests__/helpers/test-helpers";
 import { createTestDb } from "../../../client/src/__tests__/helpers/test-db";
 
-// Mock dependencies
-vi.mock("@/server/db");
-vi.mock("@/server/_core/browserbaseSDK");
-vi.mock("@browserbasehq/stagehand");
-vi.mock("@/server/services/sessionMetrics.service");
-vi.mock("@/server/services/websocket.service");
+// Create hoisted mocks for all dependencies
+const {
+  mockGetDb,
+  mockBrowserbaseSDK,
+  MockStagehandClass,
+  mockSessionMetricsService,
+  mockWebsocketService,
+} = vi.hoisted(() => {
+  // Stagehand needs to be a proper class mock
+  const MockStagehandClass = vi.fn();
+  MockStagehandClass.prototype.init = vi.fn().mockResolvedValue(undefined);
+  MockStagehandClass.prototype.close = vi.fn().mockResolvedValue(undefined);
+  MockStagehandClass.prototype.page = {
+    goto: vi.fn().mockResolvedValue(undefined),
+    click: vi.fn().mockResolvedValue(undefined),
+    fill: vi.fn().mockResolvedValue(undefined),
+    locator: vi.fn().mockReturnValue({
+      click: vi.fn().mockResolvedValue(undefined),
+      fill: vi.fn().mockResolvedValue(undefined),
+      scrollIntoViewIfNeeded: vi.fn().mockResolvedValue(undefined),
+    }),
+    evaluate: vi.fn().mockResolvedValue(undefined),
+    screenshot: vi.fn().mockResolvedValue(Buffer.from("fake-screenshot")),
+    url: vi.fn().mockReturnValue("https://example.com"),
+    title: vi.fn().mockResolvedValue("Test Page"),
+  };
+  MockStagehandClass.prototype.act = vi.fn().mockResolvedValue({ success: true, message: "Action completed" });
+  MockStagehandClass.prototype.observe = vi.fn().mockResolvedValue([{ selector: "#element", description: "Element" }]);
+  MockStagehandClass.prototype.extract = vi.fn().mockResolvedValue({ data: { key: "value" } });
+
+  return {
+    mockGetDb: vi.fn(),
+    mockBrowserbaseSDK: {
+      createSession: vi.fn().mockResolvedValue({ id: "session-123", connectUrl: "wss://test.browserbase.io" }),
+      terminateSession: vi.fn().mockResolvedValue({ success: true, sessionId: "session-123" }),
+      getSessionDebug: vi.fn().mockResolvedValue({ debuggerFullscreenUrl: "https://debug.url", pages: [] }),
+      getSessionRecording: vi.fn().mockResolvedValue({ url: "https://recording.url" }),
+      getSessionLogs: vi.fn().mockResolvedValue([]),
+      listSessions: vi.fn().mockResolvedValue([]),
+      getSession: vi.fn().mockResolvedValue({ id: "session-123", status: "active" }),
+    },
+    MockStagehandClass,
+    mockSessionMetricsService: {
+      trackSessionStart: vi.fn().mockResolvedValue(undefined),
+      trackSessionEnd: vi.fn().mockResolvedValue(undefined),
+      trackOperation: vi.fn().mockResolvedValue(undefined),
+      getSessionMetrics: vi.fn().mockResolvedValue({ operations: 0, duration: 0 }),
+    },
+    mockWebsocketService: {
+      broadcastToUser: vi.fn(),
+      sendToUser: vi.fn(),
+    },
+  };
+});
+
+// Mock dependencies with factory functions
+vi.mock("@/server/db", () => ({ getDb: mockGetDb }));
+vi.mock("@/server/_core/browserbaseSDK", () => ({ browserbaseSDK: mockBrowserbaseSDK }));
+vi.mock("@browserbasehq/stagehand", () => ({ Stagehand: MockStagehandClass }));
+vi.mock("@/server/services/sessionMetrics.service", () => ({ sessionMetricsService: mockSessionMetricsService }));
+vi.mock("@/server/services/websocket.service", () => ({ websocketService: mockWebsocketService }));
 
 describe("Browser Router", () => {
   let mockCtx: any;
   let mockDb: any;
-  let mockBrowserbaseClient: ReturnType<typeof createMockBrowserbaseClient>;
-  let mockStagehand: ReturnType<typeof createMockStagehand>;
-  let mockMetricsService: ReturnType<typeof createMockSessionMetricsService>;
-  let mockWebsocketService: ReturnType<typeof createMockWebsocketService>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    // Reset all mocks before each test but keep implementations
+    vi.clearAllMocks();
+
     mockCtx = createMockContext({ id: 1 });
     mockDb = createTestDb();
-    mockBrowserbaseClient = createMockBrowserbaseClient();
-    mockStagehand = createMockStagehand();
-    mockMetricsService = createMockSessionMetricsService();
-    mockWebsocketService = createMockWebsocketService();
 
-    // Mock database
-    const dbModule = await import("@/server/db");
-    vi.mocked(dbModule.getDb).mockResolvedValue(mockDb as any);
+    // Configure database mock
+    mockGetDb.mockResolvedValue(mockDb as any);
 
-    // Mock browserbaseSDK
-    const browserbaseModule = await import("@/server/_core/browserbaseSDK");
-    vi.mocked(browserbaseModule.browserbaseSDK).mockReturnValue({
-      createSession: mockBrowserbaseClient.sessions.create,
-      terminateSession: vi.fn().mockResolvedValue({ success: true, sessionId: "session-123" }),
-      getSessionDebug: mockBrowserbaseClient.sessions.debug,
-      getSessionRecording: mockBrowserbaseClient.sessions.recording.retrieve,
-      getSessionLogs: mockBrowserbaseClient.sessions.logs.list,
-      listSessions: mockBrowserbaseClient.sessions.list,
-      getSession: mockBrowserbaseClient.sessions.retrieve,
-    } as any);
+    // Reset browserbaseSDK mock implementations
+    mockBrowserbaseSDK.createSession.mockResolvedValue({ id: "session-123", connectUrl: "wss://test.browserbase.io" });
+    mockBrowserbaseSDK.terminateSession.mockResolvedValue({ success: true, sessionId: "session-123" });
+    mockBrowserbaseSDK.getSessionDebug.mockResolvedValue({ debuggerFullscreenUrl: "https://debug.url", pages: [] });
 
-    // Mock Stagehand
-    const { Stagehand } = await import("@browserbasehq/stagehand");
-    vi.mocked(Stagehand).mockImplementation(() => mockStagehand as any);
-
-    // Mock services
-    const metricsModule = await import("@/server/services/sessionMetrics.service");
-    vi.mocked(metricsModule.sessionMetricsService).mockReturnValue(mockMetricsService as any);
-
-    const wsModule = await import("@/server/services/websocket.service");
-    vi.mocked(wsModule.websocketService).mockReturnValue(mockWebsocketService as any);
-
-    vi.clearAllMocks();
+    // Reset Stagehand prototype methods
+    MockStagehandClass.prototype.init.mockResolvedValue(undefined);
+    MockStagehandClass.prototype.close.mockResolvedValue(undefined);
+    MockStagehandClass.prototype.act.mockResolvedValue({ success: true, message: "Action completed" });
+    MockStagehandClass.prototype.observe.mockResolvedValue([{ selector: "#element", description: "Element" }]);
+    MockStagehandClass.prototype.extract.mockResolvedValue({ data: { key: "value" } });
   });
 
   afterEach(() => {
@@ -100,8 +136,8 @@ describe("Browser Router", () => {
       expect(result.sessionId).toBe("session-123");
       expect(result.debugUrl).toBeDefined();
       expect(result.status).toBe("RUNNING");
-      expect(mockBrowserbaseClient.sessions.create).toHaveBeenCalled();
-      expect(mockMetricsService.trackSessionStart).toHaveBeenCalledWith(
+      expect(mockBrowserbaseSDK.createSession).toHaveBeenCalled();
+      expect(mockSessionMetricsService.trackSessionStart).toHaveBeenCalledWith(
         "session-123",
         1
       );
@@ -130,7 +166,7 @@ describe("Browser Router", () => {
         },
       });
 
-      expect(mockBrowserbaseClient.sessions.create).toHaveBeenCalledWith(
+      expect(mockBrowserbaseSDK.createSession).toHaveBeenCalledWith(
         expect.objectContaining({
           proxies: expect.arrayContaining([
             expect.objectContaining({
@@ -146,8 +182,8 @@ describe("Browser Router", () => {
     });
 
     it("should handle database error", async () => {
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockResolvedValue(null);
+      // Use hoisted mock to simulate null database
+      mockGetDb.mockResolvedValueOnce(null);
 
       const caller = browserRouter.createCaller(mockCtx);
 
@@ -158,7 +194,7 @@ describe("Browser Router", () => {
     });
 
     it("should handle browserbase session creation failure", async () => {
-      mockBrowserbaseClient.sessions.create.mockRejectedValueOnce(
+      mockBrowserbaseSDK.createSession.mockRejectedValueOnce(
         new Error("API error")
       );
 
@@ -186,14 +222,14 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.url).toBe("https://example.com");
-      expect(mockStagehand.page.goto).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.goto).toHaveBeenCalledWith(
         "https://example.com",
         expect.objectContaining({
           waitUntil: "load",
           timeout: 30000,
         })
       );
-      expect(mockMetricsService.trackOperation).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackOperation).toHaveBeenCalledWith(
         "session-123",
         "navigate",
         expect.any(Object)
@@ -201,7 +237,7 @@ describe("Browser Router", () => {
     });
 
     it("should handle navigation timeout", async () => {
-      mockStagehand.page.goto.mockRejectedValueOnce(new Error("Timeout"));
+      MockStagehandClass.prototype.page.goto.mockRejectedValueOnce(new Error("Timeout"));
 
       const caller = browserRouter.createCaller(mockCtx);
 
@@ -248,14 +284,14 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe("selector");
-      expect(mockStagehand.page.click).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.click).toHaveBeenCalledWith(
         "button.submit",
         expect.any(Object)
       );
     });
 
     it("should fall back to AI instruction when selector fails", async () => {
-      mockStagehand.page.click.mockRejectedValueOnce(
+      MockStagehandClass.prototype.page.click.mockRejectedValueOnce(
         new Error("Element not found")
       );
 
@@ -268,11 +304,11 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe("ai");
-      expect(mockStagehand.act).toHaveBeenCalledWith("Click the submit button");
+      expect(MockStagehandClass.prototype.act).toHaveBeenCalledWith("Click the submit button");
     });
 
     it("should fail when both selector and instruction fail", async () => {
-      mockStagehand.page.click.mockRejectedValueOnce(
+      MockStagehandClass.prototype.page.click.mockRejectedValueOnce(
         new Error("Element not found")
       );
 
@@ -293,7 +329,7 @@ describe("Browser Router", () => {
         selector: "button",
       });
 
-      expect(mockMetricsService.trackOperation).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackOperation).toHaveBeenCalledWith(
         "session-123",
         "click",
         expect.objectContaining({
@@ -316,7 +352,7 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe("selector");
-      expect(mockStagehand.page.type).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.type).toHaveBeenCalledWith(
         "input#email",
         "test@example.com",
         { delay: 50 }
@@ -332,12 +368,12 @@ describe("Browser Router", () => {
         clearFirst: true,
       });
 
-      expect(mockStagehand.page.fill).toHaveBeenCalledWith("input", "");
-      expect(mockStagehand.page.type).toHaveBeenCalled();
+      expect(MockStagehandClass.prototype.page.fill).toHaveBeenCalledWith("input", "");
+      expect(MockStagehandClass.prototype.page.type).toHaveBeenCalled();
     });
 
     it("should fall back to AI instruction", async () => {
-      mockStagehand.page.type.mockRejectedValueOnce(
+      MockStagehandClass.prototype.page.type.mockRejectedValueOnce(
         new Error("Field not found")
       );
 
@@ -351,7 +387,7 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.method).toBe("ai");
-      expect(mockStagehand.act).toHaveBeenCalled();
+      expect(MockStagehandClass.prototype.act).toHaveBeenCalled();
     });
   });
 
@@ -365,7 +401,7 @@ describe("Browser Router", () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockStagehand.page.evaluate).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.evaluate).toHaveBeenCalledWith(
         expect.stringContaining("scrollTo")
       );
     });
@@ -377,7 +413,7 @@ describe("Browser Router", () => {
         position: "bottom",
       });
 
-      expect(mockStagehand.page.evaluate).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.evaluate).toHaveBeenCalledWith(
         expect.stringContaining("scrollHeight")
       );
     });
@@ -389,7 +425,7 @@ describe("Browser Router", () => {
         position: { x: 0, y: 500 },
       });
 
-      expect(mockStagehand.page.evaluate).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.evaluate).toHaveBeenCalledWith(
         expect.stringContaining("top: 500")
       );
     });
@@ -415,7 +451,7 @@ describe("Browser Router", () => {
         })),
       }));
 
-      mockStagehand.extract.mockResolvedValueOnce({
+      MockStagehandClass.prototype.extract.mockResolvedValueOnce({
         contactInfo: {
           email: "contact@example.com",
           phone: "123-456-7890",
@@ -433,7 +469,7 @@ describe("Browser Router", () => {
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
       expect(result.savedToDatabase).toBe(true);
-      expect(mockStagehand.extract).toHaveBeenCalled();
+      expect(MockStagehandClass.prototype.extract).toHaveBeenCalled();
     });
 
     it("should extract product info with schema", async () => {
@@ -455,7 +491,7 @@ describe("Browser Router", () => {
         })),
       }));
 
-      mockStagehand.extract.mockResolvedValueOnce({
+      MockStagehandClass.prototype.extract.mockResolvedValueOnce({
         productInfo: {
           name: "Test Product",
           price: "$99.99",
@@ -492,7 +528,7 @@ describe("Browser Router", () => {
         })),
       }));
 
-      mockStagehand.extract.mockResolvedValueOnce({
+      MockStagehandClass.prototype.extract.mockResolvedValueOnce({
         tableData: [
           { col1: "val1", col2: "val2" },
           { col1: "val3", col2: "val4" },
@@ -521,7 +557,7 @@ describe("Browser Router", () => {
         })),
       }));
 
-      mockStagehand.extract.mockResolvedValueOnce({
+      MockStagehandClass.prototype.extract.mockResolvedValueOnce({
         customField: "custom value",
       });
 
@@ -547,7 +583,7 @@ describe("Browser Router", () => {
         })),
       }));
 
-      mockStagehand.extract.mockResolvedValueOnce({ data: "test" });
+      MockStagehandClass.prototype.extract.mockResolvedValueOnce({ data: "test" });
 
       const caller = browserRouter.createCaller(mockCtx);
       await caller.extractData({
@@ -576,7 +612,7 @@ describe("Browser Router", () => {
       expect(result.success).toBe(true);
       expect(result.screenshot).toContain("data:image/png;base64,");
       expect(result.size).toBeGreaterThan(0);
-      expect(mockStagehand.page.screenshot).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.page.screenshot).toHaveBeenCalledWith(
         expect.objectContaining({
           fullPage: true,
           type: "png",
@@ -593,7 +629,7 @@ describe("Browser Router", () => {
         selector: "#main-content",
       });
 
-      expect(mockStagehand.page.screenshot).toHaveBeenCalled();
+      expect(MockStagehandClass.prototype.page.screenshot).toHaveBeenCalled();
     });
 
     it("should track screenshot operation", async () => {
@@ -602,7 +638,7 @@ describe("Browser Router", () => {
         sessionId: "session-123",
       });
 
-      expect(mockMetricsService.trackOperation).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackOperation).toHaveBeenCalledWith(
         "session-123",
         "screenshot",
         expect.any(Object)
@@ -633,7 +669,7 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.instruction).toBe("Click the login button");
-      expect(mockStagehand.act).toHaveBeenCalledWith("Click the login button");
+      expect(MockStagehandClass.prototype.act).toHaveBeenCalledWith("Click the login button");
     });
 
     it("should track act operation", async () => {
@@ -643,7 +679,7 @@ describe("Browser Router", () => {
         instruction: "Fill out the form",
       });
 
-      expect(mockMetricsService.trackOperation).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackOperation).toHaveBeenCalledWith(
         "session-123",
         "act",
         expect.objectContaining({
@@ -653,7 +689,7 @@ describe("Browser Router", () => {
     });
 
     it("should handle act failure", async () => {
-      mockStagehand.act.mockRejectedValueOnce(
+      MockStagehandClass.prototype.act.mockRejectedValueOnce(
         new Error("Action failed")
       );
 
@@ -670,7 +706,7 @@ describe("Browser Router", () => {
 
   describe("observe", () => {
     it("should observe page elements", async () => {
-      mockStagehand.observe.mockResolvedValueOnce([
+      MockStagehandClass.prototype.observe.mockResolvedValueOnce([
         { action: "click", selector: "button#submit" },
         { action: "type", selector: "input#email" },
       ]);
@@ -684,7 +720,7 @@ describe("Browser Router", () => {
       expect(result.success).toBe(true);
       expect(result.actions).toBeInstanceOf(Array);
       expect(result.actions.length).toBe(2);
-      expect(mockStagehand.observe).toHaveBeenCalledWith(
+      expect(MockStagehandClass.prototype.observe).toHaveBeenCalledWith(
         "Find all interactive elements"
       );
     });
@@ -696,7 +732,7 @@ describe("Browser Router", () => {
         instruction: "Observe buttons",
       });
 
-      expect(mockMetricsService.trackOperation).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackOperation).toHaveBeenCalledWith(
         "session-123",
         "observe",
         expect.any(Object)
@@ -714,13 +750,13 @@ describe("Browser Router", () => {
       expect(result.sessionId).toBe("session-123");
       expect(result.debugUrl).toContain("fullscreen");
       expect(result.wsUrl).toBeDefined();
-      expect(mockBrowserbaseClient.sessions.debug).toHaveBeenCalledWith(
+      expect(mockBrowserbaseSDK.getSessionDebug).toHaveBeenCalledWith(
         "session-123"
       );
     });
 
     it("should handle debug URL retrieval failure", async () => {
-      mockBrowserbaseClient.sessions.debug.mockRejectedValueOnce(
+      mockBrowserbaseSDK.getSessionDebug.mockRejectedValueOnce(
         new Error("Session not found")
       );
 
@@ -743,12 +779,12 @@ describe("Browser Router", () => {
       expect(result.recordingUrl).toBeDefined();
       expect(result.status).toBe("COMPLETED");
       expect(
-        mockBrowserbaseClient.sessions.recording.retrieve
+        mockBrowserbaseSDK.getSessionRecording
       ).toHaveBeenCalledWith("session-123");
     });
 
     it("should handle recording retrieval failure", async () => {
-      mockBrowserbaseClient.sessions.recording.retrieve.mockRejectedValueOnce(
+      mockBrowserbaseSDK.getSessionRecording.mockRejectedValueOnce(
         new Error("Recording not ready")
       );
 
@@ -768,12 +804,11 @@ describe("Browser Router", () => {
         })),
       }));
 
-      const browserbaseModule = await import("@/server/_core/browserbaseSDK");
-      const terminateMock = vi.fn().mockResolvedValue({
+      // Configure terminateSession for this test
+      mockBrowserbaseSDK.terminateSession.mockResolvedValueOnce({
         success: true,
         sessionId: "session-123",
       });
-      vi.mocked(browserbaseModule.browserbaseSDK).terminateSession = terminateMock;
 
       const caller = browserRouter.createCaller(mockCtx);
       const result = await caller.closeSession({
@@ -782,7 +817,7 @@ describe("Browser Router", () => {
 
       expect(result.success).toBe(true);
       expect(result.sessionId).toBe("session-123");
-      expect(mockMetricsService.trackSessionEnd).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.trackSessionEnd).toHaveBeenCalledWith(
         "session-123",
         "completed"
       );
@@ -794,9 +829,8 @@ describe("Browser Router", () => {
     });
 
     it("should handle close session failure", async () => {
-      const browserbaseModule = await import("@/server/_core/browserbaseSDK");
-      const terminateMock = vi.fn().mockRejectedValue(new Error("Termination failed"));
-      vi.mocked(browserbaseModule.browserbaseSDK).terminateSession = terminateMock;
+      // Configure terminateSession to fail
+      mockBrowserbaseSDK.terminateSession.mockRejectedValueOnce(new Error("Termination failed"));
 
       const caller = browserRouter.createCaller(mockCtx);
 
@@ -837,8 +871,8 @@ describe("Browser Router", () => {
     });
 
     it("should handle database error", async () => {
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockResolvedValue(null);
+      // Use hoisted mock to simulate null database
+      mockGetDb.mockResolvedValueOnce(null);
 
       const caller = browserRouter.createCaller(mockCtx);
 
@@ -856,12 +890,11 @@ describe("Browser Router", () => {
         })),
       }));
 
-      const browserbaseModule = await import("@/server/_core/browserbaseSDK");
-      const terminateMock = vi.fn().mockResolvedValue({
+      // Configure terminateSession for this test
+      mockBrowserbaseSDK.terminateSession.mockResolvedValue({
         success: true,
         sessionId: "session-123",
       });
-      vi.mocked(browserbaseModule.browserbaseSDK).terminateSession = terminateMock;
 
       const caller = browserRouter.createCaller(mockCtx);
       const result = await caller.bulkTerminate({
@@ -879,16 +912,15 @@ describe("Browser Router", () => {
         })),
       }));
 
-      const browserbaseModule = await import("@/server/_core/browserbaseSDK");
+      // Configure terminateSession with partial failures
       let callCount = 0;
-      const terminateMock = vi.fn().mockImplementation(() => {
+      mockBrowserbaseSDK.terminateSession.mockImplementation(() => {
         callCount++;
         if (callCount === 2) {
           return Promise.reject(new Error("Termination failed"));
         }
         return Promise.resolve({ success: true });
       });
-      vi.mocked(browserbaseModule.browserbaseSDK).terminateSession = terminateMock;
 
       const caller = browserRouter.createCaller(mockCtx);
       const result = await caller.bulkTerminate({
@@ -906,9 +938,8 @@ describe("Browser Router", () => {
         })),
       }));
 
-      const browserbaseModule = await import("@/server/_core/browserbaseSDK");
-      const terminateMock = vi.fn().mockResolvedValue({ success: true });
-      vi.mocked(browserbaseModule.browserbaseSDK).terminateSession = terminateMock;
+      // Configure terminateSession for this test
+      mockBrowserbaseSDK.terminateSession.mockResolvedValue({ success: true });
 
       const caller = browserRouter.createCaller(mockCtx);
       await caller.bulkTerminate({
@@ -1058,8 +1089,8 @@ describe("Browser Router", () => {
     });
 
     it("should handle database error", async () => {
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockResolvedValue(null);
+      // Use hoisted mock to simulate null database
+      mockGetDb.mockResolvedValueOnce(null);
 
       const caller = browserRouter.createCaller(mockCtx);
 
@@ -1077,16 +1108,16 @@ describe("Browser Router", () => {
       expect(result.sessionId).toBe("session-123");
       expect(result.cost).toBeDefined();
       expect(result.cost.totalCost).toBe(0.50);
-      expect(mockMetricsService.getSessionMetrics).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.getSessionMetrics).toHaveBeenCalledWith(
         "session-123"
       );
-      expect(mockMetricsService.calculateCost).toHaveBeenCalledWith(
+      expect(mockSessionMetricsService.calculateCost).toHaveBeenCalledWith(
         "session-123"
       );
     });
 
     it("should handle metrics retrieval failure", async () => {
-      mockMetricsService.getSessionMetrics.mockRejectedValueOnce(
+      mockSessionMetricsService.getSessionMetrics.mockRejectedValueOnce(
         new Error("Metrics not found")
       );
 
