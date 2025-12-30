@@ -1,14 +1,22 @@
 import { trpc } from "@/lib/trpc";
-import { useWebSocketStore } from "@/stores/websocketStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import type { ConnectionState } from "@/lib/sse-client";
+
+interface SessionUpdate {
+  type: string;
+  data?: any;
+  sessionId?: string;
+  timestamp?: string;
+}
 
 /**
  * Hook for managing a single browser session
- * Provides real-time updates via WebSocket and backend data
+ * Provides real-time updates via SSE (Server-Sent Events) and backend data
  */
 export function useBrowserSession(sessionId: string | undefined) {
-  const { connectionState } = useWebSocketStore();
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [realtimeSession, setRealtimeSession] = useState<any>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Fetch session history/logs from Stagehand
   const historyQuery = trpc.browser.getHistory.useQuery(
@@ -48,12 +56,115 @@ export function useBrowserSession(sessionId: string | undefined) {
     }
   );
 
-  // TODO: Add WebSocket subscription for real-time session updates
-  // The subscribe method needs to be implemented in websocketStore
+  // Handle SSE message
+  const handleSSEMessage = useCallback((message: SessionUpdate) => {
+    switch (message.type) {
+      case 'connected':
+        console.log('[BrowserSession SSE] Connected to session stream');
+        break;
+
+      case 'session_update':
+      case 'progress':
+        setRealtimeSession((prev: any) => ({
+          ...prev,
+          ...message.data,
+        }));
+        break;
+
+      case 'page_navigated':
+        setRealtimeSession((prev: any) => ({
+          ...prev,
+          currentUrl: message.data?.url,
+          currentTitle: message.data?.title,
+        }));
+        // Refetch metrics when navigation occurs
+        metricsQuery.refetch();
+        break;
+
+      case 'action_completed':
+        setRealtimeSession((prev: any) => ({
+          ...prev,
+          lastAction: message.data,
+        }));
+        // Refetch history when action completes
+        historyQuery.refetch();
+        break;
+
+      case 'session_ended':
+        setRealtimeSession((prev: any) => ({
+          ...prev,
+          status: 'completed',
+          endedAt: message.data?.endedAt,
+        }));
+        break;
+
+      case 'error':
+        setRealtimeSession((prev: any) => ({
+          ...prev,
+          error: message.data?.error,
+        }));
+        break;
+
+      default:
+        console.log('[BrowserSession SSE] Unknown message type:', message.type);
+    }
+  }, [historyQuery, metricsQuery]);
+
+  // SSE subscription for real-time session updates
   useEffect(() => {
     if (!sessionId) return;
-    // Placeholder for future WebSocket subscription
-  }, [sessionId]);
+
+    const url = `/api/ai/stream/${sessionId}`;
+    console.log('[BrowserSession SSE] Connecting to:', url);
+    setConnectionState('connecting');
+
+    const es = new EventSource(url);
+    eventSourceRef.current = es;
+
+    es.onopen = () => {
+      console.log('[BrowserSession SSE] Connected');
+      setConnectionState('connected');
+    };
+
+    // Handle named events
+    es.addEventListener('connected', (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleSSEMessage({ type: 'connected', data, sessionId });
+      } catch (e) {
+        console.error('[BrowserSession SSE] Error parsing event:', e);
+      }
+    });
+
+    // Handle generic messages
+    es.onmessage = (event: MessageEvent) => {
+      try {
+        const message: SessionUpdate = JSON.parse(event.data);
+        handleSSEMessage(message);
+      } catch (e) {
+        // Ignore non-JSON messages (heartbeats, comments)
+        if (!event.data.startsWith(':')) {
+          console.log('[BrowserSession SSE] Non-JSON message:', event.data);
+        }
+      }
+    };
+
+    es.onerror = (error) => {
+      console.error('[BrowserSession SSE] Connection error:', error);
+      setConnectionState('error');
+
+      if (es.readyState === EventSource.CLOSED) {
+        setConnectionState('disconnected');
+      }
+    };
+
+    return () => {
+      console.log('[BrowserSession SSE] Disconnecting');
+      es.close();
+      eventSourceRef.current = null;
+      setConnectionState('disconnected');
+    };
+  }, [sessionId, handleSSEMessage]);
 
   // Convert Stagehand history to log format
   const logs = historyQuery.data?.history?.map((entry: any, index: number) => ({

@@ -18,14 +18,61 @@ import * as useAgentSSEModule from '@/hooks/useAgentSSE';
 vi.mock('@/stores/agentStore');
 vi.mock('@/hooks/useAgentSSE');
 
+// Use vi.hoisted to make tRPC mock available during mock hoisting
+const { trpcMock } = vi.hoisted(() => {
+  // Create reusable mock functions for tRPC hooks
+  const mockUseQuery = () => ({
+    data: null,
+    isLoading: false,
+    error: null,
+    refetch: () => {},
+    isRefetching: false,
+  });
+
+  const mockUseMutation = () => ({
+    mutate: () => {},
+    mutateAsync: () => Promise.resolve({ success: true }),
+    isPending: false,
+    isError: false,
+    error: null,
+    reset: () => {},
+  });
+
+  // Create a proxy-based tRPC mock that handles any endpoint
+  const createTrpcMock = (): any => {
+    const handler: ProxyHandler<any> = {
+      get(target, prop) {
+        if (prop === 'useQuery') return () => mockUseQuery();
+        if (prop === 'useMutation') return () => mockUseMutation();
+        // Return a new proxy for nested access (trpc.agent.executeTask, etc.)
+        return new Proxy({}, handler);
+      },
+    };
+    return new Proxy({}, handler);
+  };
+
+  return { trpcMock: createTrpcMock() };
+});
+
+// Mock tRPC - must mock before any imports that use it
+vi.mock('@/lib/trpc', () => ({
+  trpc: trpcMock,
+}));
+
 describe('AgentDashboard', () => {
-  // Mock store data
+  // Mock store data - matches what AgentDashboard destructures from useAgentStore
   const mockStore = {
-    status: 'idle' as const,
-    currentTask: null,
+    currentExecution: null,
+    isExecuting: false,
     logs: [],
     connectedAgents: 0,
     setStatus: vi.fn(),
+    activeBrowserSession: null,
+    progress: 0,
+    reasoningSteps: [],
+    // Legacy properties kept for backward compat with some tests
+    status: 'idle' as const,
+    currentTask: null,
     setCurrentTask: vi.fn(),
     addLog: vi.fn(),
     clearLogs: vi.fn(),

@@ -1,5 +1,6 @@
 import { Route, Switch } from 'wouter';
 import DashboardHome from '@/pages/DashboardHome';
+import { AgentDashboard } from '@/pages/AgentDashboard';
 import ScheduledTasksPage from '@/pages/ScheduledTasks';
 import { Settings } from '@/pages/Settings';
 import WorkflowBuilder from '@/pages/WorkflowBuilder';
@@ -15,6 +16,7 @@ import LeadDetails from '@/pages/LeadDetails';
 import AICampaigns from '@/pages/AICampaigns';
 import CampaignDetails from '@/pages/CampaignDetails';
 import CreditPurchase from '@/pages/CreditPurchase';
+import Training from '@/pages/Training';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { UserManagement } from '@/pages/admin/UserManagement';
 import { SystemHealth } from '@/pages/admin/SystemHealth';
@@ -31,6 +33,7 @@ export function Routes() {
       <DashboardLayout>
         <Switch>
           <Route path="/" component={DashboardHome} />
+          <Route path="/agent" component={AgentDashboard} />
           <Route path="/scheduled-tasks" component={ScheduledTasksPage} />
           <Route path="/workflow-builder" component={WorkflowBuilder} />
           <Route path="/browser-sessions" component={BrowserSessions} />
@@ -47,6 +50,7 @@ export function Routes() {
           <Route path="/ai-campaigns" component={AICampaigns} />
           <Route path="/ai-campaigns/:id" component={CampaignDetails} />
           <Route path="/credits" component={CreditPurchase} />
+          <Route path="/training" component={Training} />
           {/* Admin routes */}
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />

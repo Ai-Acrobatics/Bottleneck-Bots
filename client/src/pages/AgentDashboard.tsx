@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAgentStore } from '@/stores/agentStore';
+import { useAgentSSE } from '@/hooks/useAgentSSE';
 import {
   AgentThinkingViewer,
   ExecutionHistory,
@@ -30,6 +31,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  MessageSquare,
+  PanelRight,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trpcClient } from '@/lib/trpc';
@@ -53,6 +58,14 @@ export function AgentDashboard() {
   const [selectedTemplate, setSelectedTemplate] = useState<TaskTemplate | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<'preview' | 'templates'>('preview');
+  const [mobileView, setMobileView] = useState<'chat' | 'preview'>('chat');
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
+
+  // SSE connection for real-time execution updates
+  const { isConnected: sseConnected, connectionState } = useAgentSSE({
+    executionId: currentExecution?.id,
+    autoConnect: isExecuting,
+  });
 
   // Load execution history and stats on mount
   useEffect(() => {
@@ -67,7 +80,7 @@ export function AgentDashboard() {
     }
   }, [currentExecution]);
 
-  // Poll for active browser sessions while executing
+  // Fetch active browser sessions when executing (SSE may also update this)
   useEffect(() => {
     if (!isExecuting) {
       return;
@@ -76,15 +89,17 @@ export function AgentDashboard() {
     // Initial fetch
     fetchActiveBrowserSession();
 
-    // Poll every 3 seconds
+    // Poll as backup if SSE isn't connected (every 5 seconds)
     const intervalId = setInterval(() => {
-      fetchActiveBrowserSession();
-    }, 3000);
+      if (!sseConnected) {
+        fetchActiveBrowserSession();
+      }
+    }, 5000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [isExecuting, fetchActiveBrowserSession]);
+  }, [isExecuting, fetchActiveBrowserSession, sseConnected]);
 
   const handleSubmitTask = async (task: string) => {
     setSelectedTemplate(null);
@@ -135,8 +150,68 @@ export function AgentDashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Mobile view toggle - only visible on small screens */}
+      <div className="xl:hidden fixed bottom-4 right-4 z-50 flex gap-2">
+        {activeBrowserSession?.debugUrl && (
+          <Button
+            onClick={() => setShowMobilePreview(true)}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 shadow-lg rounded-full h-12 w-12 p-0"
+          >
+            <Monitor className="w-5 h-5" />
+          </Button>
+        )}
+      </div>
+
+      {/* Mobile Live Preview Sheet */}
+      <Sheet open={showMobilePreview} onOpenChange={setShowMobilePreview}>
+        <SheetContent side="bottom" className="h-[80vh] p-0">
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-emerald-600" />
+              Live Browser Preview
+            </SheetTitle>
+          </SheetHeader>
+          {activeBrowserSession?.debugUrl ? (
+            <div className="h-[calc(80vh-80px)] flex flex-col">
+              <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span className="text-xs font-medium text-gray-600">Live Session</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => window.open(activeBrowserSession.debugUrl, '_blank')}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open in Tab
+                </Button>
+              </div>
+              <div className="flex-1 relative">
+                <iframe
+                  src={activeBrowserSession.debugUrl}
+                  className="absolute inset-0 w-full h-full border-none"
+                  title="Live Browser Preview"
+                  allow="clipboard-read; clipboard-write"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+              <Monitor className="w-12 h-12 text-gray-300 mb-4" />
+              <p className="text-gray-500">No active browser session</p>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
       {/* Sidebar with execution history */}
-      <aside className="w-80 border-r border-gray-200 bg-white flex flex-col">
+      <aside className="hidden md:flex w-80 border-r border-gray-200 bg-white flex-col">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-bold text-gray-900">Agent Dashboard</h1>
@@ -192,6 +267,28 @@ export function AgentDashboard() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile header - only visible when sidebar is hidden */}
+        <div className="md:hidden p-4 border-b border-gray-200 bg-white flex items-center justify-between">
+          <h1 className="text-lg font-bold text-gray-900">AI Agent</h1>
+          <div className="flex items-center gap-2">
+            {stats && (
+              <Badge variant="secondary" className="text-xs">
+                {stats.total} runs
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                loadExecutionHistory();
+                loadStats();
+              }}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
         {/* Task input with template support */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <TaskInput
@@ -232,7 +329,7 @@ export function AgentDashboard() {
         </div>
       </main>
 
-      {/* Right panel - Live Browser Preview & Templates */}
+      {/* Right panel - Live Browser Preview & Templates - Desktop only */}
       <aside className="hidden xl:flex w-[420px] border-l border-gray-200 bg-white flex-col">
         <Tabs value={rightPanelTab} onValueChange={(v) => setRightPanelTab(v as any)} className="flex flex-col h-full">
           <div className="border-b border-gray-200 px-2">
@@ -259,12 +356,25 @@ export function AgentDashboard() {
               <div className="h-full flex flex-col">
                 {/* Status bar */}
                 <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    <span className="text-xs font-medium text-gray-600">Live Session</span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      <span className="text-xs font-medium text-gray-600">Live Session</span>
+                    </div>
+                    {/* SSE Connection Status */}
+                    <div className="flex items-center gap-1 text-xs">
+                      {sseConnected ? (
+                        <Wifi className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <WifiOff className="w-3 h-3 text-gray-400" />
+                      )}
+                      <span className={sseConnected ? 'text-green-600' : 'text-gray-400'}>
+                        {connectionState === 'connecting' ? 'Connecting...' : sseConnected ? 'Real-time' : 'Polling'}
+                      </span>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"

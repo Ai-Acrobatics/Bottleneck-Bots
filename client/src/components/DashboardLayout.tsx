@@ -33,7 +33,9 @@ import {
   Megaphone,
   CreditCard,
   LifeBuoy,
-  Shield
+  Shield,
+  Bot,
+  BookOpen
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -43,6 +45,8 @@ import { CommandPalette } from './CommandPalette';
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Bot, label: "AI Agent", path: "/agent" },
+  { icon: BookOpen, label: "Training", path: "/training" },
   { icon: Globe, label: "Browser Sessions", path: "/browser-sessions" },
   { icon: Calendar, label: "Scheduled Tasks", path: "/scheduled-tasks" },
   { icon: Workflow, label: "Workflow Builder", path: "/workflow-builder" },

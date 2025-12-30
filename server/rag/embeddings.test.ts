@@ -6,6 +6,30 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+
+// Set up environment before any imports that use OpenAI
+process.env.OPENAI_API_KEY = "test-openai-api-key";
+
+// Use vi.hoisted to make mockCreate available during mock hoisting
+const { mockCreate } = vi.hoisted(() => {
+  return { mockCreate: vi.fn() };
+});
+
+// Mock OpenAI with a proper class
+vi.mock("openai", () => {
+  // Return an object where `default` is a class constructor
+  return {
+    default: class MockOpenAI {
+      embeddings = {
+        create: mockCreate,
+      };
+      constructor() {
+        // Mock constructor - no API key validation
+      }
+    },
+  };
+});
+
 import {
   generateEmbedding,
   generateEmbeddings,
@@ -19,27 +43,9 @@ import {
   EMBEDDING_DIMENSIONS,
 } from "./embeddings";
 
-// Mock OpenAI
-vi.mock("openai", () => {
-  const mockEmbeddings = {
-    create: vi.fn(),
-  };
-
-  return {
-    default: class {
-      embeddings = mockEmbeddings;
-    },
-  };
-});
-
 describe("RAG Embeddings Service", () => {
-  let mockCreate: any;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    const OpenAI = require("openai").default;
-    const instance = new OpenAI();
-    mockCreate = instance.embeddings.create;
   });
 
   afterEach(() => {

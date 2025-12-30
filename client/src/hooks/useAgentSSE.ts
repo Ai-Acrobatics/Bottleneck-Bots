@@ -3,10 +3,15 @@
  *
  * React hook for connecting to agent SSE (Server-Sent Events) stream.
  * Provides real-time updates for agent execution status.
+ *
+ * Server endpoints:
+ * - /api/agent/stream/:executionId - Agent execution updates (requires auth)
+ * - /api/ai/stream/:sessionId - AI browser session updates
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAgentStore } from '@/stores/agentStore';
+import { getSSEClient, type ConnectionState } from '@/lib/sse-client';
 
 interface SSEMessage {
   type: string;
@@ -16,82 +21,165 @@ interface SSEMessage {
 }
 
 interface UseAgentSSEOptions {
+  /** Automatically connect when executionId is available */
   autoConnect?: boolean;
+  /** Execution ID to subscribe to */
+  executionId?: string | number;
+  /** AI session ID to subscribe to (for browser sessions) */
   sessionId?: string;
 }
 
 export function useAgentSSE(options: UseAgentSSEOptions = {}) {
-  const { autoConnect = true, sessionId } = options;
+  const { autoConnect = true, executionId, sessionId } = options;
 
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState<string | null>(null);
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { setStatus, addLog, setConnectedAgents, handleSSEEvent } = useAgentStore();
+  const { setStatus, addLog, setConnectedAgents, handleSSEEvent, setActiveBrowserSession } = useAgentStore();
 
-  const connect = useCallback((sid?: string) => {
-    const targetSessionId = sid || sessionId;
-    if (!targetSessionId) {
-      // Connect to general agent stream
-      const es = new EventSource('/api/agent/stream');
+  const cleanup = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
+  const connect = useCallback((id?: string | number) => {
+    const targetExecutionId = id || executionId;
+    const targetSessionId = sessionId;
+
+    // Determine which endpoint to connect to
+    let url: string;
+    if (targetExecutionId) {
+      url = `/api/agent/stream/${targetExecutionId}`;
+      console.log('[SSE] Connecting to agent execution stream:', url);
+    } else if (targetSessionId) {
+      url = `/api/ai/stream/${targetSessionId}`;
+      console.log('[SSE] Connecting to AI session stream:', url);
+    } else {
+      console.log('[SSE] No execution or session ID provided, skipping connection');
+      return;
+    }
+
+    cleanup();
+    setConnectionState('connecting');
+    setError(null);
+
+    try {
+      const es = new EventSource(url, { withCredentials: true });
+      eventSourceRef.current = es;
 
       es.onopen = () => {
+        console.log('[SSE] Connected to:', url);
         setIsConnected(true);
+        setConnectionState('connected');
         setError(null);
       };
 
+      // Handle named events from server
+      es.addEventListener('connected', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'connected', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing connected event:', e);
+        }
+      });
+
+      es.addEventListener('thinking', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'thinking', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing thinking event:', e);
+        }
+      });
+
+      es.addEventListener('progress', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'progress', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing progress event:', e);
+        }
+      });
+
+      es.addEventListener('browser_session', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'browser:session', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing browser_session event:', e);
+        }
+      });
+
+      es.addEventListener('completed', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'execution:complete', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing completed event:', e);
+        }
+      });
+
+      es.addEventListener('error', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage({ type: 'execution:error', data });
+        } catch (e) {
+          console.error('[SSE] Error parsing error event:', e);
+        }
+      });
+
+      // Handle generic message events
       es.onmessage = (event) => {
         try {
           const message: SSEMessage = JSON.parse(event.data);
           handleMessage(message);
         } catch (e) {
-          console.error('[SSE] Failed to parse message:', e);
+          // Ignore non-JSON messages (like heartbeats)
+          if (!event.data.startsWith(':')) {
+            console.log('[SSE] Non-JSON message:', event.data);
+          }
         }
       };
 
-      es.onerror = () => {
+      es.onerror = (error) => {
+        console.error('[SSE] Connection error:', error);
         setIsConnected(false);
+        setConnectionState('error');
         setError('Connection lost');
-        es.close();
+
+        if (es.readyState === EventSource.CLOSED) {
+          // Attempt reconnection with exponential backoff
+          cleanup();
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('[SSE] Attempting reconnection...');
+            connect(targetExecutionId);
+          }, 3000);
+        }
       };
 
-      setEventSource(es);
-      return;
+    } catch (err) {
+      console.error('[SSE] Failed to create EventSource:', err);
+      setConnectionState('error');
+      setError(err instanceof Error ? err.message : 'Failed to connect');
     }
-
-    // Connect to session-specific stream
-    const es = new EventSource(`/api/agent/stream/${targetSessionId}`);
-
-    es.onopen = () => {
-      setIsConnected(true);
-      setError(null);
-    };
-
-    es.onmessage = (event) => {
-      try {
-        const message: SSEMessage = JSON.parse(event.data);
-        handleMessage(message);
-      } catch (e) {
-        console.error('[SSE] Failed to parse message:', e);
-      }
-    };
-
-    es.onerror = () => {
-      setIsConnected(false);
-      setError('Connection lost');
-      es.close();
-    };
-
-    setEventSource(es);
-  }, [sessionId]);
+  }, [executionId, sessionId, cleanup]);
 
   const disconnect = useCallback(() => {
-    if (eventSource) {
-      eventSource.close();
-      setEventSource(null);
-      setIsConnected(false);
-    }
-  }, [eventSource]);
+    console.log('[SSE] Disconnecting...');
+    cleanup();
+    setIsConnected(false);
+    setConnectionState('disconnected');
+  }, [cleanup]);
 
   const handleMessage = (message: SSEMessage) => {
     const timestamp = message.timestamp || new Date().toLocaleTimeString();
@@ -218,19 +306,20 @@ export function useAgentSSE(options: UseAgentSSEOptions = {}) {
     }
   };
 
-  // Auto-connect on mount if enabled
+  // Auto-connect when executionId or sessionId changes
   useEffect(() => {
-    if (autoConnect) {
+    if (autoConnect && (executionId || sessionId)) {
       connect();
     }
 
     return () => {
-      disconnect();
+      cleanup();
     };
-  }, [autoConnect]);
+  }, [autoConnect, executionId, sessionId, connect, cleanup]);
 
   return {
     isConnected,
+    connectionState,
     error,
     connect,
     disconnect,
