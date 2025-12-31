@@ -260,8 +260,8 @@ function DashboardLayoutContent({
                       tooltip={item.label}
                       className={`min-h-[44px] transition-all font-normal ${
                         isActive
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700"
-                          : "hover:bg-gray-100"
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/40"
+                          : "hover:bg-accent hover:text-accent-foreground"
                       }`}
                       data-tour={tourId}
                     >
@@ -337,12 +337,12 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-white px-2 sticky top-0 z-40">
+          <div className="flex border-b border-border h-14 items-center justify-between bg-background px-2 sticky top-0 z-40">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg" />
               <div className="flex items-center gap-3">
                 <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-gray-900">
+                  <span className="tracking-tight text-foreground">
                     {activeMenuItem?.label ?? APP_TITLE}
                   </span>
                 </div>
@@ -350,7 +350,7 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4 bg-gray-50">{children}</main>
+        <main className="flex-1 p-4 bg-background text-foreground">{children}</main>
       </SidebarInset>
     </>
   );
