@@ -5,9 +5,30 @@ import fs from "node:fs";
 import path from "path";
 import { defineConfig } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 
-
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime()];
+// Only include Sentry plugin in production builds with auth token
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  ...(process.env.SENTRY_AUTH_TOKEN
+    ? [
+        sentryVitePlugin({
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          sourcemaps: {
+            assets: ['./dist/public/**'],
+          },
+          release: {
+            name: process.env.VERCEL_GIT_COMMIT_SHA || 'development',
+          },
+        }),
+      ]
+    : []),
+];
 
 export default defineConfig({
   plugins,
@@ -24,6 +45,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    sourcemap: true, // Required for Sentry source maps
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -46,6 +68,9 @@ export default defineConfig({
             }
             if (id.includes('lucide-react')) {
               return 'icons';
+            }
+            if (id.includes('@sentry')) {
+              return 'sentry';
             }
           }
         },
