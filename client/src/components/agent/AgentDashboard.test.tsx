@@ -83,6 +83,7 @@ describe('AgentDashboard', () => {
   // Mock SSE hook
   const mockSSE = {
     isConnected: true,
+    connectionState: 'connected' as const,
     error: null,
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -121,6 +122,7 @@ describe('AgentDashboard', () => {
       vi.spyOn(useAgentSSEModule, 'useAgentSSE').mockReturnValue({
         ...mockSSE,
         isConnected: false,
+        connectionState: 'disconnected',
       });
 
       render(<AgentDashboard />);
@@ -651,6 +653,7 @@ describe('AgentDashboard', () => {
       vi.spyOn(useAgentSSEModule, 'useAgentSSE').mockReturnValue({
         ...mockSSE,
         isConnected: false,
+        connectionState: 'disconnected',
       });
 
       rerender(<AgentDashboard />);
