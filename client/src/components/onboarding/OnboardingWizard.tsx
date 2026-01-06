@@ -10,6 +10,21 @@ import { IntegrationsStep } from './IntegrationsStep';
 import { CompletionStep } from './CompletionStep';
 import { trpc } from '@/lib/trpc';
 
+// Helper to convert File to base64
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:image/png;base64,")
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
 interface OnboardingWizardProps {
   onComplete: () => void;
 }
@@ -71,6 +86,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   });
 
   const submitOnboarding = trpc.onboarding.submit.useMutation();
+  const uploadBrandAssets = trpc.onboarding.uploadBrandAssets.useMutation();
+  const saveBrandVoice = trpc.onboarding.saveBrandVoice.useMutation();
+  const initializeIntegrations = trpc.onboarding.initializeIntegrations.useMutation();
 
   // Load saved progress from localStorage
   useEffect(() => {
@@ -135,9 +153,93 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         ghlApiKey: data.ghlApiKey,
       });
 
-      // TODO: Upload brand assets (logo, guidelines) to S3
-      // TODO: Save brand voice to user profile
-      // TODO: Initialize selected integrations
+      // Track uploaded assets for saving to profile
+      let uploadedAssets: Array<{
+        id: string;
+        originalName: string;
+        optimizedName: string;
+        url: string;
+        altText: string;
+        contextTag: 'HERO' | 'TEAM' | 'TESTIMONIAL' | 'PRODUCT' | 'LOGO' | 'UNKNOWN';
+        status: 'uploading' | 'optimizing' | 'ready';
+      }> = [];
+
+      // Upload brand assets (logo, guidelines) to S3
+      const hasLogo = data.logoFile !== null;
+      const hasGuidelines = data.brandGuidelines.length > 0;
+
+      if (hasLogo || hasGuidelines) {
+        try {
+          // Prepare logo data
+          let logoBase64: string | undefined;
+          let logoMimeType: string | undefined;
+          let logoFileName: string | undefined;
+
+          if (data.logoFile) {
+            logoBase64 = await fileToBase64(data.logoFile);
+            logoMimeType = data.logoFile.type;
+            logoFileName = data.logoFile.name;
+          }
+
+          // Prepare guidelines data
+          const guidelinesBase64 = await Promise.all(
+            data.brandGuidelines.map(async (file) => ({
+              data: await fileToBase64(file),
+              mimeType: file.type,
+              fileName: file.name,
+            }))
+          );
+
+          const uploadResult = await uploadBrandAssets.mutateAsync({
+            logoBase64,
+            logoMimeType,
+            logoFileName,
+            guidelinesBase64: guidelinesBase64.length > 0 ? guidelinesBase64 : undefined,
+          });
+
+          if (uploadResult.assets) {
+            uploadedAssets = uploadResult.assets.map(asset => ({
+              ...asset,
+              status: 'ready' as const,
+            }));
+          }
+
+          console.log('[Onboarding] Brand assets uploaded:', uploadResult.message);
+        } catch (uploadError) {
+          // Log but don't fail onboarding for asset upload errors
+          console.warn('[Onboarding] Brand asset upload failed:', uploadError);
+        }
+      }
+
+      // Save brand voice to user profile
+      if (data.brandVoice.trim()) {
+        try {
+          await saveBrandVoice.mutateAsync({
+            brandVoice: data.brandVoice,
+            companyName: data.companyName,
+            assets: uploadedAssets.length > 0 ? uploadedAssets : undefined,
+          });
+
+          console.log('[Onboarding] Brand voice saved');
+        } catch (brandError) {
+          // Log but don't fail onboarding for brand voice save errors
+          console.warn('[Onboarding] Brand voice save failed:', brandError);
+        }
+      }
+
+      // Initialize selected integrations
+      if (data.integrations.length > 0) {
+        try {
+          await initializeIntegrations.mutateAsync({
+            integrations: data.integrations,
+          });
+
+          console.log('[Onboarding] Integrations initialized:', data.integrations);
+        } catch (integrationError) {
+          // Log but don't fail onboarding for integration init errors
+          console.warn('[Onboarding] Integration initialization failed:', integrationError);
+        }
+      }
 
       // Clear saved progress
       localStorage.removeItem(STORAGE_KEY);

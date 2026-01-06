@@ -330,4 +330,262 @@ export const onboardingRouter = router({
       });
     }
   }),
+
+  /**
+   * Upload brand assets (logo and guidelines) to S3
+   * Returns URLs for uploaded assets
+   */
+  uploadBrandAssets: protectedProcedure
+    .input(z.object({
+      logoBase64: z.string().optional(),
+      logoMimeType: z.string().optional(),
+      logoFileName: z.string().optional(),
+      guidelinesBase64: z.array(z.object({
+        data: z.string(),
+        mimeType: z.string(),
+        fileName: z.string(),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const uploadedAssets: Array<{
+          id: string;
+          originalName: string;
+          optimizedName: string;
+          url: string;
+          altText: string;
+          contextTag: 'LOGO' | 'HERO' | 'TEAM' | 'TESTIMONIAL' | 'PRODUCT' | 'UNKNOWN';
+          status: 'ready';
+        }> = [];
+
+        // Upload logo if provided
+        if (input.logoBase64 && input.logoMimeType && input.logoFileName) {
+          const logoBuffer = Buffer.from(input.logoBase64, 'base64');
+          const logoKey = `users/${ctx.user.id}/brand/logo/${Date.now()}-${input.logoFileName}`;
+
+          const logoUrl = await s3StorageService.uploadFile(
+            logoKey,
+            logoBuffer,
+            input.logoMimeType,
+            { userId: String(ctx.user.id), type: 'logo' }
+          );
+
+          uploadedAssets.push({
+            id: crypto.randomUUID(),
+            originalName: input.logoFileName,
+            optimizedName: input.logoFileName,
+            url: logoUrl,
+            altText: 'Company Logo',
+            contextTag: 'LOGO',
+            status: 'ready',
+          });
+
+          console.log(`[Onboarding] Uploaded logo for user ${ctx.user.id}: ${logoKey}`);
+        }
+
+        // Upload brand guidelines if provided
+        if (input.guidelinesBase64 && input.guidelinesBase64.length > 0) {
+          for (const guideline of input.guidelinesBase64) {
+            const guidelineBuffer = Buffer.from(guideline.data, 'base64');
+            const guidelineKey = `users/${ctx.user.id}/brand/guidelines/${Date.now()}-${guideline.fileName}`;
+
+            const guidelineUrl = await s3StorageService.uploadFile(
+              guidelineKey,
+              guidelineBuffer,
+              guideline.mimeType,
+              { userId: String(ctx.user.id), type: 'guideline' }
+            );
+
+            uploadedAssets.push({
+              id: crypto.randomUUID(),
+              originalName: guideline.fileName,
+              optimizedName: guideline.fileName,
+              url: guidelineUrl,
+              altText: `Brand Guideline: ${guideline.fileName}`,
+              contextTag: 'UNKNOWN',
+              status: 'ready',
+            });
+
+            console.log(`[Onboarding] Uploaded guideline for user ${ctx.user.id}: ${guidelineKey}`);
+          }
+        }
+
+        return {
+          success: true,
+          message: `Uploaded ${uploadedAssets.length} brand asset(s)`,
+          assets: uploadedAssets,
+        };
+      } catch (error) {
+        console.error("[Onboarding] Brand asset upload error:", error);
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to upload brand assets",
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Save brand voice to user's default client profile
+   * Creates a client profile if none exists
+   */
+  saveBrandVoice: protectedProcedure
+    .input(z.object({
+      brandVoice: z.string().min(1, "Brand voice is required"),
+      companyName: z.string().optional(),
+      assets: z.array(z.object({
+        id: z.string(),
+        originalName: z.string(),
+        optimizedName: z.string(),
+        url: z.string(),
+        altText: z.string(),
+        contextTag: z.enum(['HERO', 'TEAM', 'TESTIMONIAL', 'PRODUCT', 'LOGO', 'UNKNOWN']),
+        status: z.enum(['uploading', 'optimizing', 'ready']),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database not available",
+          });
+        }
+
+        // Check if user has a client profile
+        const [existingProfile] = await db
+          .select()
+          .from(clientProfiles)
+          .where(
+            and(
+              eq(clientProfiles.userId, ctx.user.id),
+              eq(clientProfiles.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (existingProfile) {
+          // Update existing profile with brand voice and assets
+          const existingAssets = existingProfile.assets
+            ? (typeof existingProfile.assets === 'string'
+                ? JSON.parse(existingProfile.assets)
+                : existingProfile.assets)
+            : [];
+
+          const mergedAssets = input.assets
+            ? [...existingAssets, ...input.assets]
+            : existingAssets;
+
+          await db
+            .update(clientProfiles)
+            .set({
+              brandVoice: input.brandVoice,
+              assets: JSON.stringify(mergedAssets),
+              updatedAt: new Date(),
+            })
+            .where(eq(clientProfiles.id, existingProfile.id));
+
+          console.log(`[Onboarding] Updated brand voice for user ${ctx.user.id}, profile ${existingProfile.id}`);
+        } else {
+          // Create new client profile with brand voice
+          const profileName = input.companyName || 'My Company';
+
+          await db.insert(clientProfiles).values({
+            userId: ctx.user.id,
+            name: profileName,
+            brandVoice: input.brandVoice,
+            assets: input.assets ? JSON.stringify(input.assets) : null,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          console.log(`[Onboarding] Created client profile with brand voice for user ${ctx.user.id}`);
+        }
+
+        return {
+          success: true,
+          message: "Brand voice saved successfully",
+        };
+      } catch (error) {
+        console.error("[Onboarding] Save brand voice error:", error);
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to save brand voice",
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Initialize selected integrations
+   * Creates integration placeholders for selected services
+   */
+  initializeIntegrations: protectedProcedure
+    .input(z.object({
+      integrations: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database not available",
+          });
+        }
+
+        const initializedIntegrations: string[] = [];
+
+        for (const service of input.integrations) {
+          // Check if integration already exists
+          const [existing] = await db
+            .select()
+            .from(integrations)
+            .where(
+              and(
+                eq(integrations.userId, ctx.user.id),
+                eq(integrations.service, service)
+              )
+            )
+            .limit(1);
+
+          if (!existing) {
+            // Create placeholder integration record
+            await db.insert(integrations).values({
+              userId: ctx.user.id,
+              service,
+              isActive: "false", // Not yet connected
+              metadata: JSON.stringify({
+                status: 'pending_setup',
+                addedDuringOnboarding: true,
+                addedAt: new Date().toISOString(),
+              }),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            initializedIntegrations.push(service);
+            console.log(`[Onboarding] Initialized integration ${service} for user ${ctx.user.id}`);
+          }
+        }
+
+        return {
+          success: true,
+          message: `Initialized ${initializedIntegrations.length} integration(s)`,
+          integrations: initializedIntegrations,
+        };
+      } catch (error) {
+        console.error("[Onboarding] Initialize integrations error:", error);
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to initialize integrations",
+          cause: error,
+        });
+      }
+    }),
 });

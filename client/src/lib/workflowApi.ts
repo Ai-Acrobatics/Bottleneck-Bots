@@ -353,7 +353,13 @@ export async function testRunWorkflow(
     });
 
     console.log('[Workflow API] Test run completed with status:', result.status);
-    return result;
+    return {
+      success: result.success,
+      status: result.status,
+      stepResults: result.stepResults,
+      output: result.output as Record<string, any> | undefined,
+      error: result.error,
+    };
   } catch (error) {
     console.error('[Workflow API] Failed to test run workflow:', error);
     throw error;
