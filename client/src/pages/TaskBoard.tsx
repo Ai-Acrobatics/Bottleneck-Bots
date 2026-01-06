@@ -420,7 +420,7 @@ function TaskDetailDialog({
     },
   });
 
-  const task = taskQuery.data;
+  const task = taskQuery.data as (typeof taskQuery.data & { taskType: string; category: string | null; tags: string[] | null }) | undefined;
   const isLoading = taskQuery.isLoading;
   const isRunning = task?.status === 'in_progress';
   const isTerminal = task?.status === 'completed' || task?.status === 'cancelled' || task?.status === 'failed';
@@ -567,11 +567,11 @@ function TaskDetailDialog({
               )}
 
               {/* Tags */}
-              {task.tags && task.tags.length > 0 && (
+              {task.tags && Array.isArray(task.tags) && task.tags.length > 0 && (
                 <div>
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</Label>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {task.tags.map((tag: string, i: number) => (
+                    {(task.tags as string[]).map((tag: string, i: number) => (
                       <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
                     ))}
                   </div>
@@ -622,9 +622,9 @@ function TaskDetailDialog({
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source Message</Label>
                   <div className="mt-2 p-3 rounded-lg bg-muted text-sm">
                     <p className="text-muted-foreground text-xs mb-1">
-                      From: {task.sourceMessage.senderName || task.sourceMessage.senderPhone || 'Unknown'}
+                      From: {task.sourceMessage.senderName || task.sourceMessage.senderIdentifier || 'Unknown'}
                     </p>
-                    <p>{task.sourceMessage.content || task.sourceMessage.rawBody}</p>
+                    <p>{task.sourceMessage.content}</p>
                   </div>
                 </div>
               )}

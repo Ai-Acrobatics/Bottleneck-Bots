@@ -14,7 +14,6 @@ import { render, waitFor } from '@testing-library/react';
 import { screen } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OnboardingWizard } from '../OnboardingWizard';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -37,35 +36,60 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 });
 
-// Mock trpc with all required mutations - using factory pattern to return fresh mocks
-const createMockMutation = () => {
-  const mockMutateAsync = vi.fn().mockResolvedValue({});
-  return {
-    useMutation: () => ({
-      mutateAsync: mockMutateAsync,
-      mutate: vi.fn(),
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null,
-      data: null,
-    }),
-    _mockMutateAsync: mockMutateAsync,
-  };
-};
+// Global mock functions that can be accessed from tests
+const mockSubmitMutateAsync = vi.fn();
+const mockUploadBrandAssetsMutateAsync = vi.fn();
+const mockSaveBrandVoiceMutateAsync = vi.fn();
+const mockInitializeIntegrationsMutateAsync = vi.fn();
 
-const submitMock = createMockMutation();
-const uploadBrandAssetsMock = createMockMutation();
-const saveBrandVoiceMock = createMockMutation();
-const initializeIntegrationsMock = createMockMutation();
-
+// Mock trpc with all required mutations - inline factory to avoid hoisting issues
 vi.mock('@/lib/trpc', () => ({
   trpc: {
     onboarding: {
-      submit: submitMock,
-      uploadBrandAssets: uploadBrandAssetsMock,
-      saveBrandVoice: saveBrandVoiceMock,
-      initializeIntegrations: initializeIntegrationsMock,
+      submit: {
+        useMutation: () => ({
+          mutateAsync: mockSubmitMutateAsync,
+          mutate: vi.fn(),
+          isLoading: false,
+          isPending: false,
+          isError: false,
+          error: null,
+          data: null,
+        }),
+      },
+      uploadBrandAssets: {
+        useMutation: () => ({
+          mutateAsync: mockUploadBrandAssetsMutateAsync,
+          mutate: vi.fn(),
+          isLoading: false,
+          isPending: false,
+          isError: false,
+          error: null,
+          data: null,
+        }),
+      },
+      saveBrandVoice: {
+        useMutation: () => ({
+          mutateAsync: mockSaveBrandVoiceMutateAsync,
+          mutate: vi.fn(),
+          isLoading: false,
+          isPending: false,
+          isError: false,
+          error: null,
+          data: null,
+        }),
+      },
+      initializeIntegrations: {
+        useMutation: () => ({
+          mutateAsync: mockInitializeIntegrationsMutateAsync,
+          mutate: vi.fn(),
+          isLoading: false,
+          isPending: false,
+          isError: false,
+          error: null,
+          data: null,
+        }),
+      },
     },
   },
 }));
@@ -146,6 +170,9 @@ vi.mock('../../GlassPane', () => ({
   ),
 }));
 
+// Import component after mocks
+import { OnboardingWizard } from '../OnboardingWizard';
+
 describe('OnboardingWizard', () => {
   const mockOnComplete = vi.fn();
 
@@ -153,10 +180,10 @@ describe('OnboardingWizard', () => {
     vi.clearAllMocks();
     localStorageMock.clear();
     // Reset mock implementations
-    submitMock._mockMutateAsync.mockResolvedValue({});
-    uploadBrandAssetsMock._mockMutateAsync.mockResolvedValue({ assets: [] });
-    saveBrandVoiceMock._mockMutateAsync.mockResolvedValue({});
-    initializeIntegrationsMock._mockMutateAsync.mockResolvedValue({});
+    mockSubmitMutateAsync.mockResolvedValue({});
+    mockUploadBrandAssetsMutateAsync.mockResolvedValue({ assets: [] });
+    mockSaveBrandVoiceMutateAsync.mockResolvedValue({});
+    mockInitializeIntegrationsMutateAsync.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -365,7 +392,7 @@ describe('OnboardingWizard', () => {
       await user.click(screen.getByTestId('complete-btn'));
 
       await waitFor(() => {
-        expect(submitMock._mockMutateAsync).toHaveBeenCalled();
+        expect(mockSubmitMutateAsync).toHaveBeenCalled();
       });
     });
 
@@ -438,7 +465,7 @@ describe('OnboardingWizard', () => {
   describe('Error Handling', () => {
     it('displays error message when submission fails', async () => {
       const user = userEvent.setup();
-      submitMock._mockMutateAsync.mockRejectedValueOnce(new Error('Submission failed'));
+      mockSubmitMutateAsync.mockRejectedValueOnce(new Error('Submission failed'));
 
       render(<OnboardingWizard onComplete={mockOnComplete} />);
 
@@ -467,7 +494,7 @@ describe('OnboardingWizard', () => {
 
     it('clears error when navigating away', async () => {
       const user = userEvent.setup();
-      submitMock._mockMutateAsync.mockRejectedValueOnce(new Error('Submission failed'));
+      mockSubmitMutateAsync.mockRejectedValueOnce(new Error('Submission failed'));
 
       render(<OnboardingWizard onComplete={mockOnComplete} />);
 
