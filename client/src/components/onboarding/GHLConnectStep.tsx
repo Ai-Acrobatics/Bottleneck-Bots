@@ -22,6 +22,8 @@ export function GHLConnectStep({ data, onNext, onBack, onSkip }: GHLConnectStepP
   const [testMessage, setTestMessage] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
 
+  const validateGHLApiKeyMutation = trpc.onboarding.validateGHLApiKey.useMutation();
+
   const handleTestConnection = async () => {
     if (!apiKey.trim()) {
       setTestStatus('error');
@@ -29,24 +31,49 @@ export function GHLConnectStep({ data, onNext, onBack, onSkip }: GHLConnectStepP
       return;
     }
 
+    // Basic format validation before making API call
+    if (apiKey.length < 10) {
+      setTestStatus('error');
+      setTestMessage('Invalid API key format - key is too short');
+      return;
+    }
+
     setTestStatus('testing');
     setTestMessage('');
 
     try {
-      // TODO: Implement actual API key validation
-      // For now, simulate a test with a timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the real GHL API key validation endpoint
+      const result = await validateGHLApiKeyMutation.mutateAsync({
+        apiKey: apiKey.trim(),
+      });
 
-      // Simulate validation (replace with actual API call)
-      if (apiKey.length < 10) {
-        throw new Error('Invalid API key format');
+      if (result.success) {
+        setTestStatus('success');
+        // Include location count if available in details
+        const locationInfo = result.details?.plan || '';
+        setTestMessage(
+          locationInfo
+            ? `Connection successful! ${locationInfo}`
+            : 'Connection successful! Your GoHighLevel account is linked.'
+        );
+      } else {
+        setTestStatus('error');
+        setTestMessage(result.message || 'Failed to connect. Please check your API key and try again.');
       }
-
-      setTestStatus('success');
-      setTestMessage('Connection successful! Your GoHighLevel account is linked.');
     } catch (error: any) {
       setTestStatus('error');
-      setTestMessage(error.message || 'Failed to connect. Please check your API key and try again.');
+      // Handle different error types
+      if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
+        setTestMessage('Connection timed out. Please check your network and try again.');
+      } else if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+        setTestMessage('Rate limit exceeded. Please wait a moment and try again.');
+      } else if (error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('authentication')) {
+        setTestMessage('Invalid API key. Please verify your GoHighLevel API key and try again.');
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        setTestMessage('Network error. Please check your internet connection and try again.');
+      } else {
+        setTestMessage(error.message || 'Failed to connect. Please check your API key and try again.');
+      }
     }
   };
 

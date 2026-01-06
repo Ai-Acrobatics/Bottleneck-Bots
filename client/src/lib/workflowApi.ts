@@ -104,26 +104,35 @@ function dbToWorkflowFormat(dbWorkflow: any): Workflow {
 
 /**
  * Save workflow to database
+ * Creates a new workflow if no ID exists, otherwise updates the existing one
  */
 export async function saveWorkflow(workflow: Workflow): Promise<Workflow> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC mutation
-    // const result = await trpc.workflows.create.mutate(workflowToDbFormat(workflow));
+    const dbFormat = workflowToDbFormat(workflow);
 
-    // For now, save to localStorage as fallback
-    const workflows = await getAllWorkflows();
-    const workflowId = workflow.id || Date.now();
-    const savedWorkflow: Workflow = {
-      ...workflow,
-      id: workflowId,
-      updatedAt: new Date(),
-    };
+    if (workflow.id) {
+      // Update existing workflow
+      const result = await trpcClient.workflows.update.mutate({
+        id: workflow.id,
+        name: dbFormat.name,
+        description: dbFormat.description,
+        steps: dbFormat.steps,
+      });
 
-    workflows[workflowId] = savedWorkflow;
-    localStorage.setItem('workflows', JSON.stringify(workflows));
+      console.log('[Workflow API] Updated workflow:', result.name);
+      return dbToWorkflowFormat(result);
+    } else {
+      // Create new workflow
+      const result = await trpcClient.workflows.create.mutate({
+        name: dbFormat.name,
+        description: dbFormat.description,
+        steps: dbFormat.steps,
+        trigger: 'manual',
+      });
 
-    console.log('[Workflow API] Saved workflow to localStorage:', savedWorkflow.name);
-    return savedWorkflow;
+      console.log('[Workflow API] Created workflow:', result.name);
+      return dbToWorkflowFormat(result);
+    }
   } catch (error) {
     console.error('[Workflow API] Failed to save workflow:', error);
     throw error;
@@ -131,24 +140,14 @@ export async function saveWorkflow(workflow: Workflow): Promise<Workflow> {
 }
 
 /**
- * Load workflow from database
+ * Load workflow from database by ID
  */
 export async function loadWorkflow(workflowId: number): Promise<Workflow> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC query
-    // const result = await trpc.workflows.get.query({ id: workflowId });
-    // return dbToWorkflowFormat(result);
+    const result = await trpcClient.workflows.get.query({ id: workflowId });
 
-    // For now, load from localStorage
-    const workflows = await getAllWorkflows();
-    const workflow = workflows[workflowId];
-
-    if (!workflow) {
-      throw new Error(`Workflow ${workflowId} not found`);
-    }
-
-    console.log('[Workflow API] Loaded workflow from localStorage:', workflow.name);
-    return workflow;
+    console.log('[Workflow API] Loaded workflow:', result.name);
+    return dbToWorkflowFormat(result);
   } catch (error) {
     console.error('[Workflow API] Failed to load workflow:', error);
     throw error;
@@ -157,16 +156,19 @@ export async function loadWorkflow(workflowId: number): Promise<Workflow> {
 
 /**
  * Get all workflows for current user
+ * Returns workflows as a record keyed by workflow ID
  */
 export async function getAllWorkflows(): Promise<Record<number, Workflow>> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC query
-    // const result = await trpc.workflows.list.query();
-    // return result.reduce((acc, w) => ({ ...acc, [w.id]: dbToWorkflowFormat(w) }), {});
+    const result = await trpcClient.workflows.list.query({ limit: 100, offset: 0 });
 
-    // For now, load from localStorage
-    const stored = localStorage.getItem('workflows');
-    return stored ? JSON.parse(stored) : {};
+    const workflows = result.reduce<Record<number, Workflow>>((acc, w) => {
+      acc[w.id] = dbToWorkflowFormat(w);
+      return acc;
+    }, {});
+
+    console.log('[Workflow API] Loaded', Object.keys(workflows).length, 'workflows');
+    return workflows;
   } catch (error) {
     console.error('[Workflow API] Failed to get workflows:', error);
     return {};
@@ -174,19 +176,36 @@ export async function getAllWorkflows(): Promise<Record<number, Workflow>> {
 }
 
 /**
- * Delete workflow from database
+ * Get all workflows as an array
+ * Useful for list views and iteration
+ */
+export async function listWorkflows(options?: {
+  status?: 'active' | 'paused' | 'archived';
+  limit?: number;
+  offset?: number;
+}): Promise<Workflow[]> {
+  try {
+    const result = await trpcClient.workflows.list.query({
+      status: options?.status,
+      limit: options?.limit ?? 50,
+      offset: options?.offset ?? 0,
+    });
+
+    console.log('[Workflow API] Listed', result.length, 'workflows');
+    return result.map(dbToWorkflowFormat);
+  } catch (error) {
+    console.error('[Workflow API] Failed to list workflows:', error);
+    return [];
+  }
+}
+
+/**
+ * Delete workflow from database (soft delete - archives the workflow)
  */
 export async function deleteWorkflow(workflowId: number): Promise<void> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC mutation
-    // await trpc.workflows.delete.mutate({ id: workflowId });
-
-    // For now, delete from localStorage
-    const workflows = await getAllWorkflows();
-    delete workflows[workflowId];
-    localStorage.setItem('workflows', JSON.stringify(workflows));
-
-    console.log('[Workflow API] Deleted workflow from localStorage:', workflowId);
+    await trpcClient.workflows.delete.mutate({ id: workflowId });
+    console.log('[Workflow API] Deleted workflow:', workflowId);
   } catch (error) {
     console.error('[Workflow API] Failed to delete workflow:', error);
     throw error;
@@ -194,22 +213,34 @@ export async function deleteWorkflow(workflowId: number): Promise<void> {
 }
 
 /**
- * Execute workflow
+ * Execute workflow on the backend
+ * Creates a browser session and runs all workflow steps
  */
-export async function executeWorkflow(workflowId: number, variables?: Record<string, any>): Promise<any> {
+export async function executeWorkflow(
+  workflowId: number,
+  options?: {
+    variables?: Record<string, any>;
+    geolocation?: {
+      city?: string;
+      state?: string;
+      country?: string;
+    };
+  }
+): Promise<WorkflowExecutionResult> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC mutation
-    // const result = await trpc.workflows.execute.mutate({
-    //   workflowId,
-    //   variables,
-    // });
-    // return result;
-
-    console.log('[Workflow API] Execute workflow (placeholder):', workflowId, variables);
-    return {
-      success: true,
+    const result = await trpcClient.workflows.execute.mutate({
       workflowId,
-      message: 'Workflow execution is a placeholder - implement backend integration',
+      variables: options?.variables,
+      geolocation: options?.geolocation,
+    });
+
+    console.log('[Workflow API] Executed workflow:', workflowId, 'execution:', result.executionId);
+    return {
+      id: result.executionId,
+      workflowId: result.workflowId,
+      status: result.status as WorkflowExecutionResult['status'],
+      output: result.output as Record<string, any> | undefined,
+      stepResults: result.stepResults as any,
     };
   } catch (error) {
     console.error('[Workflow API] Failed to execute workflow:', error);
@@ -218,18 +249,113 @@ export async function executeWorkflow(workflowId: number, variables?: Record<str
 }
 
 /**
- * List workflow executions
+ * List workflow executions for a specific workflow
  */
-export async function getWorkflowExecutions(workflowId: number): Promise<any[]> {
+export async function getWorkflowExecutions(
+  workflowId: number,
+  options?: {
+    status?: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+    limit?: number;
+    offset?: number;
+  }
+): Promise<WorkflowExecutionResult[]> {
   try {
-    // PLACEHOLDER: Replace with actual tRPC query
-    // const result = await trpc.workflows.getExecutions.query({ workflowId });
-    // return result;
+    const result = await trpcClient.workflows.getExecutions.query({
+      workflowId,
+      status: options?.status,
+      limit: options?.limit ?? 20,
+      offset: options?.offset ?? 0,
+    });
 
-    console.log('[Workflow API] Get executions (placeholder):', workflowId);
-    return [];
+    console.log('[Workflow API] Got', result.length, 'executions for workflow:', workflowId);
+    return result.map((exec) => ({
+      id: exec.id,
+      workflowId: exec.workflowId,
+      status: exec.status as WorkflowExecutionResult['status'],
+      output: exec.output as Record<string, any> | undefined,
+      error: exec.error ?? undefined,
+      stepResults: exec.stepResults as any,
+      startedAt: exec.startedAt ?? undefined,
+      completedAt: exec.completedAt ?? undefined,
+    }));
   } catch (error) {
     console.error('[Workflow API] Failed to get executions:', error);
     return [];
+  }
+}
+
+/**
+ * Get a single execution by ID
+ */
+export async function getExecution(executionId: number): Promise<WorkflowExecutionResult | null> {
+  try {
+    const result = await trpcClient.workflows.getExecution.query({ executionId });
+
+    console.log('[Workflow API] Got execution:', executionId);
+    return {
+      id: result.executionId,
+      workflowId: result.workflowId,
+      status: result.status as WorkflowExecutionResult['status'],
+      output: result.output as Record<string, any> | undefined,
+      error: result.error ?? undefined,
+      stepResults: result.stepResults as any,
+    };
+  } catch (error) {
+    console.error('[Workflow API] Failed to get execution:', error);
+    return null;
+  }
+}
+
+/**
+ * Cancel a running workflow execution
+ */
+export async function cancelExecution(executionId: number): Promise<boolean> {
+  try {
+    await trpcClient.workflows.cancelExecution.mutate({ executionId });
+    console.log('[Workflow API] Cancelled execution:', executionId);
+    return true;
+  } catch (error) {
+    console.error('[Workflow API] Failed to cancel execution:', error);
+    return false;
+  }
+}
+
+/**
+ * Test run a workflow without saving to database
+ * Useful for previewing workflow behavior before saving
+ */
+export async function testRunWorkflow(
+  nodes: WorkflowNode[],
+  options?: {
+    variables?: Record<string, any>;
+    geolocation?: {
+      city?: string;
+      state?: string;
+      country?: string;
+    };
+    stepByStep?: boolean;
+  }
+): Promise<{
+  success: boolean;
+  status: string;
+  stepResults?: any[];
+  output?: Record<string, any>;
+  error?: string;
+}> {
+  try {
+    const steps = nodesToSteps(nodes);
+
+    const result = await trpcClient.workflows.testRun.mutate({
+      steps,
+      variables: options?.variables,
+      geolocation: options?.geolocation,
+      stepByStep: options?.stepByStep ?? false,
+    });
+
+    console.log('[Workflow API] Test run completed with status:', result.status);
+    return result;
+  } catch (error) {
+    console.error('[Workflow API] Failed to test run workflow:', error);
+    throw error;
   }
 }

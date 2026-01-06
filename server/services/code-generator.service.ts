@@ -31,15 +31,23 @@ export interface ProjectAnalysis {
 }
 
 class CodeGeneratorService {
-  private claude: Anthropic;
+  private claude: Anthropic | null = null;
   private model = "claude-3-opus-20240229";
 
   constructor() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+    if (apiKey) {
+      this.claude = new Anthropic({ apiKey });
+    } else {
+      console.warn("[CodeGenerator] ANTHROPIC_API_KEY not set - code generation will not work");
     }
-    this.claude = new Anthropic({ apiKey });
+  }
+
+  private ensureClient(): Anthropic {
+    if (!this.claude) {
+      throw new Error("ANTHROPIC_API_KEY environment variable is required for code generation");
+    }
+    return this.claude;
   }
 
   /**
@@ -253,7 +261,7 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
 Do not include markdown code blocks, explanatory text, or anything outside the JSON object.`;
 
     try {
-      const message = await this.claude.messages.create({
+      const message = await this.ensureClient().messages.create({
         model: this.model,
         max_tokens: 4000,
         temperature: 0.3,
@@ -363,7 +371,7 @@ The JSON must match the exact structure specified in the user's prompt.`;
     const userPrompt = this.buildCodePrompt(request);
 
     try {
-      const message = await this.claude.messages.create({
+      const message = await this.ensureClient().messages.create({
         model: this.model,
         max_tokens: 4096,
         temperature: 0.2,
@@ -558,7 +566,7 @@ The JSON must match the exact structure specified in the user's prompt.`;
     try {
       let fullResponse = "";
 
-      const stream = await this.claude.messages.create({
+      const stream = await this.ensureClient().messages.create({
         model: this.model,
         max_tokens: 8000,
         temperature: 0.2,

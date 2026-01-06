@@ -92,6 +92,41 @@ const onboardingDataSchema = z.object({
 
 export const onboardingRouter = router({
   /**
+   * Validate GoHighLevel API key
+   * Tests the API key by making a real call to GHL's API
+   */
+  validateGHLApiKey: protectedProcedure
+    .input(z.object({
+      apiKey: z.string().min(1, "API key is required"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Import the validation service
+        const { apiKeyValidationService } = await import("../../services/apiKeyValidation.service");
+
+        console.log(`[Onboarding] Validating GHL API key for user ${ctx.user.id}`);
+
+        // Validate the API key with real GHL API call
+        const result = await apiKeyValidationService.validateGohighlevel(input.apiKey);
+
+        return {
+          success: result.valid,
+          message: result.message,
+          details: result.details,
+        };
+      } catch (error) {
+        console.error("[Onboarding] GHL API key validation error:", error);
+
+        return {
+          success: false,
+          message: error instanceof Error
+            ? error.message
+            : "Failed to validate API key. Please try again.",
+        };
+      }
+    }),
+
+  /**
    * Submit onboarding data
    * Creates or updates user profile with collected business information
    */

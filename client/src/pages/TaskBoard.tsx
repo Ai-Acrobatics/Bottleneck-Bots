@@ -74,9 +74,11 @@ interface Task {
   title: string;
   description: string | null;
   taskType: string;
+  category?: string;
   priority: TaskPriority;
   urgency: string;
   status: TaskStatus;
+  statusReason?: string | null;
   scheduledFor: Date | null;
   deadline: Date | null;
   createdAt: Date;
@@ -84,6 +86,8 @@ interface Task {
   tags?: string[] | null;
   queuePosition?: number;
   isRunning?: boolean;
+  executions?: any[];
+  sourceMessage?: any;
 }
 
 interface KanbanColumn {
@@ -382,6 +386,299 @@ function TaskListRow({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// Task Detail Dialog
+function TaskDetailDialog({
+  taskId,
+  open,
+  onOpenChange,
+  onExecute,
+  onDefer,
+  onCancel,
+}: {
+  taskId: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onExecute: (id: number) => void;
+  onDefer: (task: Task) => void;
+  onCancel: (id: number) => void;
+}) {
+  const taskQuery = trpc.agencyTasks.get.useQuery(
+    { id: taskId! },
+    { enabled: !!taskId && open }
+  );
+
+  const updateMutation = trpc.agencyTasks.update.useMutation({
+    onSuccess: () => {
+      toast.success('Task updated');
+      taskQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update task: ${error.message}`);
+    },
+  });
+
+  const task = taskQuery.data;
+  const isLoading = taskQuery.isLoading;
+  const isRunning = task?.status === 'in_progress';
+  const isTerminal = task?.status === 'completed' || task?.status === 'cancelled' || task?.status === 'failed';
+
+  const handleStatusChange = (newStatus: string) => {
+    if (!taskId) return;
+    updateMutation.mutate({ id: taskId, status: newStatus as TaskStatus });
+  };
+
+  const handlePriorityChange = (newPriority: string) => {
+    if (!taskId) return;
+    updateMutation.mutate({ id: taskId, priority: newPriority as TaskPriority });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {isLoading ? (
+              <Skeleton className="h-6 w-48" />
+            ) : (
+              <>
+                <span className={statusConfig[task?.status || 'pending']?.color}>
+                  {statusConfig[task?.status || 'pending']?.icon}
+                </span>
+                <span className="truncate">{task?.title}</span>
+              </>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {isLoading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : (
+              <>Task ID: {task?.id} | Created {task?.createdAt ? formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }) : ''}</>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        ) : task ? (
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-6 py-4">
+              {/* Description */}
+              {task.description && (
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</Label>
+                  <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{task.description}</p>
+                </div>
+              )}
+
+              {/* Status & Priority Controls */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</Label>
+                  <Select
+                    value={task.status}
+                    onValueChange={handleStatusChange}
+                    disabled={isRunning || updateMutation.isPending}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="queued">Queued</SelectItem>
+                      <SelectItem value="in_progress" disabled>In Progress</SelectItem>
+                      <SelectItem value="deferred">Scheduled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Priority</Label>
+                  <Select
+                    value={task.priority}
+                    onValueChange={handlePriorityChange}
+                    disabled={isTerminal || updateMutation.isPending}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Task Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</Label>
+                  <p className="mt-1 text-sm">
+                    <Badge variant="outline">{task.taskType.replace('_', ' ')}</Badge>
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</Label>
+                  <p className="mt-1 text-sm">{task.category || 'General'}</p>
+                </div>
+              </div>
+
+              {/* Schedule Info */}
+              {(task.scheduledFor || task.deadline) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {task.scheduledFor && (
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled For</Label>
+                      <p className="mt-1 text-sm flex items-center gap-1">
+                        <CalendarClock className="h-4 w-4 text-purple-500" />
+                        {format(new Date(task.scheduledFor), 'PPp')}
+                      </p>
+                    </div>
+                  )}
+                  {task.deadline && (
+                    <div>
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Deadline</Label>
+                      <p className="mt-1 text-sm flex items-center gap-1">
+                        <Clock className="h-4 w-4 text-orange-500" />
+                        {format(new Date(task.deadline), 'PPp')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Status Reason */}
+              {task.statusReason && (
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status Note</Label>
+                  <p className="mt-1 text-sm text-muted-foreground">{task.statusReason}</p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {task.tags && task.tags.length > 0 && (
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tags</Label>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {task.tags.map((tag: string, i: number) => (
+                      <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Execution History */}
+              {task.executions && task.executions.length > 0 && (
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Recent Executions ({task.executions.length})
+                  </Label>
+                  <div className="mt-2 space-y-2">
+                    {task.executions.slice(0, 5).map((exec: any) => (
+                      <div
+                        key={exec.id}
+                        className={cn(
+                          'p-3 rounded-lg border text-sm',
+                          exec.status === 'completed' && 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800',
+                          exec.status === 'failed' && 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800',
+                          exec.status === 'in_progress' && 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800',
+                          !['completed', 'failed', 'in_progress'].includes(exec.status) && 'bg-muted'
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium capitalize">{exec.status.replace('_', ' ')}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {exec.startedAt ? format(new Date(exec.startedAt), 'MMM d, h:mm a') : 'Not started'}
+                          </span>
+                        </div>
+                        {exec.durationMs && (
+                          <span className="text-xs text-muted-foreground">
+                            Duration: {(exec.durationMs / 1000).toFixed(2)}s
+                          </span>
+                        )}
+                        {exec.errorMessage && (
+                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{exec.errorMessage}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Source Message */}
+              {task.sourceMessage && (
+                <div>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source Message</Label>
+                  <div className="mt-2 p-3 rounded-lg bg-muted text-sm">
+                    <p className="text-muted-foreground text-xs mb-1">
+                      From: {task.sourceMessage.senderName || task.sourceMessage.senderPhone || 'Unknown'}
+                    </p>
+                    <p>{task.sourceMessage.content || task.sourceMessage.rawBody}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        ) : (
+          <div className="py-8 text-center text-muted-foreground">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+            <p>Task not found</p>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          {task && !isTerminal && !isRunning && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onDefer(task as Task);
+                  onOpenChange(false);
+                }}
+              >
+                <CalendarClock className="h-4 w-4 mr-2" />
+                Schedule
+              </Button>
+              <Button
+                onClick={() => {
+                  onExecute(task.id);
+                  onOpenChange(false);
+                }}
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Execute Now
+              </Button>
+            </>
+          )}
+          {task && !isTerminal && (
+            <Button
+              variant="destructive"
+              onClick={() => {
+                onCancel(task.id);
+                onOpenChange(false);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -873,6 +1170,16 @@ export function TaskBoard() {
         open={deferDialogOpen}
         onOpenChange={setDeferDialogOpen}
         onDefer={handleDeferSubmit}
+      />
+
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        taskId={viewTaskId}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onExecute={handleExecute}
+        onDefer={handleDefer}
+        onCancel={handleCancel}
       />
     </div>
   );
