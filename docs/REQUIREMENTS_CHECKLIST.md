@@ -14,7 +14,7 @@ This document lists everything you need to deploy and run the production-ready M
 |---------|---------|------|--------------|----------|
 | **Claude API Key** | Agent orchestration, thinking | $20-100/mo | https://console.anthropic.com | 🔴 Critical |
 | **Browserbase API Key** | Browser automation for GHL | $200/mo | https://browserbase.com | 🔴 Critical |
-| **Neon PostgreSQL** | Database hosting | $19/mo | https://neon.tech | 🔴 Critical |
+| **Supabase PostgreSQL** | Database hosting | Free-$25/mo | https://supabase.com | 🔴 Critical |
 | **Vercel Account** | Web hosting & deployment | $20/mo | https://vercel.com | 🔴 Critical |
 | **Stripe Account** | Payment processing | 2.9% + 30¢ | https://stripe.com | 🔴 Critical |
 
@@ -66,21 +66,21 @@ This document lists everything you need to deploy and run the production-ready M
 
 ## 🗄️ Infrastructure Setup
 
-### Database (Neon PostgreSQL)
+### Database (Supabase PostgreSQL)
 
 **What you need:**
-1. Neon account (free tier available)
+1. Supabase account (free tier available)
 2. Create new project: "ghl-agent-platform"
-3. Copy connection string
-4. Enable connection pooling
-5. Set up automatic backups
+3. Copy connection string from Settings > Database
+4. Use Transaction pooler mode (port 6543) for serverless
+5. Set up automatic backups (included in Pro tier)
 
 **Environment Variable:**
 ```bash
-DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
 ```
 
-**Estimated Cost:** $19/month (Pro tier)
+**Estimated Cost:** Free tier or $25/month (Pro tier)
 
 ---
 
@@ -363,7 +363,7 @@ TXT   @        verification-code
 |----------|---------|--------------|
 | **AI** | Claude API | $20 |
 | **Automation** | Browserbase | $200 |
-| **Database** | Neon PostgreSQL | $19 |
+| **Database** | Supabase PostgreSQL | $25 |
 | **Hosting** | Vercel | $20 |
 | **Caching** | Upstash (free) | $0 |
 | **Storage** | Cloudflare R2 | $5 |
@@ -377,7 +377,7 @@ TXT   @        verification-code
 |----------|---------|--------------|
 | **AI** | Claude + Gemini | $70 |
 | **Automation** | Browserbase | $200 |
-| **Database** | Neon PostgreSQL | $19 |
+| **Database** | Supabase PostgreSQL | $25 |
 | **Hosting** | Vercel Pro | $20 |
 | **Caching** | Upstash Pro | $10 |
 | **Storage** | Cloudflare R2 | $10 |
@@ -392,7 +392,7 @@ TXT   @        verification-code
 |----------|---------|--------------|
 | **AI** | Claude + Gemini | $150 |
 | **Automation** | Browserbase | $400 |
-| **Database** | Neon PostgreSQL | $69 |
+| **Database** | Supabase PostgreSQL | $75 |
 | **Hosting** | Vercel Pro | $20 |
 | **Caching** | Redis Cloud | $30 |
 | **Storage** | Cloudflare R2 | $20 |
@@ -414,7 +414,7 @@ TXT   @        verification-code
 - [ ] Obtain all API keys
 - [ ] Set up GitHub repository
 - [ ] Configure Vercel project
-- [ ] Create Neon database
+- [ ] Create Supabase database
 - [ ] Set up Stripe products
 - [ ] Configure environment variables
 

@@ -13,6 +13,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentDashboard } from './AgentDashboard';
 import * as agentStoreModule from '@/stores/agentStore';
 import * as useAgentSSEModule from '@/hooks/useAgentSSE';
+import type { ConnectionState } from '@/lib/sse-client';
 
 // Mock modules
 vi.mock('@/stores/agentStore');
@@ -83,6 +84,7 @@ describe('AgentDashboard', () => {
   // Mock SSE hook
   const mockSSE = {
     isConnected: true,
+    connectionState: 'connected' as ConnectionState,
     error: null,
     connect: vi.fn(),
     disconnect: vi.fn(),

@@ -10,21 +10,65 @@ import { TRPCError } from "@trpc/server";
 import { webhooksRouter } from "./webhooks";
 import {
   createMockContext,
-  createMockWebhook,
-  createMockFetch,
   mockEnv,
-} from "@/__tests__/helpers/test-helpers";
-import { createTestDb } from "@/__tests__/helpers/test-db";
+} from "../../../client/src/__tests__/helpers/test-helpers";
+import { createTestDb } from "../../../client/src/__tests__/helpers/test-db";
 
 // Mock dependencies
 vi.mock("@/server/db");
-vi.mock("crypto", () => ({
-  randomBytes: vi.fn(() => Buffer.from("test-random-bytes-16")),
-  createHmac: vi.fn(() => ({
-    update: vi.fn().mockReturnThis(),
-    digest: vi.fn(() => "test-signature"),
-  })),
-}));
+vi.mock("crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("crypto")>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      randomBytes: vi.fn(() => Buffer.from("0123456789abcdef0123456789abcdef")),
+      createHmac: vi.fn(() => ({
+        update: vi.fn().mockReturnThis(),
+        digest: vi.fn(() => "test-signature"),
+      })),
+      randomUUID: vi.fn(() => "test-uuid-12345"),
+    },
+    randomBytes: vi.fn(() => Buffer.from("0123456789abcdef0123456789abcdef")),
+    createHmac: vi.fn(() => ({
+      update: vi.fn().mockReturnThis(),
+      digest: vi.fn(() => "test-signature"),
+    })),
+    randomUUID: vi.fn(() => "test-uuid-12345"),
+  };
+});
+
+// Helper to create a mock webhook that matches the actual schema
+function createMockUserWebhook(overrides?: any) {
+  return {
+    id: 1,
+    userId: 1,
+    webhookToken: "test-token-uuid",
+    webhookUrl: "/api/webhooks/inbound/test-token-uuid",
+    channelType: "sms",
+    channelName: "Test Webhook",
+    channelOrder: 1,
+    providerConfig: null,
+    outboundEnabled: true,
+    outboundConfig: null,
+    isActive: true,
+    isPrimary: true,
+    isVerified: false,
+    verifiedAt: null,
+    verificationCode: "ABC123",
+    secretKey: "test-secret-key",
+    rateLimitPerMinute: 30,
+    rateLimitPerHour: 200,
+    totalMessagesReceived: 0,
+    totalMessagesSent: 0,
+    lastMessageAt: null,
+    tags: [],
+    metadata: {},
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
 
 describe("Webhooks Router", () => {
   let mockCtx: any;
@@ -49,12 +93,12 @@ describe("Webhooks Router", () => {
   // LIST WEBHOOKS TESTS
   // ========================================
 
-  describe("listWebhooks", () => {
+  describe("list", () => {
     it("should list all webhooks for user", async () => {
       const webhooks = [
-        createMockWebhook({ id: "webhook-1" }),
-        createMockWebhook({ id: "webhook-2" }),
-        createMockWebhook({ id: "webhook-3" }),
+        createMockUserWebhook({ id: 1, channelName: "Webhook 1" }),
+        createMockUserWebhook({ id: 2, channelName: "Webhook 2" }),
+        createMockUserWebhook({ id: 3, channelName: "Webhook 3" }),
       ];
 
       const db = createTestDb({
@@ -67,10 +111,10 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.listWebhooks();
+      const result = await caller.list();
 
       expect(result).toHaveLength(3);
-      expect(result[0].id).toBe("webhook-1");
+      expect(result[0].channelName).toBe("Webhook 1");
     });
 
     it("should return empty array when no webhooks exist", async () => {
@@ -84,21 +128,19 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.listWebhooks();
+      const result = await caller.list();
 
       expect(result).toEqual([]);
     });
 
-    it("should filter webhooks by type", async () => {
-      const smsWebhooks = [
-        createMockWebhook({
-          id: "webhook-sms-1",
-          metadata: { type: "sms" },
-        }),
+    it("should include inactive webhooks when requested", async () => {
+      const webhooks = [
+        createMockUserWebhook({ id: 1, isActive: true }),
+        createMockUserWebhook({ id: 2, isActive: false }),
       ];
 
       const db = createTestDb({
-        selectResponse: smsWebhooks,
+        selectResponse: webhooks,
       });
 
       const dbModule = await import("@/server/db");
@@ -107,20 +149,142 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.listWebhooks({ type: "sms" });
+      const result = await caller.list({ includeInactive: true });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].metadata?.type).toBe("sms");
+      expect(result).toHaveLength(2);
     });
 
-    it("should include webhook metadata", async () => {
-      const webhook = createMockWebhook({
-        metadata: {
-          type: "sms",
-          provider: "twilio",
-          lastReceived: new Date().toISOString(),
-        },
+    it("should throw error when database not initialized", async () => {
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(null)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+
+      await expect(caller.list()).rejects.toThrow("Database not initialized");
+    });
+  });
+
+  // ========================================
+  // CREATE WEBHOOK TESTS
+  // ========================================
+
+  describe("create", () => {
+    it("should create a new webhook", async () => {
+      const newWebhook = createMockUserWebhook({
+        id: 1,
+        channelName: "New Webhook",
       });
+
+      const db = createTestDb({
+        selectResponse: [{ count: 0 }], // count query
+        insertResponse: [newWebhook],
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+      const result = await caller.create({
+        channelType: "sms",
+        channelName: "New Webhook",
+      });
+
+      expect(result.id).toBe(1);
+      expect(result.channelName).toBe("New Webhook");
+    });
+
+    it("should enforce 3-webhook limit per user", async () => {
+      const db = createTestDb({
+        selectResponse: [{ count: 3 }], // Already has 3 webhooks
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+
+      await expect(
+        caller.create({
+          channelType: "sms",
+          channelName: "Fourth Webhook",
+        })
+      ).rejects.toThrow("Maximum of 3 webhooks allowed per user");
+    });
+
+    it("should allow webhook creation when below limit", async () => {
+      const newWebhook = createMockUserWebhook({
+        id: 3,
+        channelName: "Third Webhook",
+        channelOrder: 3,
+      });
+
+      const db = createTestDb({
+        selectResponse: [{ count: 2 }], // Has 2 webhooks
+        insertResponse: [newWebhook],
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+      const result = await caller.create({
+        channelType: "custom_webhook",
+        channelName: "Third Webhook",
+      });
+
+      expect(result.id).toBe(3);
+    });
+
+    it("should validate channel name is required", async () => {
+      const db = createTestDb();
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+
+      await expect(
+        caller.create({
+          channelType: "sms",
+          channelName: "",
+        })
+      ).rejects.toThrow();
+    });
+
+    it("should throw error when database not initialized", async () => {
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(null)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+
+      await expect(
+        caller.create({
+          channelType: "sms",
+          channelName: "Test",
+        })
+      ).rejects.toThrow("Database not initialized");
+    });
+  });
+
+  // ========================================
+  // GET WEBHOOK TESTS
+  // ========================================
+
+  describe("get", () => {
+    it("should get webhook by ID", async () => {
+      const webhook = createMockUserWebhook({ id: 1 });
 
       const db = createTestDb({
         selectResponse: [webhook],
@@ -132,130 +296,12 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.listWebhooks();
+      const result = await caller.get({ id: 1 });
 
-      expect(result[0].metadata).toBeDefined();
-    });
-  });
-
-  // ========================================
-  // CREATE WEBHOOK TESTS
-  // ========================================
-
-  describe("createWebhook", () => {
-    it("should create a new webhook", async () => {
-      const db = createTestDb({
-        selectResponse: [],
-        insertResponse: [
-          createMockWebhook({
-            id: "webhook-new",
-            name: "New Webhook",
-          }),
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.createWebhook({
-        name: "New Webhook",
-        type: "sms",
-        provider: "twilio",
-        config: { accountSid: "test-sid", authToken: "test-token" },
-      });
-
-      expect(result.id).toBe("webhook-new");
-      expect(result.name).toBe("New Webhook");
-      expect(result.token).toBeDefined();
+      expect(result.id).toBe(1);
     });
 
-    it("should generate unique token for webhook", async () => {
-      const db = createTestDb({
-        selectResponse: [],
-        insertResponse: [createMockWebhook()],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.createWebhook({
-        name: "Test Webhook",
-        type: "email",
-        provider: "custom",
-        config: {},
-      });
-
-      expect(result.token).toBeDefined();
-      expect(result.token).toMatch(/^whk_/);
-    });
-
-    it("should enforce 3-webhook limit per user", async () => {
-      const existingWebhooks = [
-        createMockWebhook({ id: "webhook-1" }),
-        createMockWebhook({ id: "webhook-2" }),
-        createMockWebhook({ id: "webhook-3" }),
-      ];
-
-      const db = createTestDb({
-        selectResponse: existingWebhooks,
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-
-      await expect(
-        caller.createWebhook({
-          name: "Fourth Webhook",
-          type: "sms",
-          provider: "twilio",
-          config: {},
-        })
-      ).rejects.toThrow("Webhook limit exceeded");
-    });
-
-    it("should allow webhook creation when below limit", async () => {
-      const existingWebhooks = [
-        createMockWebhook({ id: "webhook-1" }),
-        createMockWebhook({ id: "webhook-2" }),
-      ];
-
-      const newWebhook = createMockWebhook({
-        id: "webhook-3",
-        name: "Third Webhook",
-      });
-
-      const db = createTestDb({
-        selectResponse: existingWebhooks,
-        insertResponse: [newWebhook],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.createWebhook({
-        name: "Third Webhook",
-        type: "custom",
-        provider: "generic",
-        config: { url: "https://example.com" },
-      });
-
-      expect(result.id).toBe("webhook-3");
-    });
-
-    it("should validate webhook configuration", async () => {
+    it("should throw NOT_FOUND for non-existent webhook", async () => {
       const db = createTestDb({
         selectResponse: [],
       });
@@ -268,36 +314,8 @@ describe("Webhooks Router", () => {
       const caller = webhooksRouter.createCaller(mockCtx);
 
       await expect(
-        caller.createWebhook({
-          name: "",
-          type: "sms",
-          provider: "twilio",
-          config: {},
-        })
-      ).rejects.toThrow();
-    });
-
-    it("should store webhook configuration encrypted", async () => {
-      const db = createTestDb({
-        selectResponse: [],
-        insertResponse: [createMockWebhook()],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      await caller.createWebhook({
-        name: "Secure Webhook",
-        type: "sms",
-        provider: "twilio",
-        config: { secret: "sensitive-data" },
-      });
-
-      // Verify insert was called (config should be encrypted)
-      expect(db.insert).toHaveBeenCalled();
+        caller.get({ id: 999 })
+      ).rejects.toThrow("Webhook not found");
     });
   });
 
@@ -305,16 +323,16 @@ describe("Webhooks Router", () => {
   // UPDATE WEBHOOK TESTS
   // ========================================
 
-  describe("updateWebhook", () => {
+  describe("update", () => {
     it("should update webhook configuration", async () => {
-      const existingWebhook = createMockWebhook({
-        id: "webhook-1",
-        name: "Old Name",
+      const existingWebhook = createMockUserWebhook({
+        id: 1,
+        channelName: "Old Name",
       });
 
-      const updatedWebhook = createMockWebhook({
-        id: "webhook-1",
-        name: "New Name",
+      const updatedWebhook = createMockUserWebhook({
+        id: 1,
+        channelName: "New Name",
       });
 
       const db = createTestDb({
@@ -328,12 +346,12 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.updateWebhook({
-        id: "webhook-1",
-        name: "New Name",
+      const result = await caller.update({
+        id: 1,
+        channelName: "New Name",
       });
 
-      expect(result.name).toBe("New Name");
+      expect(result.channelName).toBe("New Name");
     });
 
     it("should throw error if webhook not found", async () => {
@@ -349,21 +367,16 @@ describe("Webhooks Router", () => {
       const caller = webhooksRouter.createCaller(mockCtx);
 
       await expect(
-        caller.updateWebhook({
-          id: "non-existent",
-          name: "Updated",
+        caller.update({
+          id: 999,
+          channelName: "Updated",
         })
       ).rejects.toThrow("Webhook not found");
     });
 
-    it("should update webhook metadata", async () => {
-      const webhook = createMockWebhook({
-        metadata: { type: "sms" },
-      });
-
-      const updatedWebhook = createMockWebhook({
-        metadata: { type: "sms", lastVerified: new Date().toISOString() },
-      });
+    it("should update webhook active status", async () => {
+      const webhook = createMockUserWebhook({ isActive: true });
+      const updatedWebhook = createMockUserWebhook({ isActive: false });
 
       const db = createTestDb({
         selectResponse: [webhook],
@@ -376,12 +389,12 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.updateWebhook({
-        id: webhook.id,
-        metadata: { lastVerified: new Date().toISOString() },
+      const result = await caller.update({
+        id: 1,
+        isActive: false,
       });
 
-      expect(result.metadata?.lastVerified).toBeDefined();
+      expect(result.isActive).toBe(false);
     });
   });
 
@@ -389,13 +402,12 @@ describe("Webhooks Router", () => {
   // DELETE WEBHOOK TESTS
   // ========================================
 
-  describe("deleteWebhook", () => {
-    it("should delete webhook", async () => {
-      const webhook = createMockWebhook({ id: "webhook-to-delete" });
+  describe("delete", () => {
+    it("should soft delete webhook", async () => {
+      const webhook = createMockUserWebhook({ id: 1 });
 
       const db = createTestDb({
         selectResponse: [webhook],
-        deleteResponse: [webhook],
       });
 
       const dbModule = await import("@/server/db");
@@ -404,11 +416,10 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.deleteWebhook({
-        id: "webhook-to-delete",
-      });
+      const result = await caller.delete({ id: 1 });
 
       expect(result.success).toBe(true);
+      expect(result.id).toBe(1);
     });
 
     it("should throw error if webhook not found", async () => {
@@ -424,7 +435,7 @@ describe("Webhooks Router", () => {
       const caller = webhooksRouter.createCaller(mockCtx);
 
       await expect(
-        caller.deleteWebhook({ id: "non-existent" })
+        caller.delete({ id: 999 })
       ).rejects.toThrow("Webhook not found");
     });
   });
@@ -433,31 +444,16 @@ describe("Webhooks Router", () => {
   // WEBHOOK VERIFICATION TESTS
   // ========================================
 
-  describe("verifyWebhook", () => {
-    it("should verify webhook with valid signature", async () => {
-      const webhook = createMockWebhook({
-        id: "webhook-1",
-        token: "whk_test123",
+  describe("verify", () => {
+    it("should verify webhook with valid code", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        isVerified: false,
+        verificationCode: "ABC123",
       });
-
-      const mockFetchFn = createMockFetch({
-        "https://example.com/webhook": {
-          ok: true,
-          status: 200,
-          json: { success: true },
-        },
-      });
-
-      global.fetch = mockFetchFn as any;
 
       const db = createTestDb({
         selectResponse: [webhook],
-        updateResponse: [
-          {
-            ...webhook,
-            metadata: { verified: true, lastVerified: new Date().toISOString() },
-          },
-        ],
       });
 
       const dbModule = await import("@/server/db");
@@ -466,30 +462,24 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.verifyWebhook({
-        id: "webhook-1",
-        testPayload: { test: true },
+      const result = await caller.verify({
+        id: 1,
+        verificationCode: "ABC123",
       });
 
+      expect(result.success).toBe(true);
       expect(result.verified).toBe(true);
     });
 
-    it("should send test payload to webhook URL", async () => {
-      const webhook = createMockWebhook({
-        url: "https://example.com/webhook",
+    it("should reject invalid verification code", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        isVerified: false,
+        verificationCode: "ABC123",
       });
-
-      const mockFetchFn = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      global.fetch = mockFetchFn;
 
       const db = createTestDb({
         selectResponse: [webhook],
-        updateResponse: [webhook],
       });
 
       const dbModule = await import("@/server/db");
@@ -498,37 +488,23 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      await caller.verifyWebhook({
-        id: webhook.id,
-        testPayload: { event: "test" },
-      });
 
-      expect(mockFetchFn).toHaveBeenCalledWith(
-        webhook.url,
-        expect.objectContaining({
-          method: "POST",
-          headers: expect.any(Object),
+      await expect(
+        caller.verify({
+          id: 1,
+          verificationCode: "WRONG",
         })
-      );
+      ).rejects.toThrow("Invalid verification code");
     });
 
-    it("should mark webhook as failed if verification fails", async () => {
-      const webhook = createMockWebhook();
-
-      const mockFetchFn = vi.fn().mockRejectedValue(
-        new Error("Connection failed")
-      );
-
-      global.fetch = mockFetchFn;
+    it("should reject if already verified", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        isVerified: true,
+      });
 
       const db = createTestDb({
         selectResponse: [webhook],
-        updateResponse: [
-          {
-            ...webhook,
-            metadata: { verified: false, verificationError: "Connection failed" },
-          },
-        ],
       });
 
       const dbModule = await import("@/server/db");
@@ -537,13 +513,13 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.verifyWebhook({
-        id: webhook.id,
-        testPayload: {},
-      });
 
-      expect(result.verified).toBe(false);
-      expect(result.error).toBeDefined();
+      await expect(
+        caller.verify({
+          id: 1,
+          verificationCode: "ABC123",
+        })
+      ).rejects.toThrow("already verified");
     });
   });
 
@@ -553,19 +529,13 @@ describe("Webhooks Router", () => {
 
   describe("regenerateToken", () => {
     it("should regenerate webhook token", async () => {
-      const webhook = createMockWebhook({
-        id: "webhook-1",
-        token: "whk_old_token_123",
-      });
-
-      const updatedWebhook = createMockWebhook({
-        id: "webhook-1",
-        token: "whk_new_token_456",
+      const webhook = createMockUserWebhook({
+        id: 1,
+        webhookToken: "old-token",
       });
 
       const db = createTestDb({
         selectResponse: [webhook],
-        updateResponse: [updatedWebhook],
       });
 
       const dbModule = await import("@/server/db");
@@ -574,12 +544,11 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.regenerateToken({
-        id: "webhook-1",
-      });
+      const result = await caller.regenerateToken({ id: 1 });
 
-      expect(result.token).toBe("whk_new_token_456");
-      expect(result.token).not.toBe(webhook.token);
+      expect(result.success).toBe(true);
+      expect(result.webhookToken).toBeDefined();
+      expect(result.webhookUrl).toBeDefined();
     });
 
     it("should throw error if webhook not found", async () => {
@@ -595,16 +564,24 @@ describe("Webhooks Router", () => {
       const caller = webhooksRouter.createCaller(mockCtx);
 
       await expect(
-        caller.regenerateToken({ id: "non-existent" })
+        caller.regenerateToken({ id: 999 })
       ).rejects.toThrow("Webhook not found");
     });
+  });
 
-    it("should generate cryptographically random token", async () => {
-      const webhook = createMockWebhook();
+  // ========================================
+  // SECRET KEY TESTS
+  // ========================================
+
+  describe("regenerateSecretKey", () => {
+    it("should regenerate webhook secret key", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        secretKey: "old-secret",
+      });
 
       const db = createTestDb({
         selectResponse: [webhook],
-        updateResponse: [webhook],
       });
 
       const dbModule = await import("@/server/db");
@@ -613,13 +590,34 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result1 = await caller.regenerateToken({ id: webhook.id });
+      const result = await caller.regenerateSecretKey({ id: 1 });
 
-      // Call again to generate different token
-      db.selectResponse = [{ ...webhook, token: result1.token }];
-      const result2 = await caller.regenerateToken({ id: webhook.id });
+      expect(result.success).toBe(true);
+      expect(result.secretKey).toBeDefined();
+    });
+  });
 
-      expect(result1.token).not.toBe(result2.token);
+  describe("getSecretKey", () => {
+    it("should return webhook secret key", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        secretKey: "test-secret-key",
+      });
+
+      const db = createTestDb({
+        selectResponse: [webhook],
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+      const result = await caller.getSecretKey({ id: 1 });
+
+      expect(result.secretKey).toBe("test-secret-key");
+      expect(result.usage).toBeDefined();
     });
   });
 
@@ -629,25 +627,43 @@ describe("Webhooks Router", () => {
 
   describe("getMessages", () => {
     it("should retrieve messages for webhook", async () => {
+      const webhook = createMockUserWebhook({ id: 1 });
       const messages = [
         {
           id: 1,
-          webhookId: "webhook-1",
-          payload: { event: "test" },
-          timestamp: new Date(),
-          status: "received",
+          webhookId: 1,
+          content: "Test message 1",
+          receivedAt: new Date(),
         },
         {
           id: 2,
-          webhookId: "webhook-1",
-          payload: { event: "test2" },
-          timestamp: new Date(),
-          status: "processed",
+          webhookId: 1,
+          content: "Test message 2",
+          receivedAt: new Date(),
         },
       ];
 
+      // First call returns webhook, second returns messages
+      let callCount = 0;
       const db = createTestDb({
-        selectResponse: messages,
+        selectResponse: [webhook],
+      });
+
+      db.select = vi.fn().mockImplementation(() => {
+        callCount++;
+        const response = callCount === 1 ? [webhook] : messages;
+        return {
+          from: vi.fn(() => ({
+            where: vi.fn(() => ({
+              orderBy: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  offset: vi.fn(() => Promise.resolve(response)),
+                })),
+              })),
+              limit: vi.fn(() => Promise.resolve(response)),
+            })),
+          })),
+        };
       });
 
       const dbModule = await import("@/server/db");
@@ -657,115 +673,10 @@ describe("Webhooks Router", () => {
 
       const caller = webhooksRouter.createCaller(mockCtx);
       const result = await caller.getMessages({
-        webhookId: "webhook-1",
-        limit: 20,
-        offset: 0,
+        webhookId: 1,
       });
 
-      expect(result.messages).toHaveLength(2);
-      expect(result.total).toBe(2);
-    });
-
-    it("should support pagination for messages", async () => {
-      const allMessages = Array.from({ length: 50 }, (_, i) => ({
-        id: i + 1,
-        webhookId: "webhook-1",
-        payload: { event: `test-${i}` },
-        timestamp: new Date(),
-        status: "received",
-      }));
-
-      const paginatedMessages = allMessages.slice(0, 20);
-
-      const db = createTestDb({
-        selectResponse: paginatedMessages,
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.getMessages({
-        webhookId: "webhook-1",
-        limit: 20,
-        offset: 0,
-      });
-
-      expect(result.messages).toHaveLength(20);
-      expect(result.pagination?.page).toBe(1);
-      expect(result.pagination?.hasMore).toBe(true);
-    });
-
-    it("should filter messages by status", async () => {
-      const successMessages = [
-        {
-          id: 1,
-          webhookId: "webhook-1",
-          payload: { event: "test" },
-          timestamp: new Date(),
-          status: "processed",
-        },
-      ];
-
-      const db = createTestDb({
-        selectResponse: successMessages,
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.getMessages({
-        webhookId: "webhook-1",
-        status: "processed",
-        limit: 20,
-        offset: 0,
-      });
-
-      expect(result.messages).toHaveLength(1);
-      expect(result.messages[0].status).toBe("processed");
-    });
-
-    it("should sort messages by timestamp", async () => {
-      const messages = [
-        {
-          id: 1,
-          webhookId: "webhook-1",
-          payload: { event: "first" },
-          timestamp: new Date("2024-01-01"),
-          status: "received",
-        },
-        {
-          id: 2,
-          webhookId: "webhook-1",
-          payload: { event: "second" },
-          timestamp: new Date("2024-01-02"),
-          status: "received",
-        },
-      ];
-
-      const db = createTestDb({
-        selectResponse: messages,
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.getMessages({
-        webhookId: "webhook-1",
-        limit: 20,
-        offset: 0,
-        sortBy: "timestamp",
-      });
-
-      expect(result.messages[0].id).toBe(1);
+      expect(result).toBeInstanceOf(Array);
     });
 
     it("should throw error if webhook not found", async () => {
@@ -782,21 +693,55 @@ describe("Webhooks Router", () => {
 
       await expect(
         caller.getMessages({
-          webhookId: "non-existent",
-          limit: 20,
-          offset: 0,
+          webhookId: 999,
         })
       ).rejects.toThrow("Webhook not found");
     });
   });
 
   // ========================================
-  // WEBHOOK STATISTICS TESTS
+  // CONVERSATIONS TESTS
   // ========================================
 
-  describe("getWebhookStats", () => {
-    it("should return webhook statistics", async () => {
-      const webhook = createMockWebhook();
+  describe("getConversations", () => {
+    it("should retrieve conversations", async () => {
+      const conversations = [
+        {
+          id: 1,
+          userId: 1,
+          webhookId: 1,
+          status: "active",
+          lastMessageAt: new Date(),
+        },
+      ];
+
+      const db = createTestDb({
+        selectResponse: conversations,
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+      const result = await caller.getConversations({});
+
+      expect(result).toBeInstanceOf(Array);
+    });
+  });
+
+  // ========================================
+  // TEST WEBHOOK TESTS
+  // ========================================
+
+  describe("test", () => {
+    it("should test webhook for SMS/email channels", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        channelType: "sms",
+        webhookUrl: "/api/webhooks/inbound/test",
+      });
 
       const db = createTestDb({
         selectResponse: [webhook],
@@ -808,27 +753,20 @@ describe("Webhooks Router", () => {
       );
 
       const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.getWebhookStats({
-        id: webhook.id,
-      });
+      const result = await caller.test({ id: 1 });
 
-      expect(result).toHaveProperty("totalMessages");
-      expect(result).toHaveProperty("successfulMessages");
-      expect(result).toHaveProperty("failedMessages");
-      expect(result).toHaveProperty("lastMessage");
+      expect(result.success).toBe(true);
+      expect(result.webhookUrl).toBeDefined();
     });
 
-    it("should include success rate in statistics", async () => {
-      const webhook = createMockWebhook();
-
-      const stats = {
-        id: webhook.id,
-        totalMessages: 100,
-        successfulMessages: 95,
-        failedMessages: 5,
-        successRate: 0.95,
-        lastMessage: new Date(),
-      };
+    it("should test custom webhook with outbound URL", async () => {
+      const webhook = createMockUserWebhook({
+        id: 1,
+        channelType: "custom_webhook",
+        outboundConfig: {
+          outboundWebhookUrl: "https://example.com/webhook",
+        },
+      });
 
       const db = createTestDb({
         selectResponse: [webhook],
@@ -839,14 +777,35 @@ describe("Webhooks Router", () => {
         Promise.resolve(db as any)
       );
 
-      const caller = webhooksRouter.createCaller(mockCtx);
-      const result = await caller.getWebhookStats({
-        id: webhook.id,
+      // Mock fetch
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
       });
 
-      expect(result.successRate).toBeDefined();
-      expect(result.successRate).toBeGreaterThanOrEqual(0);
-      expect(result.successRate).toBeLessThanOrEqual(1);
+      const caller = webhooksRouter.createCaller(mockCtx);
+      const result = await caller.test({ id: 1 });
+
+      expect(result.success).toBe(true);
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    it("should throw error if webhook not found", async () => {
+      const db = createTestDb({
+        selectResponse: [],
+      });
+
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(db as any)
+      );
+
+      const caller = webhooksRouter.createCaller(mockCtx);
+
+      await expect(
+        caller.test({ id: 999 })
+      ).rejects.toThrow("Webhook not found");
     });
   });
 
@@ -857,9 +816,11 @@ describe("Webhooks Router", () => {
   describe("Integration", () => {
     it("should complete full webhook lifecycle", async () => {
       // Create webhook
+      const createdWebhook = createMockUserWebhook({ id: 1 });
+
       let createDb = createTestDb({
-        selectResponse: [],
-        insertResponse: [createMockWebhook({ id: "webhook-1" })],
+        selectResponse: [{ count: 0 }],
+        insertResponse: [createdWebhook],
       });
 
       let dbModule = await import("@/server/db");
@@ -868,65 +829,63 @@ describe("Webhooks Router", () => {
       );
 
       let caller = webhooksRouter.createCaller(mockCtx);
-      const created = await caller.createWebhook({
-        name: "Test Webhook",
-        type: "sms",
-        provider: "twilio",
-        config: {},
+      const created = await caller.create({
+        channelType: "sms",
+        channelName: "Test Webhook",
       });
 
-      expect(created.id).toBe("webhook-1");
+      expect(created.id).toBe(1);
 
-      // Verify webhook
-      const verifyDb = createTestDb({
-        selectResponse: [created],
-        updateResponse: [
-          { ...created, metadata: { verified: true } },
-        ],
+      // Get webhook
+      const getDb = createTestDb({
+        selectResponse: [createdWebhook],
       });
 
       vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(verifyDb as any)
+        Promise.resolve(getDb as any)
       );
 
       caller = webhooksRouter.createCaller(mockCtx);
-      const mockFetchFn = createMockFetch({
-        [created.url]: { ok: true, status: 200 },
+      const retrieved = await caller.get({ id: 1 });
+
+      expect(retrieved.id).toBe(1);
+
+      // Update webhook
+      const updatedWebhook = createMockUserWebhook({
+        id: 1,
+        channelName: "Updated Name",
       });
-      global.fetch = mockFetchFn as any;
 
-      const verified = await caller.verifyWebhook({
-        id: created.id,
-        testPayload: { test: true },
-      });
-
-      expect(verified.verified).toBe(true);
-
-      // Get messages
-      const messagesDb = createTestDb({
-        selectResponse: [
-          {
-            id: 1,
-            webhookId: created.id,
-            payload: { test: true },
-            timestamp: new Date(),
-            status: "received",
-          },
-        ],
+      const updateDb = createTestDb({
+        selectResponse: [createdWebhook],
+        updateResponse: [updatedWebhook],
       });
 
       vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(messagesDb as any)
+        Promise.resolve(updateDb as any)
       );
 
       caller = webhooksRouter.createCaller(mockCtx);
-      const messages = await caller.getMessages({
-        webhookId: created.id,
-        limit: 20,
-        offset: 0,
+      const updated = await caller.update({
+        id: 1,
+        channelName: "Updated Name",
       });
 
-      expect(messages.messages).toHaveLength(1);
+      expect(updated.channelName).toBe("Updated Name");
+
+      // Delete webhook
+      const deleteDb = createTestDb({
+        selectResponse: [updatedWebhook],
+      });
+
+      vi.mocked(dbModule.getDb).mockImplementation(() =>
+        Promise.resolve(deleteDb as any)
+      );
+
+      caller = webhooksRouter.createCaller(mockCtx);
+      const deleted = await caller.delete({ id: 1 });
+
+      expect(deleted.success).toBe(true);
     });
   });
 });

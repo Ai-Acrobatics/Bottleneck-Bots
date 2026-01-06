@@ -2,9 +2,10 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../../db";
-import { userProfiles, users } from "../../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { userProfiles, users, clientProfiles, integrations } from "../../../drizzle/schema";
+import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { s3StorageService } from "../../services/s3-storage.service";
 
 /**
  * Onboarding Router

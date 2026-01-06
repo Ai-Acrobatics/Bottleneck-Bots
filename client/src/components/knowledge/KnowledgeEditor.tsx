@@ -115,7 +115,7 @@ export function KnowledgeEditor({ open, onOpenChange, entry, onSave }: Knowledge
       onOpenChange(false);
       resetForm();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to save: ${error.message}`);
     },
   });

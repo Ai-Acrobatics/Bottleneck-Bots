@@ -127,7 +127,7 @@ export function SelectorManager() {
           {filteredPages.map((page) => {
             const pageSelectors = groupedSelectors[page];
             const avgSuccessRate =
-              pageSelectors.reduce((sum, s) => sum + s.successRate, 0) / pageSelectors.length;
+              pageSelectors.reduce((sum, s) => sum + s.successRate, 0 as number) / pageSelectors.length;
 
             return (
               <AccordionItem key={page} value={page} className="border rounded-lg">
@@ -293,7 +293,7 @@ function SelectorForm({ onSuccess }: { onSuccess: () => void }) {
       toast.success('Selector saved');
       onSuccess();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to save: ${error.message}`);
     },
   });

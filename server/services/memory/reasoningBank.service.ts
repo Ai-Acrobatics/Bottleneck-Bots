@@ -296,6 +296,7 @@ export class ReasoningBankService {
 
   /**
    * Get top performing reasoning patterns
+   * Now with tenant isolation - only returns patterns for current tenant
    */
   async getTopPatterns(limit: number = 10): Promise<ReasoningPattern[]> {
     const db = await getDb();
@@ -303,9 +304,14 @@ export class ReasoningBankService {
       throw new Error("Database not initialized");
     }
 
+    // Add tenant filter to ensure data isolation
+    const conditions: SQL<unknown>[] = [];
+    this.addTenantDomainFilter(conditions);
+
     const results = await db
       .select()
       .from(reasoningPatterns)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(
         desc(reasoningPatterns.successRate),
         desc(reasoningPatterns.usageCount),
@@ -334,6 +340,7 @@ export class ReasoningBankService {
 
   /**
    * Get reasoning bank statistics
+   * Now with tenant isolation - only returns stats for current tenant
    */
   async getStats(domain?: string): Promise<MemoryStats> {
     const db = await getDb();
@@ -341,7 +348,9 @@ export class ReasoningBankService {
       throw new Error("Database not initialized");
     }
 
-    const conditions = domain ? [eq(reasoningPatterns.domain, domain)] : [];
+    // Add tenant filter to ensure data isolation
+    const conditions: SQL<unknown>[] = [];
+    this.addTenantDomainFilter(conditions, domain);
 
     const totalResult = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -353,9 +362,11 @@ export class ReasoningBankService {
       .from(reasoningPatterns)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
+    // For domains, also apply tenant filter
     const domainsResult = await db
       .select({ domain: reasoningPatterns.domain })
       .from(reasoningPatterns)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .groupBy(reasoningPatterns.domain);
 
     return {

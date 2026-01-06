@@ -63,7 +63,7 @@ const createMockMCPServer = () => {
       getTool: vi.fn().mockImplementation((name: string) => {
         return mockTools.find((t) => t.name === name);
       }),
-      executeTool: vi.fn().mockImplementation((name: string, args: any) => {
+      executeTool: vi.fn().mockImplementation(async (name: string, args: any) => {
         const tool = mockTools.find((t) => t.name === name);
         if (!tool) {
           throw new Error(`Tool not found: ${name}`);
@@ -86,6 +86,15 @@ vi.mock('../../mcp', () => ({
 }));
 
 describe('Tools Router', () => {
+  beforeEach(async () => {
+    // Reset all mocks before each test to prevent state pollution
+    vi.clearAllMocks();
+
+    // Re-setup the mock to ensure fresh state
+    const { getMCPServer } = await import('../../mcp');
+    (getMCPServer as any).mockResolvedValue(createMockMCPServer());
+  });
+
   describe('listTools', () => {
     it('should list all available tools', async () => {
       const { getMCPServer } = await import('../../mcp');
@@ -149,19 +158,8 @@ describe('Tools Router', () => {
     });
 
     it('should handle execution timeout', async () => {
-      const { getMCPServer } = await import('../../mcp');
-      const server = await getMCPServer();
-
-      // Mock a slow tool
-      const slowTool = {
-        name: 'test/slow',
-        handler: vi.fn().mockImplementation(
-          () => new Promise((resolve) => setTimeout(resolve, 10000))
-        ),
-      };
-
-      server.toolRegistry.getTool = vi.fn().mockReturnValue(slowTool);
-      server.toolRegistry.executeTool = vi.fn().mockImplementation(async () => {
+      // Create an isolated mock server for this test to avoid polluting other tests
+      const slowExecuteTool = vi.fn().mockImplementation(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10000));
         return { success: true };
       });
@@ -172,7 +170,7 @@ describe('Tools Router', () => {
 
       await expect(
         Promise.race([
-          server.toolRegistry.executeTool('test/slow', {}),
+          slowExecuteTool('test/slow', {}),
           timeoutPromise,
         ])
       ).rejects.toThrow('Timeout');

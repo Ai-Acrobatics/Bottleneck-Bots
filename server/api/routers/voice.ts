@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router } from "../../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../../_core/trpc";
 import { getDb } from "../../db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
@@ -19,9 +19,9 @@ import { addVoiceCallJob } from "../../_core/queue";
  */
 export const voiceRouter = router({
     /**
-     * Get current voice campaign status
+     * Get current voice campaign status for the authenticated user
      */
-    getStatus: publicProcedure.query(async () => {
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
         const db = await getDb();
         if (!db) {
             return {
@@ -37,14 +37,16 @@ export const voiceRouter = router({
         }
 
         try {
+            const userId = ctx.user.id;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
+            // Filter all queries by userId for tenant isolation
             const [totalCallsResult, activeCallsResult, completedTodayResult, successfulCallsResult] = await Promise.all([
-                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls),
-                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(eq(ai_calls.status, "calling")),
-                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(sql`${ai_calls.calledAt} >= ${today}`),
-                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(eq(ai_calls.status, "completed")),
+                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(eq(ai_calls.userId, userId)),
+                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(and(eq(ai_calls.userId, userId), eq(ai_calls.status, "calling"))),
+                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(and(eq(ai_calls.userId, userId), sql`${ai_calls.calledAt} >= ${today}`)),
+                db.select({ count: sql<number>`count(*)::int` }).from(ai_calls).where(and(eq(ai_calls.userId, userId), eq(ai_calls.status, "completed"))),
             ]);
 
             const totalCalls = totalCallsResult[0]?.count || 0;
@@ -68,9 +70,9 @@ export const voiceRouter = router({
     }),
 
     /**
-     * Get list of leads for calling
+     * Get list of leads for calling (filtered by authenticated user)
      */
-    getLeads: publicProcedure
+    getLeads: protectedProcedure
         .input(
             z.object({
                 listId: z.number().optional(),
@@ -79,29 +81,36 @@ export const voiceRouter = router({
                 offset: z.number().default(0),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 return { leads: [], total: 0 };
             }
 
             try {
-                let query = db.select().from(leads);
+                const userId = ctx.user.id;
+                const conditions = [eq(leads.userId, userId)];
 
                 if (input.listId) {
-                    query = query.where(eq(leads.listId, input.listId)) as any;
+                    conditions.push(eq(leads.listId, input.listId));
                 }
 
                 if (input.enrichmentStatus) {
-                    query = query.where(eq(leads.enrichmentStatus, input.enrichmentStatus)) as any;
+                    conditions.push(eq(leads.enrichmentStatus, input.enrichmentStatus));
                 }
 
-                const results = await query
+                const results = await db
+                    .select()
+                    .from(leads)
+                    .where(and(...conditions))
                     .limit(input.limit)
                     .offset(input.offset)
                     .orderBy(desc(leads.createdAt));
 
-                const totalResult = await db.select({ count: sql<number>`count(*)::int` }).from(leads);
+                const totalResult = await db
+                    .select({ count: sql<number>`count(*)::int` })
+                    .from(leads)
+                    .where(eq(leads.userId, userId));
                 const total = totalResult[0]?.count || 0;
 
                 return {
@@ -115,12 +124,11 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Create a new campaign
+     * Create a new campaign for the authenticated user
      */
-    createCampaign: publicProcedure
+    createCampaign: protectedProcedure
         .input(
             z.object({
-                userId: z.number(),
                 name: z.string().min(1),
                 description: z.string().optional(),
                 script: z.string().min(1),
@@ -138,7 +146,7 @@ export const voiceRouter = router({
                 }).optional(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -146,7 +154,7 @@ export const voiceRouter = router({
 
             try {
                 const campaignData: InsertAiCallCampaign = {
-                    userId: input.userId,
+                    userId: ctx.user.id,
                     name: input.name,
                     description: input.description,
                     script: input.script,
@@ -168,25 +176,25 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Get all campaigns
+     * Get all campaigns for the authenticated user
      */
-    getCampaigns: publicProcedure
+    getCampaigns: protectedProcedure
         .input(
             z.object({
-                userId: z.number(),
                 status: z.enum(["draft", "running", "paused", "completed", "cancelled"]).optional(),
                 limit: z.number().default(50),
                 offset: z.number().default(0),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 return { campaigns: [], total: 0 };
             }
 
             try {
-                const whereConditions = [eq(ai_call_campaigns.userId, input.userId)];
+                const userId = ctx.user.id;
+                const whereConditions = [eq(ai_call_campaigns.userId, userId)];
 
                 if (input.status) {
                     whereConditions.push(eq(ai_call_campaigns.status, input.status));
@@ -203,7 +211,7 @@ export const voiceRouter = router({
                 const totalResult = await db
                     .select({ count: sql<number>`count(*)::int` })
                     .from(ai_call_campaigns)
-                    .where(eq(ai_call_campaigns.userId, input.userId));
+                    .where(eq(ai_call_campaigns.userId, userId));
                 const total = totalResult[0]?.count || 0;
 
                 return {
@@ -217,13 +225,13 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Get a specific campaign with details
+     * Get a specific campaign with details (only if owned by authenticated user)
      */
-    getCampaign: publicProcedure
+    getCampaign: protectedProcedure
         .input(z.object({
             campaignId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -233,7 +241,10 @@ export const voiceRouter = router({
                 const campaign = await db
                     .select()
                     .from(ai_call_campaigns)
-                    .where(eq(ai_call_campaigns.id, input.campaignId))
+                    .where(and(
+                        eq(ai_call_campaigns.id, input.campaignId),
+                        eq(ai_call_campaigns.userId, ctx.user.id)
+                    ))
                     .limit(1);
 
                 if (!campaign[0]) {
@@ -248,27 +259,30 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Start outbound calling campaign
+     * Start outbound calling campaign (only if owned by authenticated user)
      */
-    startCampaign: publicProcedure
+    startCampaign: protectedProcedure
         .input(
             z.object({
                 campaignId: z.number(),
                 leadIds: z.array(z.number()).optional(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
             }
 
             try {
-                // Get campaign details
+                // Get campaign details (verify ownership)
                 const campaign = await db
                     .select()
                     .from(ai_call_campaigns)
-                    .where(eq(ai_call_campaigns.id, input.campaignId))
+                    .where(and(
+                        eq(ai_call_campaigns.id, input.campaignId),
+                        eq(ai_call_campaigns.userId, ctx.user.id)
+                    ))
                     .limit(1);
 
                 if (!campaign[0]) {
@@ -355,13 +369,13 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Pause a campaign
+     * Pause a campaign (only if owned by authenticated user)
      */
-    pauseCampaign: publicProcedure
+    pauseCampaign: protectedProcedure
         .input(z.object({
             campaignId: z.number(),
         }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -374,7 +388,10 @@ export const voiceRouter = router({
                         status: "paused",
                         updatedAt: new Date(),
                     })
-                    .where(eq(ai_call_campaigns.id, input.campaignId));
+                    .where(and(
+                        eq(ai_call_campaigns.id, input.campaignId),
+                        eq(ai_call_campaigns.userId, ctx.user.id)
+                    ));
 
                 return {
                     success: true,
@@ -387,13 +404,13 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Get campaign statistics
+     * Get campaign statistics (only if owned by authenticated user)
      */
-    getCampaignStats: publicProcedure
+    getCampaignStats: protectedProcedure
         .input(z.object({
             campaignId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -403,7 +420,10 @@ export const voiceRouter = router({
                 const campaign = await db
                     .select()
                     .from(ai_call_campaigns)
-                    .where(eq(ai_call_campaigns.id, input.campaignId))
+                    .where(and(
+                        eq(ai_call_campaigns.id, input.campaignId),
+                        eq(ai_call_campaigns.userId, ctx.user.id)
+                    ))
                     .limit(1);
 
                 if (!campaign[0]) {
@@ -425,12 +445,11 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Make a single call
+     * Make a single call for authenticated user
      */
-    makeCall: publicProcedure
+    makeCall: protectedProcedure
         .input(
             z.object({
-                userId: z.number(),
                 phoneNumber: z.string(),
                 script: z.string(),
                 settings: z.object({
@@ -446,16 +465,18 @@ export const voiceRouter = router({
                 }).optional(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
             }
 
             try {
+                const userId = ctx.user.id;
+
                 // Create a temporary campaign for single call
                 const campaignResult = await db.insert(ai_call_campaigns).values({
-                    userId: input.userId,
+                    userId: userId,
                     name: `Single Call - ${input.phoneNumber}`,
                     script: input.script,
                     settings: input.settings as any,
@@ -468,7 +489,7 @@ export const voiceRouter = router({
                 // Create call record
                 const callResult = await db.insert(ai_calls).values({
                     campaignId: campaign.id,
-                    userId: input.userId,
+                    userId: userId,
                     phoneNumber: input.phoneNumber,
                     status: "pending",
                 } as InsertAiCall).returning();
@@ -477,7 +498,7 @@ export const voiceRouter = router({
 
                 // Add to queue
                 const job = await addVoiceCallJob({
-                    userId: input.userId.toString(),
+                    userId: userId.toString(),
                     callId: call.id.toString(),
                     phoneNumber: input.phoneNumber,
                     metadata: {
@@ -499,13 +520,13 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Get call status
+     * Get call status (only if owned by authenticated user)
      */
-    getCallStatus: publicProcedure
+    getCallStatus: protectedProcedure
         .input(z.object({
             callId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -515,7 +536,10 @@ export const voiceRouter = router({
                 const call = await db
                     .select()
                     .from(ai_calls)
-                    .where(eq(ai_calls.id, input.callId))
+                    .where(and(
+                        eq(ai_calls.id, input.callId),
+                        eq(ai_calls.userId, ctx.user.id)
+                    ))
                     .limit(1);
 
                 if (!call[0]) {
@@ -555,13 +579,13 @@ export const voiceRouter = router({
         }),
 
     /**
-     * Get call transcript
+     * Get call transcript (only if owned by authenticated user)
      */
-    getCallTranscript: publicProcedure
+    getCallTranscript: protectedProcedure
         .input(z.object({
             callId: z.number(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 throw new Error("Database not available");
@@ -571,7 +595,10 @@ export const voiceRouter = router({
                 const call = await db
                     .select()
                     .from(ai_calls)
-                    .where(eq(ai_calls.id, input.callId))
+                    .where(and(
+                        eq(ai_calls.id, input.callId),
+                        eq(ai_calls.userId, ctx.user.id)
+                    ))
                     .limit(1);
 
                 if (!call[0]) {
@@ -603,26 +630,26 @@ export const voiceRouter = router({
         }),
 
     /**
-     * List calls with filters
+     * List calls with filters for authenticated user
      */
-    listCalls: publicProcedure
+    listCalls: protectedProcedure
         .input(
             z.object({
-                userId: z.number(),
                 campaignId: z.number().optional(),
                 status: z.enum(["pending", "calling", "answered", "no_answer", "failed", "completed"]).optional(),
                 limit: z.number().default(50),
                 offset: z.number().default(0),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const db = await getDb();
             if (!db) {
                 return { calls: [], total: 0 };
             }
 
             try {
-                const conditions = [eq(ai_calls.userId, input.userId)];
+                const userId = ctx.user.id;
+                const conditions = [eq(ai_calls.userId, userId)];
 
                 if (input.campaignId) {
                     conditions.push(eq(ai_calls.campaignId, input.campaignId));
@@ -643,7 +670,7 @@ export const voiceRouter = router({
                 const totalResult = await db
                     .select({ count: sql<number>`count(*)::int` })
                     .from(ai_calls)
-                    .where(eq(ai_calls.userId, input.userId));
+                    .where(eq(ai_calls.userId, userId));
                 const total = totalResult[0]?.count || 0;
 
                 return {

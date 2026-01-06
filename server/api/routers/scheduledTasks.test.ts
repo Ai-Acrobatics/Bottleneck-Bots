@@ -118,18 +118,35 @@ describe("Scheduled Tasks Router", () => {
     });
 
     it("should calculate pagination correctly", async () => {
-      const db = createTestDb({
-        selectResponse: Array(5)
-          .fill(null)
-          .map((_, i) => createMockScheduledTask({ id: i + 1 })),
-      });
+      const mockTasks = Array(5)
+        .fill(null)
+        .map((_, i) => createMockScheduledTask({ id: i + 1 }));
 
-      // Mock count query
-      db.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve([{ count: 25 }])),
-        })),
-      })) as any;
+      // Create a mock that handles both the tasks query and count query
+      let callCount = 0;
+      const createChain = () => {
+        const chainResult = callCount === 0 ? mockTasks : [{ count: 25 }];
+        callCount++;
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          offset: vi.fn(() => chain),
+          then: (resolve: any) => {
+            resolve(chainResult);
+            return Promise.resolve(chainResult);
+          },
+        };
+        return Object.assign(Promise.resolve(chainResult), chain);
+      };
+
+      const db = {
+        select: vi.fn(() => createChain()),
+        insert: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      };
 
       const dbModule = await import("@/server/db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
@@ -585,24 +602,33 @@ describe("Scheduled Tasks Router", () => {
         createMockExecutionResult({ id: 2 }),
       ];
 
-      const db = createTestDb({
-        selectResponse: executions,
-      });
+      // The router does 3 queries: task verification, executions, and count
+      let callCount = 0;
+      const responses = [[task], executions, [{ count: 2 }]];
 
-      // Mock task verification
-      db.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve([task])),
-            offset: vi.fn(() => Promise.resolve(executions)),
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                offset: vi.fn(() => Promise.resolve(executions)),
-              })),
-            })),
-          })),
-        })),
-      })) as any;
+      const createChain = () => {
+        const chainResult = responses[callCount] || [];
+        callCount++;
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          offset: vi.fn(() => chain),
+          then: (resolve: any) => {
+            resolve(chainResult);
+            return Promise.resolve(chainResult);
+          },
+        };
+        return Object.assign(Promise.resolve(chainResult), chain);
+      };
+
+      const db = {
+        select: vi.fn(() => createChain()),
+        insert: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      };
 
       const dbModule = await import("@/server/db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>
@@ -625,23 +651,33 @@ describe("Scheduled Tasks Router", () => {
         createMockExecutionResult({ status: "success" }),
       ];
 
-      const db = createTestDb({
-        selectResponse: executions,
-      });
+      // The router does 3 queries: task verification, executions, and count
+      let callCount = 0;
+      const responses = [[task], executions, [{ count: 1 }]];
 
-      db.select = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve([task])),
-            offset: vi.fn(() => Promise.resolve(executions)),
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                offset: vi.fn(() => Promise.resolve(executions)),
-              })),
-            })),
-          })),
-        })),
-      })) as any;
+      const createChain = () => {
+        const chainResult = responses[callCount] || [];
+        callCount++;
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          offset: vi.fn(() => chain),
+          then: (resolve: any) => {
+            resolve(chainResult);
+            return Promise.resolve(chainResult);
+          },
+        };
+        return Object.assign(Promise.resolve(chainResult), chain);
+      };
+
+      const db = {
+        select: vi.fn(() => createChain()),
+        insert: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      };
 
       const dbModule = await import("@/server/db");
       vi.mocked(dbModule.getDb).mockImplementation(() =>

@@ -483,12 +483,12 @@ function calculateStagehandCost(
 
 ```typescript
 // server/_core/db-monitoring.ts
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
 import * as Sentry from '@sentry/node';
 
 export function createMonitoredDb() {
-  const sql = neon(process.env.DATABASE_URL!);
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL! });
 
   // Wrap queries with monitoring
   const monitoredSql = new Proxy(sql, {

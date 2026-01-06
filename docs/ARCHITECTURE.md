@@ -37,7 +37,7 @@ graph TB
     end
 
     subgraph "Data Layer"
-        Postgres[(PostgreSQL/Neon)]
+        Postgres[(PostgreSQL/Supabase)]
         Redis[(Redis Cache)]
         S3[S3 Storage]
     end
@@ -310,7 +310,7 @@ erDiagram
 | Technology | Purpose |
 |------------|---------|
 | PostgreSQL | Primary Database |
-| Neon | Serverless Postgres |
+| Supabase | Serverless Postgres |
 | Redis | Cache & Sessions |
 
 ### AI & Automation
@@ -340,7 +340,7 @@ graph TB
     end
 
     subgraph "External Services"
-        Neon[(Neon PostgreSQL)]
+        Supabase[(Supabase PostgreSQL)]
         Redis[(Redis Cloud)]
         Browserbase[Browserbase]
         Claude[Anthropic API]
@@ -354,7 +354,7 @@ graph TB
     Users -->|HTTPS| Vercel_CDN
     Vercel_CDN --> Frontend
     Frontend --> API
-    API --> Neon
+    API --> Supabase
     API --> Redis
     API --> Browserbase
     API --> Claude
@@ -397,7 +397,7 @@ sequenceDiagram
 ### Horizontal Scaling
 - Stateless API servers
 - Redis for session storage
-- PostgreSQL connection pooling via Neon
+- PostgreSQL connection pooling via Supabase
 
 ### Performance Optimizations
 - Redis caching for frequent queries

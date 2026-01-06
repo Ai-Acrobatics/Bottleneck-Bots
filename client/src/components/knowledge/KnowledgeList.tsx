@@ -117,7 +117,7 @@ export function KnowledgeList({ onEdit, onView }: KnowledgeListProps) {
       setEntryToDelete(null);
       refetch();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to delete: ${error.message}`);
     },
   });
@@ -132,7 +132,7 @@ export function KnowledgeList({ onEdit, onView }: KnowledgeListProps) {
       title: pattern.taskName,
       content: `Action pattern for ${pattern.taskType}`,
       context: pattern.pageUrl,
-      examples: pattern.steps.map(s => s.instruction || s.action).filter(Boolean),
+      examples: pattern.steps.map((s) => s.instruction || s.action).filter(Boolean),
       confidence: pattern.successCount && pattern.failureCount
         ? pattern.successCount / (pattern.successCount + pattern.failureCount)
         : 0.5,

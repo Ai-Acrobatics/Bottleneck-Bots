@@ -1,0 +1,99 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [active]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - navigation [ref=e7]:
+            - button "previous" [disabled] [ref=e8]:
+              - img "previous" [ref=e9]
+            - generic [ref=e11]:
+              - generic [ref=e12]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e13]:
+              - img "next" [ref=e14]
+          - img
+        - generic [ref=e16]:
+          - link "Next.js 16.1.0 (stale) Turbopack" [ref=e17] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e18]
+            - generic "There is a newer version (16.1.1) available, upgrade recommended!" [ref=e20]: Next.js 16.1.0 (stale)
+            - generic [ref=e21]: Turbopack
+          - img
+      - dialog "Runtime Error" [ref=e23]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]:
+                - generic [ref=e30]: Runtime Error
+                - generic [ref=e31]: Server
+              - generic [ref=e32]:
+                - button "Copy Error Info" [ref=e33] [cursor=pointer]:
+                  - img [ref=e34]
+                - button "No related documentation found" [disabled] [ref=e36]:
+                  - img [ref=e37]
+                - button "Attach Node.js inspector" [ref=e39] [cursor=pointer]:
+                  - img [ref=e40]
+            - generic [ref=e48]:
+              - generic [ref=e49]: "Failed query: select \"microsites\".\"id\", \"microsites\".\"partner_id\", \"microsites\".\"domain\", \"microsites\".\"subdomain\", \"microsites\".\"custom_domain\", \"microsites\".\"site_name\", \"microsites\".\"primary_color\", \"microsites\".\"logo_url\", \"microsites\".\"hero_image_url\", \"microsites\".\"monthly_charge\", \"microsites\".\"julian_share\", \"microsites\".\"operating_margin\", \"microsites\".\"setup_fee\", \"microsites\".\"setup_fee_paid\", \"microsites\".\"setup_fee_paid_at\", \"microsites\".\"billing_status\", \"microsites\".\"next_billing_date\", \"microsites\".\"stripe_subscription_id\", \"microsites\".\"status\", \"microsites\".\"launched_at\", \"microsites\".\"qr_code_url\", \"microsites\".\"total_visitors\", \"microsites\".\"total_leads\", \"microsites\".\"total_policies\", \"microsites\".\"created_at\", \"microsites\".\"updated_at\", \"partners\".\"id\", \"partners\".\"user_id\", \"partners\".\"clerk_user_id\", \"partners\".\"business_name\", \"partners\".\"business_type\", \"partners\".\"contact_name\", \"partners\".\"contact_email\", \"partners\".\"contact_phone\", \"partners\".\"business_address\", \"partners\".\"website_url\", \"partners\".\"direct_contact_name\", \"partners\".\"direct_contact_email\", \"partners\".\"direct_contact_phone\", \"partners\".\"estimated_monthly_participants\", \"partners\".\"estimated_annual_participants\", \"partners\".\"integration_type\", \"partners\".\"primary_color\", \"partners\".\"logo_url\", \"partners\".\"branding_images\", \"partners\".\"location_count\", \"partners\".\"has_multiple_locations\", \"partners\".\"status\", \"partners\".\"ghl_contact_id\", \"partners\".\"ghl_opportunity_id\", \"partners\".\"documents_status\", \"partners\".\"agreement_signed\", \"partners\".\"w9_signed\", \"partners\".\"direct_deposit_signed\", \"partners\".\"documents_sent_at\", \"partners\".\"documents_completed_at\", \"partners\".\"approved_at\", \"partners\".\"approved_by\", \"partners\".\"created_at\", \"partners\".\"updated_at\" from \"microsites\" inner join \"partners\" on \"microsites\".\"partner_id\" = \"partners\".\"id\" where \"microsites\".\"subdomain\" = $1 limit $2 params: ,1"
+              - button "Show More" [ref=e51] [cursor=pointer]
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - paragraph [ref=e55]:
+                - img [ref=e57]
+                - generic [ref=e61]: node_modules/src/pg-core/session.ts (73:11) @ PostgresJsPreparedQuery.queryWithCache
+                - button "Open in editor" [ref=e62] [cursor=pointer]:
+                  - img [ref=e64]
+              - generic [ref=e67]:
+                - generic [ref=e68]: 71 | return await query();
+                - generic [ref=e69]: "72 | } catch (e) {"
+                - generic [ref=e70]: "> 73 | throw new DrizzleQueryError(queryString, params, e as Error);"
+                - generic [ref=e71]: "| ^"
+                - generic [ref=e72]: "74 | }"
+                - generic [ref=e73]: "75 | }"
+                - generic [ref=e74]: 76 |
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - paragraph [ref=e77]:
+                  - text: Call Stack
+                  - generic [ref=e78]: "8"
+                - button "Show 5 ignore-listed frame(s)" [ref=e79] [cursor=pointer]:
+                  - text: Show 5 ignore-listed frame(s)
+                  - img [ref=e80]
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - text: PostgresJsPreparedQuery.queryWithCache
+                  - button "Open PostgresJsPreparedQuery.queryWithCache in editor" [ref=e84] [cursor=pointer]:
+                    - img [ref=e85]
+                - text: node_modules/src/pg-core/session.ts (73:11)
+              - generic [ref=e87]:
+                - generic [ref=e88]:
+                  - text: <anonymous>
+                  - button "Open <anonymous> in editor" [ref=e89] [cursor=pointer]:
+                    - img [ref=e90]
+                - text: node_modules/src/postgres-js/session.ts (58:17)
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - text: MicrositePage
+                  - button "Open MicrositePage in editor" [ref=e94] [cursor=pointer]:
+                    - img [ref=e95]
+                - text: app/[slug]/page.tsx (64:20)
+        - generic [ref=e97]: "1"
+        - generic [ref=e98]: "2"
+    - generic [ref=e103] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e104]:
+        - img [ref=e105]
+      - generic [ref=e108]:
+        - button "Open issues overlay" [ref=e109]:
+          - generic [ref=e110]:
+            - generic [ref=e111]: "0"
+            - generic [ref=e112]: "1"
+          - generic [ref=e113]: Issue
+        - button "Collapse issues badge" [ref=e114]:
+          - img [ref=e115]
+  - generic [ref=e118]:
+    - 'heading "Application error: a server-side exception has occurred while loading localhost (see the server logs for more information)." [level=2] [ref=e119]'
+    - paragraph [ref=e120]: "Digest: 2549604647"
+```

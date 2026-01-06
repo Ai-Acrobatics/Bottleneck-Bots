@@ -14,7 +14,7 @@
 | Service | Current Use | New Use | Extra Cost |
 |---------|-------------|---------|------------|
 | **Vercel** | Hosting GHL Agency AI | Same + agent UI | $0 (same tier) |
-| **Neon PostgreSQL** | Client data | + agent executions | $0 (same tier) |
+| **Supabase PostgreSQL** | Client data | + agent executions | $0 (same tier) |
 | **Browserbase** | GHL automation | Same usage | $0 (no change) |
 | **Stripe** | Payments | Same | $0 (no change) |
 | **1Password** | Credentials | Same | $0 (no change) |
@@ -246,7 +246,7 @@
 
 ### Don't Pay For:
 - ❌ New hosting (use existing Vercel)
-- ❌ New database (use existing Neon)
+- ❌ New database (use existing Supabase)
 - ❌ New authentication (use existing JWT)
 - ❌ New UI framework (use existing React)
 - ❌ New payment system (use existing Stripe)

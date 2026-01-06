@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, router } from "../../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../../_core/trpc";
 import { getDb } from "../../db";
 import {
   emailConnections,
@@ -53,15 +53,14 @@ export const emailRouter = router({
    * Generate OAuth authorization URL
    * Returns URL to redirect user to provider's consent screen
    */
-  getAuthUrl: publicProcedure
+  getAuthUrl: protectedProcedure
     .input(
       z.object({
         provider: providerEnum,
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       // Generate secure state parameter
       const state = oauthStateService.generateState();
@@ -200,9 +199,8 @@ export const emailRouter = router({
   /**
    * List user's connected email accounts
    */
-  listConnections: publicProcedure.query(async () => {
-    // PLACEHOLDER: Replace with actual userId from auth context
-    const userId = 1;
+  listConnections: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
 
     const db = await getDb();
     if (!db) {
@@ -233,15 +231,14 @@ export const emailRouter = router({
   /**
    * Disconnect (remove) email account
    */
-  disconnectAccount: publicProcedure
+  disconnectAccount: protectedProcedure
     .input(
       z.object({
         connectionId: z.number().int(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -280,15 +277,14 @@ export const emailRouter = router({
   /**
    * Trigger email sync for a connection (queues background job)
    */
-  syncEmails: publicProcedure
+  syncEmails: protectedProcedure
     .input(
       z.object({
         connectionId: z.number().int(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -336,7 +332,7 @@ export const emailRouter = router({
   /**
    * Get synced emails with pagination and filters
    */
-  getEmails: publicProcedure
+  getEmails: protectedProcedure
     .input(
       z.object({
         connectionId: z.number().int().optional(),
@@ -347,9 +343,8 @@ export const emailRouter = router({
         requiresResponse: z.boolean().optional(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -404,7 +399,7 @@ export const emailRouter = router({
   /**
    * Get AI-generated drafts
    */
-  getDrafts: publicProcedure
+  getDrafts: protectedProcedure
     .input(
       z.object({
         status: draftStatusEnum.optional(),
@@ -412,9 +407,8 @@ export const emailRouter = router({
         offset: z.number().int().min(0).default(0),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -461,7 +455,7 @@ export const emailRouter = router({
   /**
    * Send approved draft
    */
-  sendDraft: publicProcedure
+  sendDraft: protectedProcedure
     .input(
       z.object({
         draftId: z.number().int(),
@@ -473,9 +467,8 @@ export const emailRouter = router({
           .optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -573,15 +566,14 @@ export const emailRouter = router({
   /**
    * Delete/discard draft
    */
-  deleteDraft: publicProcedure
+  deleteDraft: protectedProcedure
     .input(
       z.object({
         draftId: z.number().int(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -620,7 +612,7 @@ export const emailRouter = router({
   /**
    * Generate AI draft response for an email
    */
-  generateDraft: publicProcedure
+  generateDraft: protectedProcedure
     .input(
       z.object({
         emailId: z.number().int(),
@@ -629,9 +621,8 @@ export const emailRouter = router({
         context: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -702,15 +693,14 @@ export const emailRouter = router({
   /**
    * Analyze email sentiment using AI
    */
-  analyzeSentiment: publicProcedure
+  analyzeSentiment: protectedProcedure
     .input(
       z.object({
         emailId: z.number().int(),
       })
     )
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -764,9 +754,8 @@ export const emailRouter = router({
   /**
    * Get email monitoring status and stats
    */
-  getStatus: publicProcedure.query(async () => {
-    // PLACEHOLDER: Replace with actual userId from auth context
-    const userId = 1;
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
 
     const db = await getDb();
     if (!db) {

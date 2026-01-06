@@ -2,7 +2,7 @@
 
 ## Overview
 
-GHL Agency AI uses PostgreSQL (via Neon) with Drizzle ORM. The schema is organized into modular files by domain.
+GHL Agency AI uses PostgreSQL (via Supabase) with Drizzle ORM. The schema is organized into modular files by domain.
 
 ## Schema Files
 

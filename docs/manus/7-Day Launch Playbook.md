@@ -52,7 +52,7 @@ This playbook outlines an aggressive 7-day implementation plan to launch the Man
 - [ ] Create migration for webdev_projects table
 - [ ] Create migration for project_versions table
 - [ ] Create migration for deployments table
-- [ ] Run migrations on Neon database
+- [ ] Run migrations on Supabase database
 - [ ] Test all tables created successfully
 
 **Deliverable:** Complete database schema
@@ -808,7 +808,7 @@ CREATE INDEX idx_deployments_project ON deployments(project_id);
 
 ### Services & APIs
 - Claude API key
-- Neon database
+- Supabase database
 - Vercel account
 - S3 bucket
 - GitHub repository

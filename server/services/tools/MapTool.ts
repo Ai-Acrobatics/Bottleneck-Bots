@@ -411,13 +411,20 @@ export class MapTool extends EventEmitter implements ITool {
     };
 
     // Process items with concurrency control
-    const queue = [...items];
+    // Create queue with original indices
+    const queue: Array<{ item: T; index: number }> = items.map((item, index) => ({ item, index }));
     const workers: Promise<void>[] = [];
+    let inProgressCount = 0;
 
     for (let i = 0; i < Math.min(concurrency, items.length); i++) {
-      workers.push(this.worker(queue, processItem, () => {
+      workers.push(this.workerWithIndex(queue, async (item, index) => {
+        inProgressCount++;
+        progress.inProgress = inProgressCount;
+        updateProgress();
+        await processItem(item, index);
+        inProgressCount--;
         completed++;
-        progress.inProgress = Math.max(0, workers.length - (items.length - queue.length));
+        progress.inProgress = inProgressCount;
         updateProgress();
       }));
     }
@@ -707,19 +714,35 @@ export class MapTool extends EventEmitter implements ITool {
   }
 
   /**
-   * Worker for processing queue items
+   * Worker for processing queue items with index tracking
+   */
+  private async workerWithIndex<T>(
+    queue: Array<{ item: T; index: number }>,
+    processor: (item: T, index: number) => Promise<void>
+  ): Promise<void> {
+    while (queue.length > 0) {
+      const entry = queue.shift();
+      if (!entry) break;
+
+      await processor(entry.item, entry.index);
+    }
+  }
+
+  /**
+   * Worker for processing queue items (legacy)
    */
   private async worker<T>(
     queue: T[],
     processor: (item: T, index: number) => Promise<void>,
     onComplete: () => void
   ): Promise<void> {
+    let index = 0;
     while (queue.length > 0) {
       const item = queue.shift();
-      if (!item) break;
+      if (item === undefined) break;
 
-      const index = queue.length; // Original index
       await processor(item, index);
+      index++;
       onComplete();
     }
   }

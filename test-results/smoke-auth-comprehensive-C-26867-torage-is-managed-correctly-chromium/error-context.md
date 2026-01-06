@@ -1,0 +1,135 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - link "Daily Event Insurance" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "Daily Event Insurance" [ref=e8]
+        - navigation [ref=e9]:
+          - link "How It Works" [ref=e10] [cursor=pointer]:
+            - /url: "#how-it-works"
+          - link "For Carriers" [ref=e11] [cursor=pointer]:
+            - /url: /carriers
+          - button "Industries" [ref=e13]:
+            - text: Industries
+            - img [ref=e14]
+          - button "Resources" [ref=e17]:
+            - text: Resources
+            - img [ref=e18]
+        - generic [ref=e20]:
+          - link "Login" [ref=e21] [cursor=pointer]:
+            - /url: /sign-in
+          - link "Get Demo" [ref=e22] [cursor=pointer]:
+            - /url: "#apply"
+    - main [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic:
+            - img "Daily Event Insurance"
+          - heading "Welcome back" [level=1] [ref=e26]
+          - paragraph [ref=e27]: Sign in to your partner account
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - generic [ref=e31]: Email address
+              - generic [ref=e32]:
+                - img [ref=e33]
+                - textbox "Email address" [ref=e36]:
+                  - /placeholder: you@company.com
+            - generic [ref=e37]:
+              - generic [ref=e38]: Password
+              - generic [ref=e39]:
+                - img [ref=e40]
+                - textbox "Password" [ref=e43]:
+                  - /placeholder: ••••••••
+            - button "Sign in" [ref=e44]:
+              - text: Sign in
+              - img [ref=e45]
+          - paragraph [ref=e48]:
+            - text: Don't have an account?
+            - link "Sign up" [ref=e49] [cursor=pointer]:
+              - /url: /sign-up
+    - contentinfo [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e54]:
+            - heading "Daily Event Insurance" [level=3] [ref=e55]
+            - paragraph [ref=e56]: A HiQOR Company
+            - paragraph [ref=e57]: Empowering fitness businesses with embedded insurance technology.
+            - link "LinkedIn" [ref=e59] [cursor=pointer]:
+              - /url: https://linkedin.com
+              - img [ref=e60]
+          - generic [ref=e62]:
+            - heading "Quick Links" [level=4] [ref=e63]
+            - list [ref=e64]:
+              - listitem [ref=e65]:
+                - link "How It Works" [ref=e66] [cursor=pointer]:
+                  - /url: /#how-it-works
+              - listitem [ref=e67]:
+                - link "Who We Serve" [ref=e68] [cursor=pointer]:
+                  - /url: /#who-we-serve
+              - listitem [ref=e69]:
+                - link "Benefits" [ref=e70] [cursor=pointer]:
+                  - /url: /#benefits
+              - listitem [ref=e71]:
+                - link "Pricing" [ref=e72] [cursor=pointer]:
+                  - /url: /pricing
+              - listitem [ref=e73]:
+                - link "For Carriers" [ref=e74] [cursor=pointer]:
+                  - /url: /carriers
+          - generic [ref=e75]:
+            - heading "Industries We Serve" [level=4] [ref=e76]
+            - list [ref=e77]:
+              - listitem [ref=e78]:
+                - link "Race Directors" [ref=e79] [cursor=pointer]:
+                  - /url: /industries/race-directors
+              - listitem [ref=e80]:
+                - link "Cycling Events" [ref=e81] [cursor=pointer]:
+                  - /url: /industries/cycling-events
+              - listitem [ref=e82]:
+                - link "Triathlons" [ref=e83] [cursor=pointer]:
+                  - /url: /industries/triathlons
+              - listitem [ref=e84]:
+                - link "Obstacle Courses" [ref=e85] [cursor=pointer]:
+                  - /url: /industries/obstacle-courses
+              - listitem [ref=e86]:
+                - link "Marathons & Fun Runs" [ref=e87] [cursor=pointer]:
+                  - /url: /industries/marathons
+              - listitem [ref=e88]:
+                - link "Corporate Wellness" [ref=e89] [cursor=pointer]:
+                  - /url: /industries/corporate-wellness
+              - listitem [ref=e90]:
+                - link "Schools & Universities" [ref=e91] [cursor=pointer]:
+                  - /url: /industries/schools-universities
+          - generic [ref=e92]:
+            - heading "Get Started" [level=4] [ref=e93]
+            - paragraph [ref=e94]: Ready to start earning commission? Sign up today—no contracts, no setup fees.
+            - link "Get Started Today" [ref=e96] [cursor=pointer]:
+              - /url: /#apply
+              - text: Get Started Today
+              - img [ref=e97]
+            - paragraph [ref=e100]:
+              - text: Questions? Email us at
+              - link "partners@dailyeventinsurance.com" [ref=e101] [cursor=pointer]:
+                - /url: mailto:partners@dailyeventinsurance.com
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - paragraph [ref=e104]: © 2026 Daily Event Insurance. All rights reserved.
+            - generic [ref=e105]:
+              - link "Privacy Policy" [ref=e106] [cursor=pointer]:
+                - /url: /privacy
+              - link "Terms of Service" [ref=e107] [cursor=pointer]:
+                - /url: /terms
+              - link "Insurance Disclosure" [ref=e108] [cursor=pointer]:
+                - /url: /insurance-disclosure
+            - generic [ref=e109]:
+              - generic [ref=e110]: Powered by
+              - link "HiQOR" [ref=e111] [cursor=pointer]:
+                - /url: https://hiqor.com
+          - paragraph [ref=e113]: Daily Event Insurance provides flexible event coverage options. Insurance products are underwritten by licensed insurers. Coverage availability and terms may vary by state and event type. Please review policy documents for full terms and conditions.
+  - button "Open chatbot" [ref=e114]:
+    - img [ref=e115]
+```

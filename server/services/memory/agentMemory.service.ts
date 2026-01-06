@@ -283,6 +283,7 @@ export class AgentMemoryService {
 
   /**
    * Update context entry
+   * Now with tenant isolation - only updates entries belonging to current tenant
    */
   async updateContext(
     sessionId: string,
@@ -295,6 +296,10 @@ export class AgentMemoryService {
       throw new Error("Database not initialized");
     }
 
+    // Apply tenant scoping
+    const tenantSessionId = this.getTenantSessionId(sessionId);
+    const tenantKey = this.getTenantMemoryKey(key);
+
     const updates: any = {
       value,
       updatedAt: new Date(),
@@ -304,23 +309,28 @@ export class AgentMemoryService {
       updates.metadata = metadata;
     }
 
+    // Build conditions with tenant filter
+    const conditions = [
+      eq(memoryEntries.sessionId, tenantSessionId),
+      eq(memoryEntries.key, tenantKey)
+    ];
+
+    // Add tenant filter to ensure data isolation
+    this.addTenantFilter(conditions);
+
     await db
       .update(memoryEntries)
       .set(updates)
-      .where(
-        and(
-          eq(memoryEntries.sessionId, sessionId),
-          eq(memoryEntries.key, key)
-        )
-      );
+      .where(and(...conditions));
 
-    // Invalidate cache
-    const cacheKey = `${sessionId}:${key}`;
+    // Invalidate cache with tenant-scoped key
+    const cacheKey = `${tenantSessionId}:${tenantKey}`;
     this.cache.delete(cacheKey);
   }
 
   /**
    * Delete context entries for a session
+   * Now with tenant isolation - only deletes entries belonging to current tenant
    */
   async deleteContext(sessionId: string, key?: string): Promise<void> {
     const db = await getDb();
@@ -328,15 +338,22 @@ export class AgentMemoryService {
       throw new Error("Database not initialized");
     }
 
-    const conditions = [eq(memoryEntries.sessionId, sessionId)];
+    // Apply tenant scoping
+    const tenantSessionId = this.getTenantSessionId(sessionId);
+
+    const conditions = [eq(memoryEntries.sessionId, tenantSessionId)];
+
+    // Add tenant filter to ensure data isolation
+    this.addTenantFilter(conditions);
 
     if (key) {
-      conditions.push(eq(memoryEntries.key, key));
-      const cacheKey = `${sessionId}:${key}`;
+      const tenantKey = this.getTenantMemoryKey(key);
+      conditions.push(eq(memoryEntries.key, tenantKey));
+      const cacheKey = `${tenantSessionId}:${tenantKey}`;
       this.cache.delete(cacheKey);
     } else {
-      // Clear all cache entries for this session
-      const keysToDelete = Array.from(this.cache.keys()).filter(k => k.startsWith(`${sessionId}:`));
+      // Clear all cache entries for this tenant-scoped session
+      const keysToDelete = Array.from(this.cache.keys()).filter(k => k.startsWith(`${tenantSessionId}:`));
       for (const k of keysToDelete) {
         this.cache.delete(k);
       }
@@ -349,6 +366,7 @@ export class AgentMemoryService {
 
   /**
    * Store session-level context
+   * Now with tenant isolation - automatically scopes to current tenant
    */
   async storeSessionContext(
     sessionId: string,
@@ -364,16 +382,31 @@ export class AgentMemoryService {
       throw new Error("Database not initialized");
     }
 
+    // Apply tenant scoping
+    const tenantSessionId = this.getTenantSessionId(sessionId);
+
+    // Auto-inject userId from tenant context if not provided
+    const tenantUserId = this.tenantService.getUserId();
+    const userId = options.userId ?? tenantUserId;
+
+    // Add tenant metadata
+    const tenantMetadata = this.tenantService.hasTenantContext()
+      ? {
+          tenantId: this.tenantService.getTenantId(),
+          namespace: this.tenantService.getTenantNamespace('session-context'),
+        }
+      : {};
+
     const now = new Date();
 
     await db
       .insert(sessionContexts)
       .values({
-        sessionId,
-        userId: options.userId || null,
+        sessionId: tenantSessionId,
+        userId: userId || null,
         agentId: options.agentId || null,
         context: context as any,
-        metadata: (options.metadata || {}) as any,
+        metadata: { ...tenantMetadata, ...options.metadata } as any,
         createdAt: now,
         updatedAt: now,
       })
@@ -381,14 +414,20 @@ export class AgentMemoryService {
         target: sessionContexts.sessionId,
         set: {
           context: context as any,
-          metadata: (options.metadata || {}) as any,
+          metadata: { ...tenantMetadata, ...options.metadata } as any,
           updatedAt: now,
         },
       });
+
+    // Audit log
+    this.tenantService.auditLog('session.store', {
+      sessionId: tenantSessionId,
+    });
   }
 
   /**
    * Retrieve session-level context
+   * Now with tenant isolation - only retrieves context belonging to current tenant
    */
   async retrieveSessionContext(sessionId: string): Promise<SessionContext | null> {
     const db = await getDb();
@@ -396,10 +435,24 @@ export class AgentMemoryService {
       throw new Error("Database not initialized");
     }
 
+    // Apply tenant scoping
+    const tenantSessionId = this.getTenantSessionId(sessionId);
+
+    // Build conditions with tenant filter
+    const conditions = [eq(sessionContexts.sessionId, tenantSessionId)];
+
+    // Add tenant filter via userId if available
+    if (this.tenantService.hasTenantContext()) {
+      const userId = this.tenantService.getUserId();
+      if (userId !== undefined) {
+        conditions.push(eq(sessionContexts.userId, userId));
+      }
+    }
+
     const results = await db
       .select()
       .from(sessionContexts)
-      .where(eq(sessionContexts.sessionId, sessionId))
+      .where(and(...conditions))
       .limit(1);
 
     if (results.length === 0) {
@@ -407,6 +460,14 @@ export class AgentMemoryService {
     }
 
     const row = results[0];
+
+    // Validate tenant ownership
+    if (this.tenantService.hasTenantContext()) {
+      if (!this.tenantService.validateTenantOwnership(row.userId)) {
+        throw new Error("Access denied: Session context does not belong to current tenant");
+      }
+    }
+
     return {
       sessionId: row.sessionId,
       userId: row.userId || undefined,

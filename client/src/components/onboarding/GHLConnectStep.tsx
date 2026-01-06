@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { OnboardingData } from './OnboardingWizard';
+import { trpc } from '@/lib/trpc';
 
 interface GHLConnectStepProps {
   data: OnboardingData;

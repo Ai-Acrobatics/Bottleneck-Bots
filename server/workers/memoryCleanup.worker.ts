@@ -104,6 +104,40 @@ export function onMemoryJobFailed(job: Job | undefined, error: Error): void {
 /**
  * Job progress handler
  */
-export function onMemoryJobProgress(job: Job, progress: number | object): void {
+export function onMemoryJobProgress(job: Job, progress: number | object | string | boolean): void {
   console.log(`[Memory Worker] Job ${job.id} progress:`, progress);
+}
+
+// ========================================
+// WORKER FACTORY
+// ========================================
+
+import { Worker } from "bullmq";
+import { getRedisConnection } from "./utils";
+
+/**
+ * Create and configure the memory cleanup worker
+ */
+export function createMemoryCleanupWorker(): Worker {
+  const worker = new Worker<MemoryJobData>(
+    "memory_cleanup",
+    async (job) => {
+      return await processMemoryJob(job);
+    },
+    {
+      connection: getRedisConnection(),
+      concurrency: 2, // Process up to 2 cleanup jobs concurrently
+      limiter: {
+        max: 5, // Max 5 jobs
+        duration: 60000, // Per minute (cleanup jobs are less frequent)
+      },
+    }
+  );
+
+  worker.on("completed", onMemoryJobCompleted);
+  worker.on("failed", onMemoryJobFailed);
+  worker.on("progress", onMemoryJobProgress);
+
+  console.log("Memory cleanup worker initialized");
+  return worker;
 }

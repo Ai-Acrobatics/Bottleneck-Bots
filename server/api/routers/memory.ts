@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod';
-import { publicProcedure, router } from '../../_core/trpc';
+import { publicProcedure, protectedProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
 import { getMemorySystem, getAgentMemory, getReasoningBank, memoryCleanupScheduler } from '../../services/memory';
 
@@ -144,8 +144,9 @@ export const memoryRouter = router({
 
   /**
    * Create a new memory entry
+   * Protected: Requires authentication to prevent unauthorized data creation
    */
-  create: publicProcedure
+  create: protectedProcedure
     .input(createMemorySchema)
     .mutation(async ({ input }) => {
       try {
@@ -265,8 +266,9 @@ export const memoryRouter = router({
 
   /**
    * Update an existing memory entry
+   * Protected: Requires authentication to prevent unauthorized data modification
    */
-  update: publicProcedure
+  update: protectedProcedure
     .input(updateMemorySchema)
     .mutation(async ({ input }) => {
       try {
@@ -293,8 +295,9 @@ export const memoryRouter = router({
 
   /**
    * Delete memory entry or all entries for a session
+   * Protected: Requires authentication to prevent unauthorized data deletion
    */
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(deleteMemorySchema)
     .mutation(async ({ input }) => {
       try {
@@ -323,8 +326,9 @@ export const memoryRouter = router({
 
   /**
    * Store session context
+   * Protected: Requires authentication to prevent unauthorized data creation
    */
-  storeContext: publicProcedure
+  storeContext: protectedProcedure
     .input(sessionContextSchema)
     .mutation(async ({ input }) => {
       try {
@@ -373,8 +377,9 @@ export const memoryRouter = router({
 
   /**
    * Update session context
+   * Protected: Requires authentication to prevent unauthorized data modification
    */
-  updateContext: publicProcedure
+  updateContext: protectedProcedure
     .input(sessionContextSchema)
     .mutation(async ({ input }) => {
       try {
@@ -403,8 +408,9 @@ export const memoryRouter = router({
 
   /**
    * Store a reasoning pattern
+   * Protected: Requires authentication to prevent unauthorized data creation
    */
-  storeReasoning: publicProcedure
+  storeReasoning: protectedProcedure
     .input(reasoningPatternSchema)
     .mutation(async ({ input }) => {
       try {
@@ -464,8 +470,9 @@ export const memoryRouter = router({
 
   /**
    * Update reasoning pattern usage statistics
+   * Protected: Requires authentication to prevent unauthorized data modification
    */
-  updateReasoningUsage: publicProcedure
+  updateReasoningUsage: protectedProcedure
     .input(updateReasoningUsageSchema)
     .mutation(async ({ input }) => {
       try {
@@ -514,8 +521,9 @@ export const memoryRouter = router({
 
   /**
    * Consolidate similar memory entries (merge duplicates)
+   * Protected: Requires authentication to prevent unauthorized data modification
    */
-  consolidate: publicProcedure
+  consolidate: protectedProcedure
     .input(z.object({
       sessionId: z.string().optional(),
       agentId: z.string().optional(),
@@ -583,8 +591,9 @@ export const memoryRouter = router({
 
   /**
    * Clean up expired and low-performing memory
+   * Protected: Requires authentication to prevent unauthorized data deletion
    */
-  cleanup: publicProcedure
+  cleanup: protectedProcedure
     .input(cleanupOptionsSchema)
     .mutation(async ({ input }) => {
       try {
@@ -607,8 +616,9 @@ export const memoryRouter = router({
 
   /**
    * Clear all caches
+   * Protected: Requires authentication to prevent unauthorized cache manipulation
    */
-  clearCaches: publicProcedure
+  clearCaches: protectedProcedure
     .mutation(() => {
       try {
         const memorySystem = getMemorySystem();
@@ -725,8 +735,9 @@ export const memoryRouter = router({
 
   /**
    * Manually trigger memory cleanup
+   * Protected: Requires authentication to prevent unauthorized data deletion
    */
-  triggerCleanup: publicProcedure
+  triggerCleanup: protectedProcedure
     .input(z.object({
       cleanupExpired: z.boolean().optional(),
       cleanupLowPerformance: z.boolean().optional(),
@@ -753,8 +764,9 @@ export const memoryRouter = router({
 
   /**
    * Manually trigger memory consolidation
+   * Protected: Requires authentication to prevent unauthorized data modification
    */
-  triggerConsolidation: publicProcedure
+  triggerConsolidation: protectedProcedure
     .input(z.object({
       sessionId: z.string().optional(),
       agentId: z.string().optional(),
@@ -799,8 +811,9 @@ export const memoryRouter = router({
 
   /**
    * Start memory cleanup scheduler
+   * Protected: Requires authentication for system administration operations
    */
-  startCleanupScheduler: publicProcedure
+  startCleanupScheduler: protectedProcedure
     .input(z.object({
       cleanupIntervalHours: z.number().positive().optional(),
       consolidateIntervalHours: z.number().positive().optional(),
@@ -828,8 +841,9 @@ export const memoryRouter = router({
 
   /**
    * Stop memory cleanup scheduler
+   * Protected: Requires authentication for system administration operations
    */
-  stopCleanupScheduler: publicProcedure
+  stopCleanupScheduler: protectedProcedure
     .mutation(() => {
       try {
         memoryCleanupScheduler.stop();

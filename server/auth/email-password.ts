@@ -185,6 +185,8 @@ export async function createPasswordResetToken(email: string) {
 
 /**
  * Reset password using a valid token
+ * SECURITY: Iterates through all valid tokens to find matching hash
+ * This is necessary because tokens are hashed and cannot be queried directly
  */
 export async function resetPassword(token: string, newPassword: string) {
   const db = await getDb();
@@ -192,31 +194,46 @@ export async function resetPassword(token: string, newPassword: string) {
     throw new Error("Database not available");
   }
 
-  // Find valid token
-  const [resetToken] = await db
+  // Validate new password strength
+  const passwordErrors = validatePassword(newPassword);
+  if (passwordErrors.length > 0) {
+    throw new Error(`Invalid password: ${passwordErrors.join(", ")}`);
+  }
+
+  // Find all valid (non-expired, unused) tokens
+  // We must check each one because we store hashed tokens
+  const validTokens = await db
     .select()
     .from(passwordResetTokens)
     .where(and(gt(passwordResetTokens.expiresAt, new Date()), isNull(passwordResetTokens.usedAt)))
-    .limit(100); // Get all unexpired tokens
+    .limit(100);
 
-  if (!resetToken) {
+  if (validTokens.length === 0) {
     throw new Error("Invalid or expired token");
   }
 
-  // Verify token hash
-  const isValidToken = await bcrypt.compare(token, resetToken.token);
-  if (!isValidToken) {
-    throw new Error("Invalid token");
+  // Find the matching token by comparing hashes
+  let matchingToken = null;
+  for (const resetToken of validTokens) {
+    const isMatch = await bcrypt.compare(token, resetToken.token);
+    if (isMatch) {
+      matchingToken = resetToken;
+      break;
+    }
+  }
+
+  if (!matchingToken) {
+    throw new Error("Invalid or expired token");
   }
 
   // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
   // Update user password
-  await db.update(users).set({ password: hashedPassword }).where(eq(users.id, resetToken.userId));
+  await db.update(users).set({ password: hashedPassword }).where(eq(users.id, matchingToken.userId));
 
   // Mark token as used
-  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, resetToken.id));
+  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, matchingToken.id));
 
   return { success: true };
 }
@@ -251,6 +268,7 @@ async function createEmailVerificationToken(userId: number) {
 
 /**
  * Verify email using token
+ * SECURITY: Iterates through all valid tokens to find matching hash
  */
 export async function verifyEmail(token: string) {
   const db = await getDb();
@@ -258,28 +276,39 @@ export async function verifyEmail(token: string) {
     throw new Error("Database not available");
   }
 
-  const [verificationToken] = await db
+  // Find all valid (non-expired, unverified) tokens
+  // We must check each one because we store hashed tokens
+  const validTokens = await db
     .select()
     .from(emailVerificationTokens)
     .where(and(gt(emailVerificationTokens.expiresAt, new Date()), isNull(emailVerificationTokens.verifiedAt)))
     .limit(100);
 
-  if (!verificationToken) {
+  if (validTokens.length === 0) {
     throw new Error("Invalid or expired token");
   }
 
-  const isValidToken = await bcrypt.compare(token, verificationToken.token);
-  if (!isValidToken) {
-    throw new Error("Invalid token");
+  // Find the matching token by comparing hashes
+  let matchingToken = null;
+  for (const verificationToken of validTokens) {
+    const isMatch = await bcrypt.compare(token, verificationToken.token);
+    if (isMatch) {
+      matchingToken = verificationToken;
+      break;
+    }
+  }
+
+  if (!matchingToken) {
+    throw new Error("Invalid or expired token");
   }
 
   // Mark email as verified
-  await db.update(emailVerificationTokens).set({ verifiedAt: new Date() }).where(eq(emailVerificationTokens.id, verificationToken.id));
+  await db.update(emailVerificationTokens).set({ verifiedAt: new Date() }).where(eq(emailVerificationTokens.id, matchingToken.id));
 
   // Update user - you may want to add an emailVerified field to the users table
   // await db.update(users).set({ emailVerified: true }).where(eq(users.id, verificationToken.userId));
 
-  return { success: true, userId: verificationToken.userId };
+  return { success: true, userId: matchingToken.userId };
 }
 
 // ========================================

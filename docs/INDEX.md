@@ -186,7 +186,7 @@ GHL Agency AI is a white-label SaaS platform for browser automation and workflow
 - OpenAI Embeddings
 
 ### Database
-- PostgreSQL (Neon)
+- PostgreSQL (Supabase)
 - Redis
 
 ---

@@ -91,7 +91,7 @@ Manus 1.5 is an enterprise-grade AI agent orchestration platform that enables mu
 ### Backend
 - Node.js 22 + TypeScript
 - Express + tRPC for APIs
-- Drizzle ORM + PostgreSQL (Neon)
+- Drizzle ORM + PostgreSQL (Supabase)
 - Claude API for agent intelligence
 - BullMQ for job queues
 
@@ -104,7 +104,7 @@ Manus 1.5 is an enterprise-grade AI agent orchestration platform that enables mu
 
 ### Infrastructure
 - Vercel for hosting
-- Neon PostgreSQL for database
+- Supabase PostgreSQL for database
 - Redis for caching
 - S3-compatible storage for files
 - Docker for sandboxing

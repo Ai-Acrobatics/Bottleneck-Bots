@@ -18,7 +18,7 @@ import { CreditService } from "../../services/credit.service";
  * - Individual lead enrichment
  * - Export enriched data
  *
- * PLACEHOLDER: userId is hardcoded to 1 until authentication is implemented
+ * All procedures require authentication via protectedProcedure
  */
 
 // ========================================
@@ -67,11 +67,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Create a new lead list
    */
-  createList: publicProcedure
+  createList: protectedProcedure
     .input(createLeadListSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -105,7 +104,7 @@ export const leadEnrichmentRouter = router({
   /**
    * Get all lead lists for user
    */
-  getLists: publicProcedure
+  getLists: protectedProcedure
     .input(
       z.object({
         limit: z.number().int().positive().default(50),
@@ -113,9 +112,8 @@ export const leadEnrichmentRouter = router({
         status: z.enum(["uploading", "processing", "completed", "failed"]).optional(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -161,11 +159,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Get a single lead list by ID
    */
-  getList: publicProcedure
+  getList: protectedProcedure
     .input(z.object({ listId: z.number().int() }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -194,11 +191,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Upload leads to a list
    */
-  uploadLeads: publicProcedure
+  uploadLeads: protectedProcedure
     .input(uploadLeadsSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -253,7 +249,7 @@ export const leadEnrichmentRouter = router({
   /**
    * Get leads in a list
    */
-  getLeads: publicProcedure
+  getLeads: protectedProcedure
     .input(
       z.object({
         listId: z.number().int(),
@@ -262,9 +258,8 @@ export const leadEnrichmentRouter = router({
         enrichmentStatus: z.enum(["pending", "enriched", "failed", "skipped"]).optional(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -326,11 +321,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Enrich a single lead
    */
-  enrichLead: publicProcedure
+  enrichLead: protectedProcedure
     .input(enrichLeadSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -446,11 +440,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Batch enrich all pending leads in a list
    */
-  enrichList: publicProcedure
+  enrichList: protectedProcedure
     .input(enrichListSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -590,11 +583,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Delete a lead list
    */
-  deleteList: publicProcedure
+  deleteList: protectedProcedure
     .input(z.object({ listId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -627,11 +619,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Export enriched leads as JSON
    */
-  exportLeads: publicProcedure
+  exportLeads: protectedProcedure
     .input(z.object({ listId: z.number().int() }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -675,11 +666,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Get batch enrichment status for a list
    */
-  getEnrichmentStatus: publicProcedure
+  getEnrichmentStatus: protectedProcedure
     .input(z.object({ listId: z.number().int() }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -745,16 +735,15 @@ export const leadEnrichmentRouter = router({
   /**
    * Get enrichment history for all lists
    */
-  getEnrichmentHistory: publicProcedure
+  getEnrichmentHistory: protectedProcedure
     .input(
       z.object({
         limit: z.number().int().positive().default(20),
         offset: z.number().int().nonnegative().default(0),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -817,11 +806,10 @@ export const leadEnrichmentRouter = router({
   /**
    * Re-enrich failed leads in a list
    */
-  reEnrichFailed: publicProcedure
+  reEnrichFailed: protectedProcedure
     .input(z.object({ listId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -886,9 +874,8 @@ export const leadEnrichmentRouter = router({
   /**
    * Get enrichment statistics
    */
-  getEnrichmentStats: publicProcedure.query(async () => {
-    // PLACEHOLDER: Replace with actual userId from auth context
-    const userId = 1;
+  getEnrichmentStats: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
 
     const db = await getDb();
     if (!db) {

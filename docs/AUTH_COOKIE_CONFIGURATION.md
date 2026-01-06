@@ -54,7 +54,7 @@ GOOGLE_CLIENT_ID=<your-google-client-id>
 GOOGLE_CLIENT_SECRET=<your-google-client-secret>
 GOOGLE_REDIRECT_URI=https://www.ghlagencyai.com/api/oauth/google/callback
 COOKIE_SECRET=<random-32-character-string>
-DATABASE_URL=<neon-postgres-connection-string>
+DATABASE_URL=<supabase-postgres-connection-string>
 ```
 
 ### Cookie Domain Considerations

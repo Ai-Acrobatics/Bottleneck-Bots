@@ -269,7 +269,7 @@ function BrandVoiceForm({
       toast.success('Brand voice saved');
       onSuccess();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to save: ${error.message}`);
     },
   });

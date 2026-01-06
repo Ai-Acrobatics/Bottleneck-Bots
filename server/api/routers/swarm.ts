@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { publicProcedure, router } from '../../_core/trpc';
+import { protectedProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
 import {
   SwarmCoordinator,
@@ -89,7 +89,7 @@ export const swarmRouter = router({
   /**
    * Initialize the swarm coordinator
    */
-  initialize: publicProcedure.mutation(async () => {
+  initialize: protectedProcedure.mutation(async () => {
     try {
       const coord = await getCoordinator();
       return {
@@ -107,7 +107,7 @@ export const swarmRouter = router({
   /**
    * Create a new swarm
    */
-  create: publicProcedure.input(createSwarmSchema).mutation(async ({ input }) => {
+  create: protectedProcedure.input(createSwarmSchema).mutation(async ({ input }) => {
     try {
       const coord = await getCoordinator();
 
@@ -136,7 +136,7 @@ export const swarmRouter = router({
   /**
    * Start a swarm
    */
-  start: publicProcedure.input(swarmIdSchema).mutation(async ({ input }) => {
+  start: protectedProcedure.input(swarmIdSchema).mutation(async ({ input }) => {
     try {
       const coord = await getCoordinator();
       await coord.startSwarm(input.swarmId);
@@ -156,7 +156,7 @@ export const swarmRouter = router({
   /**
    * Stop a swarm
    */
-  stop: publicProcedure
+  stop: protectedProcedure
     .input(
       z.object({
         swarmId: z.string(),
@@ -183,7 +183,7 @@ export const swarmRouter = router({
   /**
    * Get swarm status
    */
-  getStatus: publicProcedure.input(swarmIdSchema).query(async ({ input }) => {
+  getStatus: protectedProcedure.input(swarmIdSchema).query(async ({ input }) => {
     try {
       const coord = await getCoordinator();
       const status = coord.getSwarmStatus(input.swarmId);
@@ -222,7 +222,7 @@ export const swarmRouter = router({
   /**
    * List all active swarms
    */
-  listActive: publicProcedure.query(async () => {
+  listActive: protectedProcedure.query(async () => {
     try {
       const coord = await getCoordinator();
       const swarms = coord.getAllSwarmStatuses();
@@ -251,7 +251,7 @@ export const swarmRouter = router({
   /**
    * Get health status
    */
-  getHealth: publicProcedure.query(async () => {
+  getHealth: protectedProcedure.query(async () => {
     try {
       const coord = await getCoordinator();
       const health = await coord.getHealth();
@@ -271,7 +271,7 @@ export const swarmRouter = router({
   /**
    * Get metrics
    */
-  getMetrics: publicProcedure.query(async () => {
+  getMetrics: protectedProcedure.query(async () => {
     try {
       const coord = await getCoordinator();
       const metrics = coord.getMetrics();
@@ -291,7 +291,7 @@ export const swarmRouter = router({
   /**
    * Get available agent types
    */
-  getAgentTypes: publicProcedure.query(async () => {
+  getAgentTypes: protectedProcedure.query(async () => {
     try {
       const { AGENT_TYPES } = await import('../../services/swarm');
 
@@ -320,7 +320,7 @@ export const swarmRouter = router({
   /**
    * Get task queue status
    */
-  getQueueStatus: publicProcedure.query(async () => {
+  getQueueStatus: protectedProcedure.query(async () => {
     try {
       const dist = getDistributor();
       const status = dist.getQueueStatus();
@@ -340,7 +340,7 @@ export const swarmRouter = router({
   /**
    * Execute quick swarm - create and start in one call
    */
-  executeQuick: publicProcedure.input(createSwarmSchema).mutation(async ({ input }) => {
+  executeQuick: protectedProcedure.input(createSwarmSchema).mutation(async ({ input }) => {
     try {
       const coord = await getCoordinator();
 
@@ -373,7 +373,7 @@ export const swarmRouter = router({
   /**
    * Shutdown coordinator (for cleanup)
    */
-  shutdown: publicProcedure.mutation(async () => {
+  shutdown: protectedProcedure.mutation(async () => {
     try {
       if (coordinator) {
         await coordinator.shutdown();

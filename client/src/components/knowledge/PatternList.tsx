@@ -51,7 +51,7 @@ export function PatternList() {
       toast.success('Pattern deleted');
       refetch();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to delete: ${error.message}`);
     },
   });

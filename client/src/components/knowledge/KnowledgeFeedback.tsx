@@ -163,7 +163,7 @@ export function KnowledgeFeedback({
       resetForm();
       onFeedbackSubmitted?.();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to submit feedback: ${error.message}`);
     },
   });

@@ -146,7 +146,7 @@ Share with prospects
 - shadcn/ui components
 
 **Infrastructure**
-- Neon PostgreSQL (database)
+- Supabase PostgreSQL (database)
 - Vercel (hosting & deployment)
 - S3 (file storage)
 - Redis (caching)
@@ -181,7 +181,7 @@ Share with prospects
 **MVP (10 customers)**
 - Claude API: $50/month
 - Browserbase: $200/month
-- Neon DB: $19/month
+- Supabase DB: $25/month
 - Vercel: $20/month
 - Redis: $10/month
 - **Total: $299/month**
@@ -189,7 +189,7 @@ Share with prospects
 **Production (50 customers)**
 - Claude API: $100/month
 - Browserbase: $200/month
-- Neon DB: $19/month
+- Supabase DB: $25/month
 - Vercel: $20/month
 - Redis: $30/month
 - **Total: $369/month**
@@ -212,9 +212,9 @@ Share with prospects
    - Get key: https://console.anthropic.com
    - Cost: $20-100/month
 
-2. **Neon PostgreSQL** - Database
-   - Sign up: https://neon.tech
-   - Cost: $19/month
+2. **Supabase PostgreSQL** - Database
+   - Sign up: https://supabase.com
+   - Cost: Free tier or $25/month
 
 3. **Vercel** - Hosting & deployment
    - Sign up: https://vercel.com

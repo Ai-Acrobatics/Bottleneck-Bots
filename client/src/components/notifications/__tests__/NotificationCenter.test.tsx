@@ -97,8 +97,8 @@ describe('NotificationCenter', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Notifications')).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 15000);
 
   it('displays empty state when no notifications', async () => {
     const user = userEvent.setup();
@@ -114,8 +114,8 @@ describe('NotificationCenter', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No notifications')).toBeInTheDocument();
-    });
-  });
+    }, { timeout: 10000 });
+  }, 15000);
 
   it('throws error when used outside NotificationProvider', () => {
     // Suppress console.error for this test

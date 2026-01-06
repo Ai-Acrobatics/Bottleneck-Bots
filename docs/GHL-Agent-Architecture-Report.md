@@ -20,7 +20,7 @@ The platform leverages a modern full-stack architecture built on React 19, Node.
 
 The application employs a modern, type-safe full-stack architecture that prioritizes developer experience and runtime reliability. The frontend utilizes **React 19** with **Tailwind CSS 4** for responsive, component-based UI development, while the backend runs on **Node.js** with **Express 4** and **tRPC 11** to ensure end-to-end type safety between client and server. This architecture eliminates the need for manual API contract management and reduces runtime errors through compile-time type checking.
 
-The data layer consists of **Neon Serverless PostgreSQL** for application state and user data, with **Drizzle ORM** providing type-safe database queries and automatic schema migrations. File storage and asset management leverage **S3-compatible object storage** for scalability and cost efficiency. The authentication system integrates with **Manus OAuth** for secure user management, while the deployment infrastructure runs on **Vercel** with automatic CI/CD from GitHub.
+The data layer consists of **Supabase PostgreSQL** for application state and user data, with **Drizzle ORM** providing type-safe database queries and automatic schema migrations. File storage and asset management leverage **S3-compatible object storage** for scalability and cost efficiency. The authentication system integrates with **Manus OAuth** for secure user management, while the deployment infrastructure runs on **Vercel** with automatic CI/CD from GitHub.
 
 ### Core Application Components
 
@@ -138,7 +138,7 @@ The backend architecture implements a hub-and-spoke model where the central Node
 | GoHighLevel | REST API | OAuth 2.0 + API Key | Bidirectional | Sub-account management, workflow execution |
 | Notion | REST API | Internal Integration Token | Read-heavy | Client context retrieval |
 | Slack | Webhooks + API | Webhook URL + Bot Token | Outbound notifications | Team alerts, error notifications |
-| Neon Database | PostgreSQL Protocol | Connection String | Bidirectional | Application state, user data |
+| Supabase Database | PostgreSQL Protocol | Connection String | Bidirectional | Application state, user data |
 | Twilio | REST API | Account SID + Auth Token | Bidirectional | SMS, voice calls, recordings |
 | WhatsApp (via Twilio) | REST API | Twilio credentials | Bidirectional | Customer messaging |
 | Google Gemini | REST API | API Key | Request/Response | AI planning, error analysis |
@@ -155,7 +155,7 @@ Rate limiting considerations require implementing exponential backoff with a max
 **Notion Integration**  
 The Notion API integration provides read access to client databases where agencies store brand guidelines, SOPs, and project documentation. The system uses a dedicated Notion integration token with permissions scoped to specific databases. The implementation caches frequently accessed pages to reduce API calls and improve response times.
 
-Context extraction occurs asynchronously when a new client is added to the Notion database. The system retrieves page content, parses structured properties (brand voice, target audience, primary goals), and stores the processed data in the Neon database for fast agent access. Updates to Notion pages trigger webhook notifications that invalidate the cache and re-extract context.
+Context extraction occurs asynchronously when a new client is added to the Notion database. The system retrieves page content, parses structured properties (brand voice, target audience, primary goals), and stores the processed data in the Supabase database for fast agent access. Updates to Notion pages trigger webhook notifications that invalidate the cache and re-extract context.
 
 **Slack Integration**  
 Slack serves as the primary notification channel for team alerts, agent status updates, and error escalations. The integration implements incoming webhooks for simple message posting and the Slack API for interactive features like message threading and reaction-based workflows.
@@ -177,12 +177,12 @@ To optimize costs, the system implements prompt caching for client contexts and 
 **Google Drive Integration**  
 The Drive API integration enables agents to access brand assets, SOPs, and marketing materials stored in the agency's Google Workspace. The implementation uses a service account with domain-wide delegation to access files across the organization without individual user authentication.
 
-The system maintains a file index in the Neon database, storing file IDs, names, MIME types, and last modified timestamps. When an agent needs a specific asset (e.g., client logo for landing page upload), it queries the index, retrieves the file via the Drive API, and caches it temporarily in S3 for fast access during the automation session.
+The system maintains a file index in the Supabase database, storing file IDs, names, MIME types, and last modified timestamps. When an agent needs a specific asset (e.g., client logo for landing page upload), it queries the index, retrieves the file via the Drive API, and caches it temporarily in S3 for fast access during the automation session.
 
 ### Data Flow Architecture
 
 **Agent Execution Cycle**:
-1. User submits command via dashboard → Command queued in Neon database
+1. User submits command via dashboard → Command queued in Supabase database
 2. Agent polls queue → Retrieves next pending task
 3. Agent fetches client context from Notion/Drive → Caches in memory
 4. Agent calls Gemini API → Receives execution plan
@@ -204,7 +204,7 @@ The system maintains a file index in the Neon database, storing file IDs, names,
 
 ## Security & Compliance Considerations
 
-The platform implements multiple security layers to protect sensitive client data and API credentials. All API keys and authentication tokens store in environment variables managed by Vercel's encrypted secrets system, never committed to version control. Database connections use SSL/TLS encryption in transit, and the Neon database enables encryption at rest for all stored data.
+The platform implements multiple security layers to protect sensitive client data and API credentials. All API keys and authentication tokens store in environment variables managed by Vercel's encrypted secrets system, never committed to version control. Database connections use SSL/TLS encryption in transit, and the Supabase database enables encryption at rest for all stored data.
 
 User authentication leverages Manus OAuth with JWT session tokens, implementing automatic token refresh and secure cookie storage with `httpOnly` and `sameSite` flags. Role-based access control (RBAC) restricts sensitive operations to Owner and Manager roles, preventing VA-level users from accessing billing information or modifying integration credentials.
 
@@ -214,7 +214,7 @@ API rate limiting prevents abuse and ensures fair usage across all service provi
 
 ## Scalability & Performance Optimization
 
-The architecture supports horizontal scaling through Vercel's serverless function model, automatically allocating compute resources based on request volume. Database queries utilize Drizzle ORM's connection pooling to efficiently manage concurrent requests without exhausting connection limits. The Neon database's serverless architecture scales compute resources automatically and scales to zero during idle periods to minimize costs.
+The architecture supports horizontal scaling through Vercel's serverless function model, automatically allocating compute resources based on request volume. Database queries utilize Drizzle ORM's connection pooling to efficiently manage concurrent requests without exhausting connection limits. The Supabase database's serverless-compatible architecture scales compute resources automatically and supports connection pooling for optimal performance.
 
 Caching strategies reduce API calls and improve response times. Client contexts cache in-memory for the duration of agent execution sessions, Notion pages cache for 1 hour with webhook-based invalidation, and Drive files cache in S3 for 24 hours. The frontend implements optimistic UI updates for instant feedback, with background revalidation ensuring data consistency.
 
@@ -227,7 +227,7 @@ WebSocket connections provide real-time updates to the dashboard without polling
 ### Phase 1: Foundation (Weeks 1-2)
 - Set up GitHub repository with CI/CD pipeline
 - Configure Vercel deployment with environment variables
-- Initialize Neon database and run schema migrations
+- Initialize Supabase database and run schema migrations
 - Implement authentication system with Manus OAuth
 - Build core dashboard UI components
 
@@ -274,7 +274,7 @@ WebSocket connections provide real-time updates to the dashboard without polling
 - GoHighLevel Agency account (Unlimited or Pro plan)
 - Notion workspace with API integration
 - Slack workspace with admin access
-- Neon database account
+- Supabase database account
 - Twilio account with verified phone number
 - Google Cloud account for Gemini API
 - Google Workspace for Drive API
@@ -323,7 +323,7 @@ S3_SECRET_KEY=...
 
 ## Monitoring & Maintenance
 
-The platform implements comprehensive monitoring through multiple channels. Vercel provides automatic error tracking, performance metrics, and deployment logs. The application logs all agent actions, API calls, and errors to the Neon database for historical analysis and debugging.
+The platform implements comprehensive monitoring through multiple channels. Vercel provides automatic error tracking, performance metrics, and deployment logs. The application logs all agent actions, API calls, and errors to the Supabase database for historical analysis and debugging.
 
 Slack notifications alert the team to critical errors, agent failures, and unusual activity patterns. The dashboard displays real-time system health metrics including API response times, error rates, active agent count, and resource utilization. Monthly usage reports track API consumption across all service providers to identify cost optimization opportunities.
 

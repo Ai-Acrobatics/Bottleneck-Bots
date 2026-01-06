@@ -21,7 +21,7 @@ This document provides step-by-step response procedures for critical production 
    - If yes, and started immediately after: **Consider rollback**
 
 3. **Check external dependencies**
-   - Database status (Neon dashboard)
+   - Database status (Supabase dashboard)
    - Redis status (Upstash dashboard)
    - Stripe API status
    - Third-party API health
@@ -120,7 +120,7 @@ vercel logs --meta
 **Alert Trigger:** Any database connection error
 
 ### Immediate Actions
-1. **Check Neon dashboard** for service status
+1. **Check Supabase dashboard** for service status
 2. **Verify connection string** is correct
 3. **Test connection** from Vercel deployment
    ```bash
@@ -146,10 +146,10 @@ try {
 DATABASE_URL=postgresql://...?sslmode=require&ssl=true
 ```
 
-#### Neon Project Suspended
-- Check billing status in Neon dashboard
+#### Supabase Project Paused
+- Check billing status in Supabase dashboard
 - Upgrade plan if free tier limit exceeded
-- Contact Neon support for critical issues
+- Contact Supabase support for critical issues
 
 ---
 
@@ -348,6 +348,6 @@ After resolving any critical alert:
 
 - [Sentry Dashboard](https://sentry.io/organizations/[org]/projects/bottleneck-bots/)
 - [Vercel Dashboard](https://vercel.com/[team]/bottleneck-bots)
-- [Neon Dashboard](https://console.neon.tech/)
+- [Supabase Dashboard](https://supabase.com/dashboard)
 - [Upstash Dashboard](https://console.upstash.com/)
 - [Incident Log Template](./INCIDENT_LOG_TEMPLATE.md)

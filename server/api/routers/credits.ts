@@ -17,8 +17,6 @@ import Stripe from "stripe";
  * - Transaction history
  * - Admin: create packages, adjust credits
  * - Usage statistics
- *
- * PLACEHOLDER: userId is hardcoded to 1 until authentication is implemented
  */
 
 // ========================================
@@ -89,9 +87,8 @@ export const creditsRouter = router({
   /**
    * Get user's credit balances for all types
    */
-  getBalances: publicProcedure.query(async () => {
-    // PLACEHOLDER: Replace with actual userId from auth context
-    const userId = 1;
+  getBalances: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
 
     const creditService = new CreditService();
 
@@ -114,11 +111,10 @@ export const creditsRouter = router({
   /**
    * Get balance for a specific credit type
    */
-  getBalance: publicProcedure
+  getBalance: protectedProcedure
     .input(z.object({ creditType: creditTypeEnum }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const creditService = new CreditService();
 
@@ -262,11 +258,10 @@ export const creditsRouter = router({
    * Purchase credits
    * PLACEHOLDER: Stripe integration required for actual payment processing
    */
-  purchaseCredits: publicProcedure
+  purchaseCredits: protectedProcedure
     .input(purchaseCreditsSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -352,11 +347,10 @@ export const creditsRouter = router({
    * Create Stripe Checkout Session for credit purchase
    * Returns a checkout URL that the user should be redirected to
    */
-  createCheckoutSession: publicProcedure
+  createCheckoutSession: protectedProcedure
     .input(createCheckoutSessionSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeSecretKey) {
@@ -450,11 +444,10 @@ export const creditsRouter = router({
   /**
    * Get transaction history
    */
-  getTransactionHistory: publicProcedure
+  getTransactionHistory: protectedProcedure
     .input(transactionHistorySchema)
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const creditService = new CreditService();
 
@@ -510,11 +503,10 @@ export const creditsRouter = router({
   /**
    * Get usage statistics
    */
-  getUsageStats: publicProcedure
+  getUsageStats: protectedProcedure
     .input(usageStatsSchema)
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const creditService = new CreditService();
 
@@ -572,16 +564,15 @@ export const creditsRouter = router({
   /**
    * Check if user has sufficient credits
    */
-  checkBalance: publicProcedure
+  checkBalance: protectedProcedure
     .input(
       z.object({
         creditType: creditTypeEnum,
         required: z.number().int().positive(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const creditService = new CreditService();
 

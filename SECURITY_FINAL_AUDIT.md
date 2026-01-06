@@ -710,7 +710,7 @@ app.use((err, req, res, next) => {
 _pool = new Pool({
   connectionString: dbUrl,
   ssl: {
-    rejectUnauthorized: false,  // For Neon/managed databases
+    rejectUnauthorized: false,  // For Supabase/managed databases
   },
   max: 10,
   idleTimeoutMillis: 30000,

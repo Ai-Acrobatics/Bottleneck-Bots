@@ -1,30 +1,101 @@
 /**
  * Unit Tests for Webhook Receiver Service
  *
- * Tests SMS webhook handling (Twilio format), email webhooks,
- * custom webhook handling, authentication validation,
- * and conversation creation/retrieval
+ * Tests webhook processing, authentication validation,
+ * and conversation management
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { webhookReceiverService } from "./webhookReceiver.service";
-import { createTestDb } from "@/__tests__/helpers/test-db";
-import { mockEnv } from "@/__tests__/helpers/test-helpers";
+import { WebhookReceiverService } from "./webhookReceiver.service";
 
 // Mock dependencies
 vi.mock("@/server/db");
-vi.mock("crypto", () => ({
-  createHmac: vi.fn(() => ({
-    update: vi.fn().mockReturnThis(),
-    digest: vi.fn(() => "test-signature"),
-  })),
-}));
+vi.mock("./messageProcessing.service", () => {
+  const MockMessageProcessingService = function(this: any) {
+    this.processMessage = vi.fn().mockResolvedValue({ taskId: 1, reply: "Auto-reply" });
+  };
+  return {
+    MessageProcessingService: MockMessageProcessingService,
+  };
+});
+
+// Helper: Create test database mock
+function createTestDb(config: {
+  selectResponse?: any[];
+  insertResponse?: any[];
+  updateResponse?: any[];
+} = {}) {
+  const { selectResponse = [], insertResponse = [], updateResponse = [] } = config;
+
+  const createChainableQuery = (response: any) => {
+    const chain: any = {
+      from: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      orderBy: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      offset: vi.fn(() => chain),
+      innerJoin: vi.fn(() => chain),
+      leftJoin: vi.fn(() => chain),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
+      },
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  const createInsertChain = (response: any) => {
+    const chain: any = {
+      values: vi.fn(() => chain),
+      returning: vi.fn(() => Promise.resolve(response)),
+      onConflictDoUpdate: vi.fn(() => chain),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
+      },
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  const createUpdateChain = (response: any) => {
+    const chain: any = {
+      set: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      returning: vi.fn(() => Promise.resolve(response)),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
+      },
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  return {
+    select: vi.fn(() => createChainableQuery(selectResponse)),
+    insert: vi.fn(() => createInsertChain(insertResponse)),
+    update: vi.fn(() => createUpdateChain(updateResponse)),
+    delete: vi.fn(() => createChainableQuery([])),
+  };
+}
+
+// Helper: Mock environment variables
+function mockEnv(vars: Record<string, string>): () => void {
+  const originalEnv = { ...process.env };
+  Object.entries(vars).forEach(([key, value]) => {
+    process.env[key] = value;
+  });
+  return () => {
+    process.env = originalEnv;
+  };
+}
 
 describe("Webhook Receiver Service", () => {
   let restoreEnv: () => void;
+  let webhookService: WebhookReceiverService;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    webhookService = new WebhookReceiverService();
 
     restoreEnv = mockEnv({
       TWILIO_AUTH_TOKEN: "test-twilio-token",
@@ -38,877 +109,425 @@ describe("Webhook Receiver Service", () => {
   });
 
   // ========================================
-  // TWILIO SMS WEBHOOK TESTS
+  // WEBHOOK PROCESSING TESTS
   // ========================================
 
-  describe("handleTwilioSmsWebhook", () => {
-    it("should parse valid Twilio SMS payload", async () => {
-      const twilioPayload = {
-        MessageSid: "SM1234567890abcdef1234567890abcdef",
-        AccountSid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        MessagingServiceSid: "MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        From: "+1234567890",
-        To: "+0987654321",
-        Body: "Hello, this is a test message",
-        NumMedia: "0",
+  describe("processWebhook", () => {
+    it("should return error when webhook not found", async () => {
+      const db = createTestDb({ selectResponse: [] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.processWebhook(
+        "non-existent-token",
+        { Body: "Test message" },
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Webhook not found");
+    });
+
+    it("should return error when webhook is inactive", async () => {
+      const inactiveWebhook = {
+        id: 1,
+        webhookToken: "test-token",
+        isActive: false,
+        channelType: "sms",
+        userId: 1,
+      };
+
+      const db = createTestDb({ selectResponse: [inactiveWebhook] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.processWebhook(
+        "test-token",
+        { Body: "Test message" },
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Webhook is inactive");
+    });
+
+    it("should process valid SMS webhook", async () => {
+      const activeWebhook = {
+        id: 1,
+        webhookToken: "test-token",
+        isActive: true,
+        channelType: "sms",
+        userId: 1,
+        providerConfig: null,
+        totalMessagesReceived: 0,
+      };
+
+      const conversation = {
+        id: 1,
+        userId: 1,
+        webhookId: 1,
+        participantIdentifier: "+1234567890",
+        status: "active",
+        messageCount: 0,
+      };
+
+      const message = {
+        id: 1,
+        webhookId: 1,
+        userId: 1,
+        conversationId: 1,
+        content: "Test message",
       };
 
       const db = createTestDb({
-        insertResponse: [
-          {
-            id: 1,
-            webhookId: "webhook-1",
-            type: "sms",
-            from: "+1234567890",
-            to: "+0987654321",
-            body: "Hello, this is a test message",
-            payload: twilioPayload,
-            status: "received",
-            createdAt: new Date(),
+        selectResponse: [activeWebhook],
+        insertResponse: [message],
+        updateResponse: [{ ...activeWebhook, totalMessagesReceived: 1 }],
+      });
+
+      // Mock select to return different results on subsequent calls
+      let selectCallCount = 0;
+      db.select.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          // First call: find webhook
+          return createChainableQuery([activeWebhook]);
+        } else {
+          // Subsequent calls: find conversation (return empty to create new)
+          return createChainableQuery([]);
+        }
+      });
+
+      function createChainableQuery(response: any) {
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          then: (resolve: (value: any) => void) => {
+            resolve(response);
+            return Promise.resolve(response);
           },
-        ],
+        };
+        return Object.assign(Promise.resolve(response), chain);
+      }
+
+      // Mock insert to return conversation then message
+      let insertCallCount = 0;
+      db.insert.mockImplementation(() => {
+        insertCallCount++;
+        const response = insertCallCount === 1 ? [conversation] : [message];
+        const chain: any = {
+          values: vi.fn(() => chain),
+          returning: vi.fn(() => Promise.resolve(response)),
+        };
+        return chain;
       });
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await webhookReceiverService.handleTwilioSmsWebhook(
-        "webhook-1",
-        twilioPayload as any
-      );
-
-      expect(result.type).toBe("sms");
-      expect(result.from).toBe("+1234567890");
-      expect(result.body).toBe("Hello, this is a test message");
-    });
-
-    it("should validate Twilio webhook signature", async () => {
       const twilioPayload = {
-        MessageSid: "SM1234567890abcdef1234567890abcdef",
+        MessageSid: "SM1234567890",
+        AccountSid: "AC1234567890",
         From: "+1234567890",
+        To: "+0987654321",
         Body: "Test message",
       };
 
-      const db = createTestDb();
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
+      const result = await webhookService.processWebhook(
+        "test-token",
+        twilioPayload,
+        {}
       );
 
-      const result = await webhookReceiverService.validateTwilioSignature(
-        {
-          MessageSid: "SM1234567890abcdef1234567890abcdef",
-          From: "+1234567890",
-          Body: "Test message",
-        },
-        "test-signature",
-        "https://example.com/webhook"
-      );
-
-      expect(typeof result).toBe("boolean");
+      expect(result.success).toBe(true);
+      expect(result.messageId).toBeDefined();
     });
 
-    it("should handle Twilio webhook with media attachments", async () => {
-      const twilioPayload = {
-        MessageSid: "SM1234567890abcdef1234567890abcdef",
-        From: "+1234567890",
-        To: "+0987654321",
-        Body: "Check out this image",
-        NumMedia: "1",
-        MediaUrl0: "https://example.com/image.jpg",
-        MediaContentType0: "image/jpeg",
-      };
-
-      const message = {
+    it("should handle authentication failure", async () => {
+      const webhookWithAuth = {
         id: 1,
-        webhookId: "webhook-1",
-        type: "sms",
-        from: "+1234567890",
-        body: "Check out this image",
-        mediaAttachments: [
-          {
-            url: "https://example.com/image.jpg",
-            contentType: "image/jpeg",
-          },
-        ],
-      };
-
-      const db = createTestDb({
-        insertResponse: [message],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleTwilioSmsWebhook(
-        "webhook-1",
-        twilioPayload as any
-      );
-
-      expect(result.mediaAttachments).toBeDefined();
-      expect(result.mediaAttachments?.length).toBe(1);
-    });
-
-    it("should extract phone numbers and normalize them", async () => {
-      const twilioPayload = {
-        From: "+12025551234",
-        To: "+12025555678",
-        Body: "Test",
-      };
-
-      const db = createTestDb({
-        insertResponse: [
-          {
-            from: "+12025551234",
-            to: "+12025555678",
-          },
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleTwilioSmsWebhook(
-        "webhook-1",
-        twilioPayload as any
-      );
-
-      expect(result.from).toMatch(/^\+1\d{10}$/);
-    });
-
-    it("should identify conversation participant from phone number", async () => {
-      const conversation = {
-        id: 1,
-        userId: 1,
-        participants: [
-          { phoneNumber: "+1234567890", name: "John Doe" },
-        ],
-      };
-
-      const twilioPayload = {
-        From: "+1234567890",
-        Body: "Message from known contact",
-      };
-
-      const db = createTestDb({
-        selectResponse: [conversation],
-        insertResponse: [
-          {
-            conversationId: 1,
-            from: "+1234567890",
-            body: "Message from known contact",
-          },
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleTwilioSmsWebhook(
-        "webhook-1",
-        twilioPayload as any
-      );
-
-      expect(result).toBeDefined();
-    });
-  });
-
-  // ========================================
-  // EMAIL WEBHOOK TESTS
-  // ========================================
-
-  describe("handleEmailWebhook", () => {
-    it("should parse email webhook payload", async () => {
-      const emailPayload = {
-        MessageId: "email-123",
-        From: "sender@example.com",
-        To: "recipient@example.com",
-        Subject: "Test Email",
-        HtmlBody: "<p>This is a test email</p>",
-        TextBody: "This is a test email",
-        Timestamp: "2024-01-15T10:30:00Z",
-      };
-
-      const message = {
-        id: 1,
-        webhookId: "webhook-2",
-        type: "email",
-        from: "sender@example.com",
-        to: "recipient@example.com",
-        subject: "Test Email",
-        body: "This is a test email",
-        htmlBody: "<p>This is a test email</p>",
-      };
-
-      const db = createTestDb({
-        insertResponse: [message],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleEmailWebhook(
-        "webhook-2",
-        emailPayload as any
-      );
-
-      expect(result.type).toBe("email");
-      expect(result.from).toBe("sender@example.com");
-      expect(result.subject).toBe("Test Email");
-    });
-
-    it("should handle email with attachments", async () => {
-      const emailPayload = {
-        MessageId: "email-456",
-        From: "sender@example.com",
-        To: "recipient@example.com",
-        Subject: "Email with attachment",
-        TextBody: "See attached file",
-        Attachments: [
-          {
-            Name: "document.pdf",
-            Content: "base64-encoded-content",
-            ContentType: "application/pdf",
-          },
-        ],
-      };
-
-      const message = {
-        id: 1,
-        webhookId: "webhook-2",
-        type: "email",
-        from: "sender@example.com",
-        attachments: [
-          {
-            name: "document.pdf",
-            contentType: "application/pdf",
-            size: 1024,
-          },
-        ],
-      };
-
-      const db = createTestDb({
-        insertResponse: [message],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleEmailWebhook(
-        "webhook-2",
-        emailPayload as any
-      );
-
-      expect(result.attachments).toBeDefined();
-      expect(result.attachments?.length).toBeGreaterThan(0);
-    });
-
-    it("should extract email addresses and validate format", async () => {
-      const emailPayload = {
-        From: "sender+tag@example.com",
-        To: "recipient@sub.example.com",
-        Subject: "Test",
-        TextBody: "Test email",
-      };
-
-      const db = createTestDb({
-        insertResponse: [
-          {
-            from: "sender+tag@example.com",
-            to: "recipient@sub.example.com",
-          },
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleEmailWebhook(
-        "webhook-2",
-        emailPayload as any
-      );
-
-      expect(result.from).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-    });
-
-    it("should prefer HTML body when available", async () => {
-      const emailPayload = {
-        From: "sender@example.com",
-        To: "recipient@example.com",
-        Subject: "HTML Email",
-        HtmlBody: "<h1>Rich content</h1><p>HTML formatted</p>",
-        TextBody: "Plain text fallback",
-      };
-
-      const db = createTestDb({
-        insertResponse: [
-          {
-            htmlBody: "<h1>Rich content</h1><p>HTML formatted</p>",
-          },
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleEmailWebhook(
-        "webhook-2",
-        emailPayload as any
-      );
-
-      expect(result.htmlBody).toBe(
-        "<h1>Rich content</h1><p>HTML formatted</p>"
-      );
-    });
-  });
-
-  // ========================================
-  // CUSTOM WEBHOOK TESTS
-  // ========================================
-
-  describe("handleCustomWebhook", () => {
-    it("should parse custom webhook payload", async () => {
-      const customPayload = {
-        event_type: "order_completed",
-        order_id: "123456",
-        customer_id: "cust-789",
-        amount: 99.99,
-        timestamp: "2024-01-15T10:30:00Z",
-      };
-
-      const message = {
-        id: 1,
-        webhookId: "webhook-3",
-        type: "custom",
-        payload: customPayload,
-        eventType: "order_completed",
-      };
-
-      const db = createTestDb({
-        insertResponse: [message],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleCustomWebhook(
-        "webhook-3",
-        customPayload as any
-      );
-
-      expect(result.type).toBe("custom");
-      expect(result.payload).toEqual(customPayload);
-    });
-
-    it("should validate custom webhook against expected schema", async () => {
-      const customPayload = {
-        event_type: "user_signup",
-        email: "newuser@example.com",
-        timestamp: "2024-01-15T10:30:00Z",
-      };
-
-      const schema = {
-        type: "object",
-        properties: {
-          event_type: { type: "string" },
-          email: { type: "string", format: "email" },
-        },
-        required: ["event_type"],
-      };
-
-      const isValid = await webhookReceiverService.validatePayloadSchema(
-        customPayload,
-        schema as any
-      );
-
-      expect(isValid).toBe(true);
-    });
-
-    it("should reject invalid custom webhook payload", async () => {
-      const invalidPayload = {
-        event_type: "test",
-        // Missing required email field
-      };
-
-      const schema = {
-        type: "object",
-        properties: {
-          event_type: { type: "string" },
-          email: { type: "string" },
-        },
-        required: ["event_type", "email"],
-      };
-
-      const isValid = await webhookReceiverService.validatePayloadSchema(
-        invalidPayload,
-        schema as any
-      );
-
-      expect(isValid).toBe(false);
-    });
-
-    it("should support nested payload structures", async () => {
-      const complexPayload = {
-        event: "transaction",
-        data: {
-          transaction_id: "tx-123",
-          user: {
-            id: "user-456",
-            email: "user@example.com",
-          },
-          items: [
-            { sku: "item-1", quantity: 2 },
-            { sku: "item-2", quantity: 1 },
-          ],
-        },
-      };
-
-      const db = createTestDb({
-        insertResponse: [
-          {
-            webhookId: "webhook-3",
-            payload: complexPayload,
-          },
-        ],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.handleCustomWebhook(
-        "webhook-3",
-        complexPayload as any
-      );
-
-      expect(result.payload.data.user.email).toBe("user@example.com");
-    });
-  });
-
-  // ========================================
-  // AUTHENTICATION VALIDATION TESTS
-  // ========================================
-
-  describe("validateAuthentication", () => {
-    it("should validate webhook token", async () => {
-      const webhook = {
-        id: "webhook-1",
-        token: "whk_test_token_123",
+        webhookToken: "test-token",
         isActive: true,
-      };
-
-      const db = createTestDb({
-        selectResponse: [webhook],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const isValid = await webhookReceiverService.validateWebhookToken(
-        "webhook-1",
-        "whk_test_token_123"
-      );
-
-      expect(isValid).toBe(true);
-    });
-
-    it("should reject invalid token", async () => {
-      const webhook = {
-        id: "webhook-1",
-        token: "whk_test_token_123",
-      };
-
-      const db = createTestDb({
-        selectResponse: [webhook],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const isValid = await webhookReceiverService.validateWebhookToken(
-        "webhook-1",
-        "whk_wrong_token"
-      );
-
-      expect(isValid).toBe(false);
-    });
-
-    it("should throw error if webhook not found", async () => {
-      const db = createTestDb({
-        selectResponse: [],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      await expect(
-        webhookReceiverService.validateWebhookToken("non-existent", "token")
-      ).rejects.toThrow("Webhook not found");
-    });
-
-    it("should validate inactive webhooks", async () => {
-      const inactiveWebhook = {
-        id: "webhook-1",
-        token: "whk_test_token_123",
-        isActive: false,
-      };
-
-      const db = createTestDb({
-        selectResponse: [inactiveWebhook],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const isValid = await webhookReceiverService.validateWebhookToken(
-        "webhook-1",
-        "whk_test_token_123"
-      );
-
-      expect(isValid).toBe(false);
-    });
-
-    it("should support API key authentication", async () => {
-      const webhook = {
-        id: "webhook-1",
-        apiKey: "sk_test_key_123",
-        authMethod: "api_key",
-      };
-
-      const db = createTestDb({
-        selectResponse: [webhook],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const isValid = await webhookReceiverService.validateApiKey(
-        "webhook-1",
-        "sk_test_key_123"
-      );
-
-      expect(isValid).toBe(true);
-    });
-  });
-
-  // ========================================
-  // CONVERSATION TESTS
-  // ========================================
-
-  describe("findOrCreateConversation", () => {
-    it("should find existing conversation by phone number", async () => {
-      const conversation = {
-        id: 1,
+        channelType: "sms",
         userId: 1,
-        type: "sms",
-        participantPhone: "+1234567890",
-        lastMessage: new Date(),
+        providerConfig: {
+          authType: "bearer",
+          authToken: "expected-token",
+        },
       };
 
-      const db = createTestDb({
-        selectResponse: [conversation],
-      });
-
+      const db = createTestDb({ selectResponse: [webhookWithAuth] });
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.processWebhook(
+        "test-token",
+        { Body: "Test" },
+        { authorization: "Bearer wrong-token" }
       );
 
-      const result = await webhookReceiverService.findOrCreateConversation({
-        type: "sms",
-        participantPhone: "+1234567890",
-        userId: 1,
-      });
-
-      expect(result.id).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Authentication failed");
     });
 
-    it("should create new conversation if not found", async () => {
-      const newConversation = {
-        id: 1,
+    it("should process email webhook", async () => {
+      const emailWebhook = {
+        id: 2,
+        webhookToken: "email-token",
+        isActive: true,
+        channelType: "email",
         userId: 1,
-        type: "sms",
-        participantPhone: "+1234567890",
-        createdAt: new Date(),
+        providerConfig: null,
+        totalMessagesReceived: 0,
       };
 
-      const db = createTestDb({
-        selectResponse: [],
-        insertResponse: [newConversation],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.findOrCreateConversation({
-        type: "sms",
-        participantPhone: "+1234567890",
-        userId: 1,
-      });
-
-      expect(result.id).toBe(1);
-      expect(result.createdAt).toBeDefined();
-    });
-
-    it("should find existing email conversation", async () => {
       const conversation = {
         id: 2,
         userId: 1,
-        type: "email",
-        participantEmail: "sender@example.com",
+        webhookId: 2,
+        participantIdentifier: "sender@example.com",
+        status: "active",
+      };
+
+      const message = {
+        id: 2,
+        webhookId: 2,
+        userId: 1,
+        conversationId: 2,
+        content: "Email body",
       };
 
       const db = createTestDb({
-        selectResponse: [conversation],
+        selectResponse: [emailWebhook],
+        insertResponse: [message],
+      });
+
+      let selectCallCount = 0;
+      db.select.mockImplementation(() => {
+        selectCallCount++;
+        const response = selectCallCount === 1 ? [emailWebhook] : [];
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          then: (resolve: (value: any) => void) => {
+            resolve(response);
+            return Promise.resolve(response);
+          },
+        };
+        return Object.assign(Promise.resolve(response), chain);
+      });
+
+      let insertCallCount = 0;
+      db.insert.mockImplementation(() => {
+        insertCallCount++;
+        const response = insertCallCount === 1 ? [conversation] : [message];
+        const chain: any = {
+          values: vi.fn(() => chain),
+          returning: vi.fn(() => Promise.resolve(response)),
+        };
+        return chain;
       });
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const emailPayload = {
+        messageId: "email-123",
+        from: "sender@example.com",
+        to: "recipient@example.com",
+        subject: "Test Email",
+        body: "Email body",
+      };
+
+      const result = await webhookService.processWebhook(
+        "email-token",
+        emailPayload,
+        {}
       );
 
-      const result = await webhookReceiverService.findOrCreateConversation({
-        type: "email",
-        participantEmail: "sender@example.com",
-        userId: 1,
-      });
-
-      expect(result.id).toBe(2);
-      expect(result.participantEmail).toBe("sender@example.com");
+      expect(result.success).toBe(true);
     });
 
-    it("should update conversation timestamp on message received", async () => {
-      const conversation = {
-        id: 1,
+    it("should process custom webhook", async () => {
+      const customWebhook = {
+        id: 3,
+        webhookToken: "custom-token",
+        isActive: true,
+        channelType: "custom_webhook",
         userId: 1,
-        type: "sms",
-        participantPhone: "+1234567890",
-        lastMessage: new Date("2024-01-01T10:00:00Z"),
+        providerConfig: null,
+        totalMessagesReceived: 0,
       };
 
-      const updatedConversation = {
-        ...conversation,
-        lastMessage: new Date("2024-01-15T10:30:00Z"),
+      const conversation = {
+        id: 3,
+        userId: 1,
+        webhookId: 3,
+        participantIdentifier: "custom-sender",
+        status: "active",
+      };
+
+      const message = {
+        id: 3,
+        webhookId: 3,
+        userId: 1,
+        conversationId: 3,
       };
 
       const db = createTestDb({
-        selectResponse: [conversation],
-        updateResponse: [updatedConversation],
+        selectResponse: [customWebhook],
+        insertResponse: [message],
+      });
+
+      let selectCallCount = 0;
+      db.select.mockImplementation(() => {
+        selectCallCount++;
+        const response = selectCallCount === 1 ? [customWebhook] : [];
+        const chain: any = {
+          from: vi.fn(() => chain),
+          where: vi.fn(() => chain),
+          orderBy: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          then: (resolve: (value: any) => void) => {
+            resolve(response);
+            return Promise.resolve(response);
+          },
+        };
+        return Object.assign(Promise.resolve(response), chain);
+      });
+
+      let insertCallCount = 0;
+      db.insert.mockImplementation(() => {
+        insertCallCount++;
+        const response = insertCallCount === 1 ? [conversation] : [message];
+        const chain: any = {
+          values: vi.fn(() => chain),
+          returning: vi.fn(() => Promise.resolve(response)),
+        };
+        return chain;
       });
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const customPayload = {
+        sender: "custom-sender",
+        content: "Custom message content",
+      };
+
+      const result = await webhookService.processWebhook(
+        "custom-token",
+        customPayload,
+        {}
       );
 
-      const result = await webhookReceiverService.findOrCreateConversation({
-        type: "sms",
-        participantPhone: "+1234567890",
-        userId: 1,
-      });
+      expect(result.success).toBe(true);
+    });
 
-      expect(result.id).toBe(1);
+    it("should return error for unknown channel type", async () => {
+      const unknownWebhook = {
+        id: 4,
+        webhookToken: "unknown-token",
+        isActive: true,
+        channelType: "unknown",
+        userId: 1,
+        providerConfig: null,
+      };
+
+      const db = createTestDb({ selectResponse: [unknownWebhook] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.processWebhook(
+        "unknown-token",
+        {},
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unknown channel type");
     });
   });
 
   // ========================================
-  // MESSAGE LOGGING TESTS
+  // SEND REPLY TESTS
   // ========================================
 
-  describe("logMessage", () => {
-    it("should log inbound message to database", async () => {
-      const message = {
+  describe("sendReply", () => {
+    it("should return error when webhook not found", async () => {
+      const db = createTestDb({ selectResponse: [] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.sendReply(
+        999,
+        "+1234567890",
+        "Reply message"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Webhook not found");
+    });
+
+    it("should return error when outbound is disabled", async () => {
+      const webhook = {
         id: 1,
-        webhookId: "webhook-1",
-        conversationId: 1,
-        type: "sms",
-        from: "+1234567890",
-        body: "Test message",
-        status: "received",
-        createdAt: new Date(),
+        outboundEnabled: false,
+        userId: 1,
+      };
+
+      const db = createTestDb({ selectResponse: [webhook] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await webhookService.sendReply(
+        1,
+        "+1234567890",
+        "Reply message"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Outbound messaging is disabled");
+    });
+
+    it("should send reply successfully", async () => {
+      const webhook = {
+        id: 1,
+        outboundEnabled: true,
+        userId: 1,
+        totalMessagesSent: 0,
+      };
+
+      const outboundMessage = {
+        id: 1,
+        webhookId: 1,
+        userId: 1,
+        content: "Reply message",
+        recipientIdentifier: "+1234567890",
+        deliveryStatus: "pending",
       };
 
       const db = createTestDb({
-        insertResponse: [message],
+        selectResponse: [webhook],
+        insertResponse: [outboundMessage],
+        updateResponse: [{ ...outboundMessage, deliveryStatus: "sent" }],
       });
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await webhookReceiverService.logMessage(
-        "webhook-1",
+      const result = await webhookService.sendReply(
         1,
-        {
-          type: "sms",
-          from: "+1234567890",
-          body: "Test message",
-        }
+        "+1234567890",
+        "Reply message"
       );
 
-      expect(result.id).toBe(1);
-      expect(result.status).toBe("received");
-    });
-
-    it("should include message metadata", async () => {
-      const message = {
-        id: 1,
-        webhookId: "webhook-1",
-        type: "custom",
-        payload: { test: true },
-        metadata: {
-          sourceIP: "192.168.1.1",
-          userAgent: "Custom/1.0",
-        },
-      };
-
-      const db = createTestDb({
-        insertResponse: [message],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await webhookReceiverService.logMessage(
-        "webhook-1",
-        null,
-        {
-          type: "custom",
-          payload: { test: true },
-        },
-        {
-          sourceIP: "192.168.1.1",
-          userAgent: "Custom/1.0",
-        }
-      );
-
-      expect(result.metadata).toBeDefined();
-    });
-  });
-
-  // ========================================
-  // INTEGRATION TESTS
-  // ========================================
-
-  describe("Integration", () => {
-    it("should handle complete SMS webhook flow", async () => {
-      const twilioPayload = {
-        MessageSid: "SM1234567890",
-        From: "+1234567890",
-        To: "+0987654321",
-        Body: "Customer inquiry",
-      };
-
-      // Step 1: Handle webhook
-      let db = createTestDb({
-        insertResponse: [
-          {
-            id: 1,
-            webhookId: "webhook-1",
-            from: "+1234567890",
-            body: "Customer inquiry",
-          },
-        ],
-      });
-
-      let dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const message = await webhookReceiverService.handleTwilioSmsWebhook(
-        "webhook-1",
-        twilioPayload as any
-      );
-
-      expect(message.from).toBe("+1234567890");
-
-      // Step 2: Find or create conversation
-      const conversation = {
-        id: 1,
-        userId: 1,
-        type: "sms",
-        participantPhone: "+1234567890",
-      };
-
-      db = createTestDb({
-        selectResponse: [conversation],
-      });
-
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const conv = await webhookReceiverService.findOrCreateConversation({
-        type: "sms",
-        participantPhone: "+1234567890",
-        userId: 1,
-      });
-
-      expect(conv.id).toBe(1);
-
-      // Step 3: Log message
-      db = createTestDb({
-        insertResponse: [
-          {
-            id: 1,
-            webhookId: "webhook-1",
-            conversationId: 1,
-            body: "Customer inquiry",
-          },
-        ],
-      });
-
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const logged = await webhookReceiverService.logMessage(
-        "webhook-1",
-        1,
-        {
-          type: "sms",
-          from: "+1234567890",
-          body: "Customer inquiry",
-        }
-      );
-
-      expect(logged.conversationId).toBe(1);
+      expect(result.success).toBe(true);
+      expect(result.messageId).toBeDefined();
     });
   });
 });

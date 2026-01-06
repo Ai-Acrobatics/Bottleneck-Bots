@@ -31,7 +31,7 @@ Bottleneck Bot is a white-label SaaS platform that enables agencies to automate 
 **Backend:**
 - Node.js + Express 4
 - tRPC 11 for end-to-end type safety
-- Drizzle ORM + Neon PostgreSQL
+- Drizzle ORM + Supabase PostgreSQL
 - S3-compatible storage for assets
 
 **Automation:**
@@ -94,7 +94,7 @@ bottleneck-bot/
 
 - Node.js 22+
 - pnpm package manager
-- PostgreSQL database (Neon recommended)
+- PostgreSQL database (Supabase recommended)
 - GitHub account
 - Vercel account
 
@@ -220,7 +220,7 @@ Five production-ready n8n workflows are included in `/n8n-workflows/`:
 
 **Cost Breakdown:**
 - Browserbase: $20-500/month (based on session volume)
-- Neon PostgreSQL: $19-69/month
+- Supabase PostgreSQL: Free tier available, Pro $25/month
 - Google Gemini API: $50-200/month
 - 1Password: $20-60/month
 - n8n: $20-80/month (self-hosted) or $50-250/month (cloud)

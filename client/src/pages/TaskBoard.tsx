@@ -604,6 +604,8 @@ export function TaskBoard() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [deferDialogOpen, setDeferDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [viewTaskId, setViewTaskId] = useState<number | null>(null);
 
   // Fetch data
   const statsQuery = trpc.agencyTasks.getStats.useQuery();
@@ -681,8 +683,8 @@ export function TaskBoard() {
   };
 
   const handleView = (id: number) => {
-    // TODO: Open task detail modal or navigate to task detail page
-    console.log('View task:', id);
+    setViewTaskId(id);
+    setDetailDialogOpen(true);
   };
 
   const handleRefresh = () => {

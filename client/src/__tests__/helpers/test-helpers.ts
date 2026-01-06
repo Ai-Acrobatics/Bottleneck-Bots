@@ -147,7 +147,7 @@ export function createMockIntegration(overrides?: any) {
  */
 export function createMockWebhook(overrides?: any) {
   return {
-    id: "webhook-uuid-123",
+    id: "550e8400-e29b-41d4-a716-446655440000",
     name: "Test Webhook",
     url: "https://example.com/webhook",
     events: ["quiz.completed", "workflow.executed"],

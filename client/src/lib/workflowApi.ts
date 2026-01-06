@@ -3,10 +3,72 @@
  * Connects the workflow builder with the backend tRPC API
  */
 
-import type { Workflow, WorkflowNode, WorkflowEdge } from '@/types/workflow';
+import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowExecutionResult } from '@/types/workflow';
+import { trpcClient } from '@/lib/trpc';
 
-// PLACEHOLDER: Replace with actual tRPC client when available
-// import { trpc } from '@/lib/trpc';
+/**
+ * Step type mapping from ReactFlow node types to backend step types
+ */
+type BackendStepType = 'navigate' | 'act' | 'observe' | 'extract' | 'wait' | 'condition' | 'loop' | 'apiCall' | 'notification';
+
+/**
+ * Map ReactFlow node type to backend step type
+ */
+function mapNodeTypeToStepType(nodeType: string): BackendStepType {
+  const typeMap: Record<string, BackendStepType> = {
+    'navigate': 'navigate',
+    'click': 'act',
+    'input': 'act',
+    'scroll': 'act',
+    'extract': 'extract',
+    'wait': 'wait',
+    'condition': 'condition',
+    'loop': 'loop',
+    'api_call': 'apiCall',
+    'variable': 'act',
+    'transform': 'act',
+    'screenshot': 'observe',
+  };
+  return typeMap[nodeType] || 'act';
+}
+
+/**
+ * Convert ReactFlow nodes to backend step format
+ */
+function nodesToSteps(nodes: WorkflowNode[]) {
+  return nodes.map((node, index) => ({
+    type: mapNodeTypeToStepType(node.data.type) as BackendStepType,
+    order: index,
+    config: {
+      // Navigation
+      url: 'url' in node.data ? node.data.url : undefined,
+      // Action
+      instruction: node.data.label,
+      // Observation
+      observeInstruction: node.data.description,
+      // Extraction
+      extractInstruction: 'extractType' in node.data ? node.data.label : undefined,
+      schemaType: 'custom' as const,
+      // Wait
+      waitMs: 'duration' in node.data ? node.data.duration : undefined,
+      selector: 'selector' in node.data ? node.data.selector : undefined,
+      // Condition
+      condition: 'condition' in node.data ? node.data.condition : undefined,
+      // Loop
+      items: 'arrayVariable' in node.data ? [] : undefined,
+      // API Call
+      method: 'method' in node.data ? node.data.method : undefined,
+      headers: 'headers' in node.data ? node.data.headers : undefined,
+      body: 'body' in node.data ? node.data.body : undefined,
+      saveAs: 'variableName' in node.data ? node.data.variableName : undefined,
+      // Notification
+      message: node.data.description,
+      type: 'info' as const,
+      // Common
+      continueOnError: node.data.errorHandling?.continueOnError || false,
+    },
+  }));
+}
 
 /**
  * Convert ReactFlow format to database format
@@ -15,12 +77,7 @@ function workflowToDbFormat(workflow: Workflow) {
   return {
     name: workflow.name,
     description: workflow.description,
-    category: workflow.category || 'custom',
-    steps: workflow.nodes,
-    edges: workflow.edges,
-    version: workflow.version,
-    isTemplate: workflow.isTemplate || false,
-    tags: workflow.tags || [],
+    steps: nodesToSteps(workflow.nodes),
   };
 }
 

@@ -18,7 +18,7 @@ import { CreditService } from "../../services/credit.service";
  * - Track call status, outcomes, and recordings
  * - Call analytics and reporting
  *
- * PLACEHOLDER: userId is hardcoded to 1 until authentication is implemented
+ * All procedures require authentication via protectedProcedure
  */
 
 // ========================================
@@ -95,11 +95,10 @@ export const aiCallingRouter = router({
   /**
    * Create a new AI call campaign
    */
-  createCampaign: publicProcedure
+  createCampaign: protectedProcedure
     .input(createCampaignSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -153,7 +152,7 @@ export const aiCallingRouter = router({
   /**
    * Get all campaigns for user
    */
-  getCampaigns: publicProcedure
+  getCampaigns: protectedProcedure
     .input(
       z.object({
         limit: z.number().int().positive().default(50),
@@ -161,9 +160,8 @@ export const aiCallingRouter = router({
         status: campaignStatusEnum.optional(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -209,11 +207,10 @@ export const aiCallingRouter = router({
   /**
    * Get a single campaign by ID
    */
-  getCampaign: publicProcedure
+  getCampaign: protectedProcedure
     .input(z.object({ campaignId: z.number().int() }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -242,11 +239,10 @@ export const aiCallingRouter = router({
   /**
    * Update a campaign
    */
-  updateCampaign: publicProcedure
+  updateCampaign: protectedProcedure
     .input(updateCampaignSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -297,11 +293,10 @@ export const aiCallingRouter = router({
   /**
    * Start a campaign
    */
-  startCampaign: publicProcedure
+  startCampaign: protectedProcedure
     .input(z.object({ campaignId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -350,11 +345,10 @@ export const aiCallingRouter = router({
   /**
    * Pause a campaign
    */
-  pauseCampaign: publicProcedure
+  pauseCampaign: protectedProcedure
     .input(z.object({ campaignId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -392,11 +386,10 @@ export const aiCallingRouter = router({
   /**
    * Make a call to a lead
    */
-  makeCall: publicProcedure
+  makeCall: protectedProcedure
     .input(makeCallSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -545,7 +538,7 @@ export const aiCallingRouter = router({
   /**
    * Get calls for a campaign
    */
-  getCalls: publicProcedure
+  getCalls: protectedProcedure
     .input(
       z.object({
         campaignId: z.number().int(),
@@ -554,9 +547,8 @@ export const aiCallingRouter = router({
         status: callStatusEnum.optional(),
       })
     )
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -616,11 +608,10 @@ export const aiCallingRouter = router({
   /**
    * Get a single call by ID
    */
-  getCall: publicProcedure
+  getCall: protectedProcedure
     .input(z.object({ callId: z.number().int() }))
-    .query(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -649,11 +640,10 @@ export const aiCallingRouter = router({
   /**
    * Update call details (outcome, notes)
    */
-  updateCall: publicProcedure
+  updateCall: protectedProcedure
     .input(updateCallSchema)
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -694,11 +684,10 @@ export const aiCallingRouter = router({
   /**
    * Sync call status from Vapi
    */
-  syncCallStatus: publicProcedure
+  syncCallStatus: protectedProcedure
     .input(z.object({ callId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {
@@ -784,11 +773,10 @@ export const aiCallingRouter = router({
   /**
    * Delete a campaign
    */
-  deleteCampaign: publicProcedure
+  deleteCampaign: protectedProcedure
     .input(z.object({ campaignId: z.number().int() }))
-    .mutation(async ({ input }) => {
-      // PLACEHOLDER: Replace with actual userId from auth context
-      const userId = 1;
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
 
       const db = await getDb();
       if (!db) {

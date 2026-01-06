@@ -53,9 +53,9 @@ curl -fsSL https://get.pnpm.io/install.sh | sh -
 ```
 
 **PostgreSQL Database**
-- **Recommended**: [Neon](https://neon.tech) serverless PostgreSQL (free tier available)
+- **Recommended**: [Supabase](https://supabase.com) PostgreSQL (free tier available)
 - **Alternative**: Local PostgreSQL 14+ installation
-- **Why Neon**: Serverless, auto-scaling, built-in connection pooling
+- **Why Supabase**: Serverless-compatible, auto-scaling, built-in connection pooling, authentication, and real-time features
 
 ### Required Accounts
 
@@ -67,8 +67,8 @@ curl -fsSL https://get.pnpm.io/install.sh | sh -
    - Sign up at [vercel.com](https://vercel.com)
    - Connect your GitHub account
 
-3. **Neon Database Account**
-   - Sign up at [neon.tech](https://neon.tech)
+3. **Supabase Database Account**
+   - Sign up at [supabase.com](https://supabase.com)
    - Create a project and database
 
 4. **AI API Keys** (at least one required)
@@ -160,18 +160,18 @@ Open `.env` in your editor and configure the following **required** variables:
 
 #### Database Configuration
 ```env
-# Neon PostgreSQL connection string
-DATABASE_URL=postgresql://user:password@host.neon.tech/dbname?sslmode=require
-
-# Format: postgresql://[user]:[password]@[host]/[database]?[options]
+# Supabase PostgreSQL connection string
+# Format: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
 ```
 
-**Getting your Neon connection string:**
-1. Log into [Neon Console](https://console.neon.tech)
+**Getting your Supabase connection string:**
+1. Log into [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select your project
-3. Go to "Connection Details"
-4. Copy the "Connection string" (select Node.js/Drizzle)
-5. Paste into your `.env` file
+3. Go to "Settings" > "Database"
+4. Copy the "Connection string" (use Transaction pooler mode for serverless, port 6543)
+5. Replace `[YOUR-PASSWORD]` with your database password
+6. Paste into your `.env` file
 
 #### Authentication
 ```env
@@ -335,7 +335,7 @@ pnpm db:migrate
 
 **View existing tables:**
 ```sql
--- Connect to your Neon database using psql or GUI tool
+-- Connect to your Supabase database using psql or GUI tool
 \dt
 ```
 
@@ -896,7 +896,7 @@ connect ECONNREFUSED
 
 **Solutions:**
 1. Verify `DATABASE_URL` in `.env`
-2. Check Neon database is active (not paused)
+2. Check Supabase database is active (project not paused)
 3. Ensure connection string includes `?sslmode=require`
 4. Test connection:
    ```bash
@@ -1033,7 +1033,7 @@ If you encounter issues not covered here:
 - [Tailwind CSS](https://tailwindcss.com)
 - [shadcn/ui](https://ui.shadcn.com)
 - [Vercel Deployment](https://vercel.com/docs)
-- [Neon Database](https://neon.tech/docs)
+- [Supabase Database](https://supabase.com/docs)
 
 ### Development Tools
 

@@ -12,7 +12,7 @@
  */
 
 import { z } from 'zod';
-import { publicProcedure, router } from '../../_core/trpc';
+import { protectedProcedure, router } from '../../_core/trpc';
 import { TRPCError } from '@trpc/server';
 import { knowledgeService } from '../../services/knowledge.service';
 
@@ -114,7 +114,7 @@ export const knowledgeRouter = router({
   /**
    * Get an action pattern by task type
    */
-  getPattern: publicProcedure
+  getPattern: protectedProcedure
     .input(z.object({ taskType: z.string() }))
     .query(async ({ input }) => {
       const pattern = await knowledgeService.getActionPattern(input.taskType);
@@ -127,7 +127,7 @@ export const knowledgeRouter = router({
   /**
    * List all action patterns
    */
-  listPatterns: publicProcedure.query(async () => {
+  listPatterns: protectedProcedure.query(async () => {
     const patterns = await knowledgeService.getAllPatterns();
     return {
       success: true,
@@ -139,7 +139,7 @@ export const knowledgeRouter = router({
   /**
    * Get top performing patterns
    */
-  getTopPatterns: publicProcedure
+  getTopPatterns: protectedProcedure
     .input(z.object({ limit: z.number().optional() }).optional())
     .query(async ({ input }) => {
       const patterns = await knowledgeService.getTopPerformingPatterns(input?.limit || 10);
@@ -152,7 +152,7 @@ export const knowledgeRouter = router({
   /**
    * Save an action pattern
    */
-  savePattern: publicProcedure
+  savePattern: protectedProcedure
     .input(actionPatternSchema)
     .mutation(async ({ input }) => {
       try {
@@ -176,7 +176,7 @@ export const knowledgeRouter = router({
   /**
    * Record pattern execution result
    */
-  recordPatternExecution: publicProcedure
+  recordPatternExecution: protectedProcedure
     .input(z.object({
       taskType: z.string(),
       success: z.boolean(),
@@ -192,7 +192,7 @@ export const knowledgeRouter = router({
   /**
    * Delete an action pattern
    */
-  deletePattern: publicProcedure
+  deletePattern: protectedProcedure
     .input(z.object({ taskType: z.string() }))
     .mutation(async ({ input }) => {
       const deleted = await knowledgeService.deletePattern(input.taskType);
@@ -215,7 +215,7 @@ export const knowledgeRouter = router({
   /**
    * Get selector for a page element
    */
-  getSelector: publicProcedure
+  getSelector: protectedProcedure
     .input(z.object({
       pagePath: z.string(),
       elementName: z.string(),
@@ -231,7 +231,7 @@ export const knowledgeRouter = router({
   /**
    * List selectors for a page
    */
-  listSelectorsForPage: publicProcedure
+  listSelectorsForPage: protectedProcedure
     .input(z.object({ pagePath: z.string() }))
     .query(async ({ input }) => {
       const selectors = await knowledgeService.getSelectorsForPage(input.pagePath);
@@ -245,7 +245,7 @@ export const knowledgeRouter = router({
   /**
    * List all selectors
    */
-  listAllSelectors: publicProcedure.query(async () => {
+  listAllSelectors: protectedProcedure.query(async () => {
     const selectors = await knowledgeService.getAllSelectors();
     return {
       success: true,
@@ -257,7 +257,7 @@ export const knowledgeRouter = router({
   /**
    * Save an element selector
    */
-  saveSelector: publicProcedure
+  saveSelector: protectedProcedure
     .input(elementSelectorSchema)
     .mutation(async ({ input }) => {
       try {
@@ -281,7 +281,7 @@ export const knowledgeRouter = router({
   /**
    * Record selector usage result
    */
-  recordSelectorUsage: publicProcedure
+  recordSelectorUsage: protectedProcedure
     .input(z.object({
       pagePath: z.string(),
       elementName: z.string(),
@@ -308,7 +308,7 @@ export const knowledgeRouter = router({
   /**
    * Record an error and get recovery strategies
    */
-  recordError: publicProcedure
+  recordError: protectedProcedure
     .input(z.object({
       errorType: z.string(),
       errorMessage: z.string(),
@@ -329,7 +329,7 @@ export const knowledgeRouter = router({
   /**
    * Record successful recovery from error
    */
-  recordRecoverySuccess: publicProcedure
+  recordRecoverySuccess: protectedProcedure
     .input(z.object({
       errorType: z.string(),
       context: z.string(),
@@ -350,7 +350,7 @@ export const knowledgeRouter = router({
   /**
    * Get error statistics
    */
-  getErrorStats: publicProcedure.query(async () => {
+  getErrorStats: protectedProcedure.query(async () => {
     const stats = await knowledgeService.getErrorStats();
     return {
       success: true,
@@ -365,7 +365,7 @@ export const knowledgeRouter = router({
   /**
    * Submit agent feedback
    */
-  submitFeedback: publicProcedure
+  submitFeedback: protectedProcedure
     .input(agentFeedbackSchema)
     .mutation(async ({ input }) => {
       try {
@@ -387,7 +387,7 @@ export const knowledgeRouter = router({
   /**
    * Get feedback entries
    */
-  getFeedback: publicProcedure
+  getFeedback: protectedProcedure
     .input(z.object({
       userId: z.number().optional(),
       taskType: z.string().optional(),
@@ -406,7 +406,7 @@ export const knowledgeRouter = router({
   /**
    * Get feedback statistics
    */
-  getFeedbackStats: publicProcedure.query(async () => {
+  getFeedbackStats: protectedProcedure.query(async () => {
     const stats = await knowledgeService.getFeedbackStats();
     return {
       success: true,
@@ -421,7 +421,7 @@ export const knowledgeRouter = router({
   /**
    * Get brand voice for a client
    */
-  getBrandVoice: publicProcedure
+  getBrandVoice: protectedProcedure
     .input(z.object({ clientId: z.number() }))
     .query(async ({ input }) => {
       const brandVoice = await knowledgeService.getBrandVoice(input.clientId);
@@ -434,7 +434,7 @@ export const knowledgeRouter = router({
   /**
    * List all brand voices
    */
-  listBrandVoices: publicProcedure.query(async () => {
+  listBrandVoices: protectedProcedure.query(async () => {
     const voices = await knowledgeService.getAllBrandVoices();
     return {
       success: true,
@@ -446,7 +446,7 @@ export const knowledgeRouter = router({
   /**
    * Save brand voice
    */
-  saveBrandVoice: publicProcedure
+  saveBrandVoice: protectedProcedure
     .input(brandVoiceSchema)
     .mutation(async ({ input }) => {
       try {
@@ -466,7 +466,7 @@ export const knowledgeRouter = router({
   /**
    * Generate brand prompt for content
    */
-  generateBrandPrompt: publicProcedure
+  generateBrandPrompt: protectedProcedure
     .input(z.object({
       clientId: z.number(),
       contentType: z.string(),
@@ -489,7 +489,7 @@ export const knowledgeRouter = router({
   /**
    * Get client context
    */
-  getClientContext: publicProcedure
+  getClientContext: protectedProcedure
     .input(z.object({ clientId: z.number() }))
     .query(async ({ input }) => {
       const context = await knowledgeService.getClientContext(input.clientId);
@@ -502,7 +502,7 @@ export const knowledgeRouter = router({
   /**
    * List all client contexts
    */
-  listClientContexts: publicProcedure.query(async () => {
+  listClientContexts: protectedProcedure.query(async () => {
     const contexts = await knowledgeService.getAllClientContexts();
     return {
       success: true,
@@ -514,7 +514,7 @@ export const knowledgeRouter = router({
   /**
    * Save client context
    */
-  saveClientContext: publicProcedure
+  saveClientContext: protectedProcedure
     .input(clientContextSchema)
     .mutation(async ({ input }) => {
       try {
@@ -534,7 +534,7 @@ export const knowledgeRouter = router({
   /**
    * Generate context prompt for agent
    */
-  generateContextPrompt: publicProcedure
+  generateContextPrompt: protectedProcedure
     .input(z.object({ clientId: z.number() }))
     .query(async ({ input }) => {
       const prompt = await knowledgeService.generateContextPrompt(input.clientId);
@@ -547,7 +547,7 @@ export const knowledgeRouter = router({
   /**
    * Update client history metrics
    */
-  updateClientHistory: publicProcedure
+  updateClientHistory: protectedProcedure
     .input(z.object({
       clientId: z.number(),
       taskCompleted: z.boolean(),
@@ -572,7 +572,7 @@ export const knowledgeRouter = router({
   /**
    * Get system-wide statistics
    */
-  getSystemStats: publicProcedure.query(async () => {
+  getSystemStats: protectedProcedure.query(async () => {
     const stats = await knowledgeService.getSystemStats();
     return {
       success: true,
@@ -583,7 +583,7 @@ export const knowledgeRouter = router({
   /**
    * Get pattern recommendations for a task
    */
-  getRecommendations: publicProcedure
+  getRecommendations: protectedProcedure
     .input(z.object({
       taskDescription: z.string(),
       clientId: z.number().optional(),
@@ -602,7 +602,7 @@ export const knowledgeRouter = router({
   /**
    * Health check for knowledge service
    */
-  health: publicProcedure.query(async () => {
+  health: protectedProcedure.query(async () => {
     const stats = await knowledgeService.getSystemStats();
     return {
       success: true,

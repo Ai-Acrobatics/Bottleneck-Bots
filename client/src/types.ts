@@ -85,7 +85,7 @@ export interface AgentStep {
 export interface IntegrationStatus {
   notion: boolean;
   slack: boolean;
-  neonDb: boolean;
+  supabaseDb: boolean;
   goHighLevel: boolean;
   twilio: boolean;
   whatsapp: boolean;

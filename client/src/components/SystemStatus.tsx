@@ -7,7 +7,7 @@ export const SystemStatus: React.FC = () => {
   const systems = [
     { name: 'Notion Knowledge Base', status: 'synced', lastSync: 'Just now', icon: 'N' },
     { name: 'Slack Ops Channel', status: 'live', lastSync: 'Listening', icon: 'S' },
-    { name: 'NeonDB Audit Log', status: 'active', lastSync: 'Recording', icon: 'DB' },
+    { name: 'Supabase Audit Log', status: 'active', lastSync: 'Recording', icon: 'DB' },
     { name: 'GoHighLevel API', status: 'connected', lastSync: '45ms latency', icon: 'GHL' },
     { name: 'Twilio Voice AI', status: 'standby', lastSync: 'Ready for calls', icon: 'T' },
     { name: 'WhatsApp Business', status: 'connected', lastSync: 'msg_id_992', icon: 'WA' },

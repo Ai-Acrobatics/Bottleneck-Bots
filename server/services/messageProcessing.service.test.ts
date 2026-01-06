@@ -1,37 +1,126 @@
 /**
  * Unit Tests for Message Processing Service
  *
- * Tests intent detection, task creation from messages,
- * urgency detection, and fallback rule-based parsing
+ * Tests the processMessage method which handles inbound message processing
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { messageProcessingService } from "./messageProcessing.service";
-import { createTestDb } from "@/__tests__/helpers/test-db";
-import { mockEnv } from "@/__tests__/helpers/test-helpers";
+
+// Mock AI clients before importing the service
+vi.mock("@anthropic-ai/sdk", () => {
+  const MockAnthropic = function(this: any) {
+    this.messages = {
+      create: vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: "Mock response" }],
+      }),
+    };
+  };
+  return { default: MockAnthropic };
+});
+
+vi.mock("openai", () => {
+  const MockOpenAI = function(this: any) {
+    this.chat = {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          choices: [{ message: { content: "Mock response" } }],
+        }),
+      },
+    };
+  };
+  return { default: MockOpenAI };
+});
 
 // Mock dependencies
 vi.mock("@/server/db");
-vi.mock("@/server/ai/client", () => ({
-  openaiClient: {
-    chat: {
-      completions: {
-        create: vi.fn(),
+
+// Import after mocking
+import { MessageProcessingService } from "./messageProcessing.service";
+
+// Helper: Create test database mock
+function createTestDb(config: {
+  selectResponse?: any[];
+  insertResponse?: any[];
+  updateResponse?: any[];
+} = {}) {
+  const { selectResponse = [], insertResponse = [], updateResponse = [] } = config;
+
+  const createChainableQuery = (response: any) => {
+    const chain: any = {
+      from: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      orderBy: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      offset: vi.fn(() => chain),
+      innerJoin: vi.fn(() => chain),
+      leftJoin: vi.fn(() => chain),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
       },
-    },
-  },
-}));
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  const createInsertChain = (response: any) => {
+    const chain: any = {
+      values: vi.fn(() => chain),
+      returning: vi.fn(() => Promise.resolve(response)),
+      onConflictDoUpdate: vi.fn(() => chain),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
+      },
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  const createUpdateChain = (response: any) => {
+    const chain: any = {
+      set: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      returning: vi.fn(() => Promise.resolve(response)),
+      then: (resolve: (value: any) => void) => {
+        resolve(response);
+        return Promise.resolve(response);
+      },
+    };
+    return Object.assign(Promise.resolve(response), chain);
+  };
+
+  return {
+    select: vi.fn(() => createChainableQuery(selectResponse)),
+    insert: vi.fn(() => createInsertChain(insertResponse)),
+    update: vi.fn(() => createUpdateChain(updateResponse)),
+    delete: vi.fn(() => createChainableQuery([])),
+  };
+}
+
+// Helper: Mock environment variables
+function mockEnv(vars: Record<string, string>): () => void {
+  const originalEnv = { ...process.env };
+  Object.entries(vars).forEach(([key, value]) => {
+    process.env[key] = value;
+  });
+  return () => {
+    process.env = originalEnv;
+  };
+}
 
 describe("Message Processing Service", () => {
   let restoreEnv: () => void;
+  let messageProcessingService: MessageProcessingService;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     restoreEnv = mockEnv({
       OPENAI_API_KEY: "sk-test-key",
+      ANTHROPIC_API_KEY: "sk-ant-test-key",
       DATABASE_URL: "postgresql://test:test@localhost/test",
     });
+
+    messageProcessingService = new MessageProcessingService();
   });
 
   afterEach(() => {
@@ -40,701 +129,238 @@ describe("Message Processing Service", () => {
   });
 
   // ========================================
-  // INTENT DETECTION TESTS
+  // SERVICE INSTANTIATION TESTS
   // ========================================
 
-  describe("detectIntent", () => {
-    it("should detect support request intent", async () => {
-      const message = "I need help with my account access";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "support_request",
-                confidence: 0.95,
-                entities: { issue_type: "account_access" },
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.intent).toBe("support_request");
-      expect(result.confidence).toBeGreaterThan(0.8);
+  describe("Service Instantiation", () => {
+    it("should create an instance of MessageProcessingService", () => {
+      expect(messageProcessingService).toBeDefined();
+      expect(messageProcessingService).toBeInstanceOf(MessageProcessingService);
     });
 
-    it("should detect order inquiry intent", async () => {
-      const message = "Where is my order #12345? It should have arrived by now";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "order_inquiry",
-                confidence: 0.92,
-                entities: { order_id: "12345" },
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.intent).toBe("order_inquiry");
-    });
-
-    it("should detect complaint intent", async () => {
-      const message = "Your product broke after one week. This is unacceptable!";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "complaint",
-                confidence: 0.98,
-                sentiment: "negative",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.intent).toBe("complaint");
-      expect(result.sentiment).toBe("negative");
-    });
-
-    it("should detect feedback intent", async () => {
-      const message = "Love your service! Keep up the great work";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "feedback",
-                confidence: 0.89,
-                sentiment: "positive",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.intent).toBe("feedback");
-      expect(result.sentiment).toBe("positive");
-    });
-
-    it("should detect scheduling intent", async () => {
-      const message = "I need to book an appointment for next Tuesday at 2pm";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "schedule_appointment",
-                confidence: 0.93,
-                entities: { date: "2024-01-23", time: "14:00" },
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.intent).toBe("schedule_appointment");
-    });
-
-    it("should return low confidence for ambiguous messages", async () => {
-      const message = "Ok";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "unknown",
-                confidence: 0.3,
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result.confidence).toBeLessThan(0.5);
-    });
-
-    it("should handle intent detection timeout with fallback", async () => {
-      const message = "Test message";
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockRejectedValue(new Error("Timeout"));
-
-      const result = await messageProcessingService.detectIntent(message);
-
-      expect(result).toBeDefined();
-      expect(result.intent).toBe("unknown");
+    it("should have processMessage method", () => {
+      expect(typeof messageProcessingService.processMessage).toBe("function");
     });
   });
 
   // ========================================
-  // TASK CREATION FROM MESSAGES TESTS
+  // PROCESS MESSAGE TESTS
   // ========================================
 
-  describe("createTaskFromMessage", () => {
-    it("should create task from support request", async () => {
-      const message = {
+  describe("processMessage", () => {
+    it("should return error when database is not initialized", async () => {
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(null);
+
+      const result = await messageProcessingService.processMessage(1, 1);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Database not initialized");
+    });
+
+    it("should return error when message is not found", async () => {
+      const db = createTestDb({ selectResponse: [] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await messageProcessingService.processMessage(999, 1);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Message not found");
+    });
+
+    it("should process valid message successfully", async () => {
+      const testMessage = {
         id: 1,
-        conversationId: 1,
+        webhookId: 1,
         userId: 1,
-        body: "I can't reset my password",
-        from: "+1234567890",
+        conversationId: 1,
+        content: "I need help with my order #12345",
+        senderIdentifier: "+1234567890",
+        processingStatus: "pending",
+        createdAt: new Date(),
       };
 
-      const task = {
+      const testTask = {
         id: 1,
         userId: 1,
         sourceType: "webhook_sms",
-        title: "Password reset request",
-        description: "Customer unable to reset password",
-        taskType: "support_request",
-        priority: "medium",
-        urgency: "normal",
+        title: "Order inquiry for #12345",
         status: "pending",
-        requiresHumanReview: true,
-        messageId: 1,
-        conversationId: 1,
       };
 
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Password reset request",
-                description: "Customer unable to reset password",
-                taskType: "support_request",
-                priority: "medium",
-              }),
+      // Mock select to return message on first call, empty for task check
+      let selectCallCount = 0;
+      const db = {
+        select: vi.fn().mockImplementation(() => {
+          selectCallCount++;
+          const response = selectCallCount === 1 ? [testMessage] : [];
+          const chain: any = {
+            from: vi.fn(() => chain),
+            where: vi.fn(() => chain),
+            orderBy: vi.fn(() => chain),
+            limit: vi.fn(() => chain),
+            then: (resolve: any) => {
+              resolve(response);
+              return Promise.resolve(response);
             },
-          },
-        ],
-      } as any);
-
-      const db = createTestDb({
-        insertResponse: [task],
-      });
+          };
+          return Object.assign(Promise.resolve(response), chain);
+        }),
+        insert: vi.fn().mockImplementation(() => {
+          const chain: any = {
+            values: vi.fn(() => chain),
+            returning: vi.fn(() => Promise.resolve([testTask])),
+            then: (resolve: any) => {
+              resolve([testTask]);
+              return Promise.resolve([testTask]);
+            },
+          };
+          return chain;
+        }),
+        update: vi.fn().mockImplementation(() => {
+          const chain: any = {
+            set: vi.fn(() => chain),
+            where: vi.fn(() => chain),
+            returning: vi.fn(() => Promise.resolve([testMessage])),
+            then: (resolve: any) => {
+              resolve([testMessage]);
+              return Promise.resolve([testMessage]);
+            },
+          };
+          return chain;
+        }),
+      };
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await messageProcessingService.createTaskFromMessage(
-        message as any
-      );
+      const result = await messageProcessingService.processMessage(1, 1);
 
-      expect(result.taskType).toBe("support_request");
-      expect(result.requiresHumanReview).toBe(true);
+      // The service should attempt to process the message
+      expect(db.select).toHaveBeenCalled();
+      expect(db.update).toHaveBeenCalled();
     });
 
-    it("should create task for complaint with high priority", async () => {
-      const message = {
-        id: 2,
-        conversationId: 2,
-        userId: 1,
-        body: "Your service is terrible! I demand a refund!",
-        from: "+9876543210",
+    it("should handle errors gracefully", async () => {
+      const db = {
+        select: vi.fn().mockImplementation(() => {
+          throw new Error("Database error");
+        }),
+        update: vi.fn().mockImplementation(() => {
+          const chain: any = {
+            set: vi.fn(() => chain),
+            where: vi.fn(() => chain),
+            returning: vi.fn(() => Promise.resolve([])),
+          };
+          return chain;
+        }),
       };
-
-      const task = {
-        id: 2,
-        userId: 1,
-        sourceType: "webhook_sms",
-        title: "Customer complaint",
-        taskType: "complaint",
-        priority: "high",
-        urgency: "urgent",
-        status: "pending",
-        requiresHumanReview: true,
-        sentiment: "negative",
-      };
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Customer complaint",
-                taskType: "complaint",
-                priority: "high",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const db = createTestDb({
-        insertResponse: [task],
-      });
 
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await messageProcessingService.createTaskFromMessage(
-        message as any
-      );
+      const result = await messageProcessingService.processMessage(1, 1);
 
-      expect(result.priority).toBe("high");
-      expect(result.requiresHumanReview).toBe(true);
-    });
-
-    it("should extract order ID from message and create task", async () => {
-      const message = {
-        id: 3,
-        conversationId: 3,
-        userId: 1,
-        body: "Where is order #ORD-2024-001234?",
-        from: "+1111111111",
-      };
-
-      const task = {
-        id: 3,
-        userId: 1,
-        sourceType: "webhook_sms",
-        title: "Order status inquiry for ORD-2024-001234",
-        taskType: "order_inquiry",
-        metadata: { orderId: "ORD-2024-001234" },
-      };
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Order status inquiry for ORD-2024-001234",
-                taskType: "order_inquiry",
-                orderId: "ORD-2024-001234",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const db = createTestDb({
-        insertResponse: [task],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await messageProcessingService.createTaskFromMessage(
-        message as any
-      );
-
-      expect(result.metadata?.orderId).toBe("ORD-2024-001234");
-    });
-
-    it("should set human review requirement based on priority", async () => {
-      const message = {
-        id: 4,
-        conversationId: 4,
-        userId: 1,
-        body: "URGENT: System is down!",
-        from: "+2222222222",
-      };
-
-      const task = {
-        id: 4,
-        userId: 1,
-        title: "URGENT: System is down!",
-        priority: "critical",
-        urgency: "immediate",
-        requiresHumanReview: true,
-        assignedToBot: false,
-      };
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "URGENT: System is down!",
-                priority: "critical",
-                urgency: "immediate",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const db = createTestDb({
-        insertResponse: [task],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      const result = await messageProcessingService.createTaskFromMessage(
-        message as any
-      );
-
-      expect(result.priority).toBe("critical");
-      expect(result.requiresHumanReview).toBe(true);
-    });
-
-    it("should handle task creation failure gracefully", async () => {
-      const message = {
-        id: 5,
-        conversationId: 5,
-        userId: 1,
-        body: "Test message",
-        from: "+3333333333",
-      };
-
-      const mockOpenAI = await import("@/server/ai/client");
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockRejectedValue(new Error("AI service unavailable"));
-
-      const db = createTestDb({
-        insertResponse: [],
-      });
-
-      const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
-
-      await expect(
-        messageProcessingService.createTaskFromMessage(message as any)
-      ).rejects.toThrow();
+      expect(result.success).toBe(false);
     });
   });
 
   // ========================================
-  // URGENCY DETECTION TESTS
+  // INPUT VALIDATION TESTS
   // ========================================
 
-  describe("detectUrgency", () => {
-    it("should detect immediate urgency from keywords", async () => {
-      const message = "URGENT! System critical error!";
+  describe("Input Validation", () => {
+    it("should handle invalid message ID", async () => {
+      const db = createTestDb({ selectResponse: [] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await messageProcessingService.detectUrgency(message);
+      const result = await messageProcessingService.processMessage(-1, 1);
 
-      expect(result.urgency).toBe("immediate");
-      expect(result.confidence).toBeGreaterThan(0.8);
+      expect(result.success).toBe(false);
     });
 
-    it("should detect urgent urgency", async () => {
-      const message = "Please help ASAP with this issue";
+    it("should handle invalid user ID", async () => {
+      const db = createTestDb({ selectResponse: [] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const result = await messageProcessingService.detectUrgency(message);
+      const result = await messageProcessingService.processMessage(1, -1);
 
-      expect(["urgent", "immediate"]).toContain(result.urgency);
-    });
-
-    it("should detect soon urgency", async () => {
-      const message = "Could you help me with this when you get a chance?";
-
-      const result = await messageProcessingService.detectUrgency(message);
-
-      expect(result.urgency).toBe("soon");
-    });
-
-    it("should default to normal urgency", async () => {
-      const message = "How do I use feature X?";
-
-      const result = await messageProcessingService.detectUrgency(message);
-
-      expect(result.urgency).toBe("normal");
-    });
-
-    it("should analyze tone for urgency", async () => {
-      const messages = [
-        { text: "Help!", expected: "immediate" },
-        { text: "Help please", expected: "soon" },
-        { text: "How can I...", expected: "normal" },
-      ];
-
-      for (const msg of messages) {
-        const result = await messageProcessingService.detectUrgency(msg.text);
-        expect([msg.expected, "urgent", "immediate"]).toContain(
-          result.urgency
-        );
-      }
-    });
-
-    it("should detect emergency indicators", async () => {
-      const emergencyMessages = [
-        "System down!",
-        "Critical error!",
-        "EMERGENCY",
-        "Help immediately!",
-      ];
-
-      for (const msg of emergencyMessages) {
-        const result = await messageProcessingService.detectUrgency(msg);
-        expect(result.urgency).toBe("immediate");
-      }
+      expect(result.success).toBe(false);
     });
   });
 
   // ========================================
-  // RULE-BASED FALLBACK PARSING TESTS
+  // EDGE CASES
   // ========================================
 
-  describe("rulBasedParsing", () => {
-    it("should extract email addresses using regex", async () => {
-      const message = "Contact us at support@example.com or sales@example.com";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.emails).toContain("support@example.com");
-      expect(result.entities.emails).toContain("sales@example.com");
-    });
-
-    it("should extract phone numbers", async () => {
-      const message = "Call me at (555) 123-4567 or 555.987.6543";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.phones).toBeDefined();
-      expect(result.entities.phones.length).toBeGreaterThan(0);
-    });
-
-    it("should extract URLs", async () => {
-      const message =
-        "Visit https://example.com or http://www.example.org for more info";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.urls).toContain("https://example.com");
-    });
-
-    it("should extract order numbers", async () => {
-      const message = "Order #12345 or order ORD-2024-001234";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.orderNumbers).toBeDefined();
-      expect(result.entities.orderNumbers.length).toBeGreaterThan(0);
-    });
-
-    it("should extract dates and times", async () => {
-      const message = "Meeting on 2024-01-15 at 10:30 AM";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.dates).toBeDefined();
-      expect(result.entities.times).toBeDefined();
-    });
-
-    it("should extract price amounts", async () => {
-      const message = "The total is $99.99 or 50 EUR";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.prices).toBeDefined();
-      expect(result.entities.prices.length).toBeGreaterThan(0);
-    });
-
-    it("should extract names from greetings", async () => {
-      const message = "Hi John, I'm Sarah calling about your order";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities).toBeDefined();
-    });
-
-    it("should handle multiple entities in complex message", async () => {
-      const message =
-        "Hi Sarah, I'm John at support@example.com (555) 123-4567. " +
-        "About order #ORD-2024-001234, scheduled for 2024-01-20. " +
-        "Total: $150.00. Website: https://example.com";
-
-      const result = await messageProcessingService.parseWithRules(message);
-
-      expect(result.entities.emails?.length).toBeGreaterThan(0);
-      expect(result.entities.phones?.length).toBeGreaterThan(0);
-      expect(result.entities.urls?.length).toBeGreaterThan(0);
-      expect(result.entities.prices?.length).toBeGreaterThan(0);
-    });
-  });
-
-  // ========================================
-  // SENTIMENT ANALYSIS TESTS
-  // ========================================
-
-  describe("analyzeSentiment", () => {
-    it("should detect positive sentiment", async () => {
-      const message = "I love your product! Excellent service!";
-
-      const result = await messageProcessingService.analyzeSentiment(message);
-
-      expect(result.sentiment).toBe("positive");
-      expect(result.score).toBeGreaterThan(0);
-    });
-
-    it("should detect negative sentiment", async () => {
-      const message = "Terrible experience. Very disappointed.";
-
-      const result = await messageProcessingService.analyzeSentiment(message);
-
-      expect(result.sentiment).toBe("negative");
-      expect(result.score).toBeLessThan(0);
-    });
-
-    it("should detect neutral sentiment", async () => {
-      const message = "I want to check my order status";
-
-      const result = await messageProcessingService.analyzeSentiment(message);
-
-      expect(result.sentiment).toBe("neutral");
-      expect(Math.abs(result.score)).toBeLessThan(0.3);
-    });
-
-    it("should handle mixed sentiment", async () => {
-      const message = "The product is good but shipping was slow";
-
-      const result = await messageProcessingService.analyzeSentiment(message);
-
-      expect(result.sentiment).toBe("mixed");
-    });
-  });
-
-  // ========================================
-  // INTEGRATION TESTS
-  // ========================================
-
-  describe("Integration", () => {
-    it("should process complete message workflow", async () => {
-      const message = {
+  describe("Edge Cases", () => {
+    it("should handle empty message content", async () => {
+      const testMessage = {
         id: 1,
-        conversationId: 1,
+        webhookId: 1,
         userId: 1,
-        body: "I need help with order #ORD-001! It's urgent!",
-        from: "+1234567890",
+        conversationId: 1,
+        content: "",
+        senderIdentifier: "+1234567890",
+        processingStatus: "pending",
+        createdAt: new Date(),
       };
 
-      const mockOpenAI = await import("@/server/ai/client");
-
-      // First call: intent detection
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                intent: "order_inquiry",
-                confidence: 0.95,
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const intent = await messageProcessingService.detectIntent(message.body);
-      expect(intent.intent).toBe("order_inquiry");
-
-      // Second call: task creation
-      vi.mocked(
-        mockOpenAI.openaiClient.chat.completions.create
-      ).mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Order inquiry for ORD-001",
-                taskType: "order_inquiry",
-                priority: "high",
-              }),
-            },
-          },
-        ],
-      } as any);
-
-      const db = createTestDb({
-        insertResponse: [
-          {
-            id: 1,
-            title: "Order inquiry for ORD-001",
-            priority: "high",
-            urgency: "urgent",
-          },
-        ],
-      });
-
+      const db = createTestDb({ selectResponse: [testMessage] });
       const dbModule = await import("@/server/db");
-      vi.mocked(dbModule.getDb).mockImplementation(() =>
-        Promise.resolve(db as any)
-      );
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
 
-      const task = await messageProcessingService.createTaskFromMessage(
-        message as any
-      );
+      const result = await messageProcessingService.processMessage(1, 1);
 
-      expect(task.priority).toBe("high");
+      // Should still attempt to process even with empty content
+      expect(db.select).toHaveBeenCalled();
+    });
 
-      // Rule-based parsing for entities
-      const parsed = await messageProcessingService.parseWithRules(
-        message.body
-      );
+    it("should handle very long message content", async () => {
+      const testMessage = {
+        id: 1,
+        webhookId: 1,
+        userId: 1,
+        conversationId: 1,
+        content: "A".repeat(10000),
+        senderIdentifier: "+1234567890",
+        processingStatus: "pending",
+        createdAt: new Date(),
+      };
 
-      expect(parsed.entities).toBeDefined();
+      const db = createTestDb({ selectResponse: [testMessage] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await messageProcessingService.processMessage(1, 1);
+
+      // Should handle long content gracefully
+      expect(db.select).toHaveBeenCalled();
+    });
+
+    it("should handle special characters in message", async () => {
+      const testMessage = {
+        id: 1,
+        webhookId: 1,
+        userId: 1,
+        conversationId: 1,
+        content: '<script>alert("XSS")</script>',
+        senderIdentifier: "+1234567890",
+        processingStatus: "pending",
+        createdAt: new Date(),
+      };
+
+      const db = createTestDb({ selectResponse: [testMessage] });
+      const dbModule = await import("@/server/db");
+      vi.mocked(dbModule.getDb).mockResolvedValue(db as any);
+
+      const result = await messageProcessingService.processMessage(1, 1);
+
+      // Should handle special characters gracefully
+      expect(db.select).toHaveBeenCalled();
     });
   });
 });

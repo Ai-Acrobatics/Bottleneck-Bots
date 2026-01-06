@@ -27,7 +27,7 @@ This guide will help you set up Browserbase for automated GoHighLevel (GHL) task
 - Service Account token for API access
 
 ### 3. **Database** (Optional - only for session history)
-- PostgreSQL database (Neon, Supabase, or Vercel Postgres)
+- PostgreSQL database (Supabase recommended, or Vercel Postgres)
 - Used for storing session metadata, NOT credentials
 
 ---

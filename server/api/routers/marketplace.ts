@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router } from "../../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../../_core/trpc";
 import { getDb } from "../../db";
 import { credit_packages } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -93,7 +93,7 @@ export const marketplaceRouter = router({
     /**
      * Create Stripe checkout session for credit package purchase
      */
-    createCheckout: publicProcedure
+    createCheckout: protectedProcedure
         .input(
             z.object({
                 packageId: z.number().int().positive(),
@@ -101,9 +101,8 @@ export const marketplaceRouter = router({
                 cancelUrl: z.string().url().optional(),
             })
         )
-        .mutation(async ({ input }) => {
-            // PLACEHOLDER: Replace with actual userId from auth context
-            const userId = 1;
+        .mutation(async ({ ctx, input }) => {
+            const userId = ctx.user.id;
 
             const db = await getDb();
             if (!db) {

@@ -1914,7 +1914,7 @@ Global shortcuts work throughout the platform:
 - Database: PostgreSQL with row-level encryption
 
 **Data Location:**
-- Primary: US East (Neon / AWS)
+- Primary: US East (Supabase / AWS)
 - EU option: Available on Enterprise plan
 - SOC 2 Type II certified
 

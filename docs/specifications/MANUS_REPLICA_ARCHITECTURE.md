@@ -48,7 +48,7 @@ Output: Live website + shareable link + visual editor access
 ┌─────────────────────────────────────────────────────────────┐
 │                     Infrastructure Layer                      │
 ├─────────────────────────────────────────────────────────────┤
-│  Vercel (Hosting) │ Neon (Database) │ S3 (Storage)          │
+│  Vercel (Hosting) │ Supabase (Database) │ S3 (Storage)          │
 │  Redis (Cache)    │ Docker (Sandbox) │ Cloudflare (CDN/DNS) │
 └─────────────────────────────────────────────────────────────┘
 ```

@@ -36,7 +36,7 @@ The integrated platform combines the strengths of both systems to create a power
 - Node.js 22 + Express
 - TypeScript with strict mode
 - tRPC 11 for end-to-end type safety
-- Drizzle ORM + PostgreSQL (Neon)
+- Drizzle ORM + PostgreSQL (Supabase)
 - Claude API (@anthropic-ai/sdk)
 - BullMQ for job queues
 
@@ -55,7 +55,7 @@ The integrated platform combines the strengths of both systems to create a power
 - n8n for workflow orchestration
 
 **Storage & Infrastructure**
-- PostgreSQL (Neon) for relational data
+- PostgreSQL (Supabase) for relational data
 - S3-compatible storage for assets
 - Redis for caching and sessions
 - Docker for containerization
@@ -93,7 +93,7 @@ The integrated platform combines the strengths of both systems to create a power
 │                 │ │                 │ │                 │
 │ ┌─────────────┐ │ │ ┌─────────────┐ │ │ ┌─────────────┐ │
 │ │ Claude-Flow │ │ │ │ Browserbase │ │ │ │ PostgreSQL  │ │
-│ │ Orchestrator│ │ │ │ + Stagehand │ │ │ │ (Neon)      │ │
+│ │ Orchestrator│ │ │ │ + Stagehand │ │ │ │ (Supabase)  │ │
 │ └─────────────┘ │ │ └─────────────┘ │ │ └─────────────┘ │
 │        │        │ │        │        │ │        │        │
 │ ┌─────────────┐ │ │ ┌─────────────┐ │ │ ┌─────────────┐ │

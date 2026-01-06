@@ -7,7 +7,7 @@ Get GHL Agency AI running in 5 minutes.
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL database (Neon recommended)
+- PostgreSQL database (Supabase recommended)
 - Redis instance
 - Browserbase account
 - Anthropic API key
@@ -31,8 +31,9 @@ cp .env.example .env
 Configure required variables:
 
 ```env
-# Database (Neon PostgreSQL)
-DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+# Database (Supabase PostgreSQL)
+# Format: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
 
 # Redis
 REDIS_URL=redis://localhost:6379

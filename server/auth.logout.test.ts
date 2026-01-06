@@ -1,6 +1,36 @@
-import { describe, expect, it } from "vitest";
-import { appRouter } from "./routers";
+// Set environment variables before any imports
+process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "test-key";
+process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "test-key";
+process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "0".repeat(64);
+
+import { describe, expect, it, vi } from "vitest";
 import { COOKIE_NAME } from "../shared/const";
+
+// Mock the Stagehand module to prevent buffer-equal-constant-time import issues
+vi.mock("@browserbasehq/stagehand", () => ({
+  Stagehand: vi.fn(),
+}));
+
+// Mock Anthropic to prevent API key requirement
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    messages: {
+      create: vi.fn().mockResolvedValue({ content: [{ text: "test" }] }),
+    },
+  })),
+}));
+
+// Mock code generator service
+vi.mock("./services/code-generator.service", () => ({
+  codeGeneratorService: {
+    generateCode: vi.fn(),
+    validateCode: vi.fn(),
+  },
+  getCodeGeneratorService: vi.fn(),
+}));
+
+// Import appRouter after mocking
+import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 type CookieCall = {
@@ -29,6 +59,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     user,
     req: {
       protocol: "https",
+      hostname: "localhost",
       headers: {},
     } as TrpcContext["req"],
     res: {

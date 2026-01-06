@@ -1,17 +1,19 @@
 import { z } from "zod";
-import { router, publicProcedure } from "../../_core/trpc";
+import { router, adminProcedure } from "../../_core/trpc";
 import { getDb } from "../../db";
 import { scheduledTasks } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
+// Note: scheduledTasks is a system-wide table without userId column.
+// Only admins should be able to manage scheduled tasks.
 export const tasksRouter = router({
-    getAll: publicProcedure.query(async () => {
+    getAll: adminProcedure.query(async () => {
         const db = await getDb();
         if (!db) throw new Error("Database not initialized");
         return await db.select().from(scheduledTasks);
     }),
 
-    create: publicProcedure
+    create: adminProcedure
         .input(
             z.object({
                 name: z.string(),
@@ -34,7 +36,7 @@ export const tasksRouter = router({
             return newTask;
         }),
 
-    toggle: publicProcedure
+    toggle: adminProcedure
         .input(z.object({ id: z.number(), status: z.enum(["active", "paused"]) }))
         .mutation(async ({ input }) => {
             const db = await getDb();
@@ -47,7 +49,7 @@ export const tasksRouter = router({
             return updatedTask;
         }),
 
-    runNow: publicProcedure
+    runNow: adminProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();

@@ -361,4 +361,69 @@ export const healthRouter = router({
       healthSummary: allHealth,
     };
   }),
+
+  /**
+   * Check Supabase/Database health
+   * Verifies database connectivity and configuration
+   *
+   * @example
+   * ```ts
+   * const dbHealth = await trpc.health.getDatabaseHealth.query();
+   * if (!dbHealth.healthy) {
+   *   console.error('Database issues:', dbHealth.error);
+   * }
+   * ```
+   */
+  getDatabaseHealth: publicProcedure.query(async () => {
+    try {
+      const { getDb } = await import('../../db');
+      const { testSupabaseConnection, getSupabaseClient } = await import('../../services/supabase.service');
+
+      const results: {
+        healthy: boolean;
+        timestamp: string;
+        drizzle: { connected: boolean; error?: string };
+        supabase: { connected: boolean; configured: boolean; error?: string };
+      } = {
+        healthy: false,
+        timestamp: new Date().toISOString(),
+        drizzle: { connected: false },
+        supabase: { connected: false, configured: false },
+      };
+
+      // Test Drizzle ORM connection
+      try {
+        const db = await getDb();
+        results.drizzle.connected = db !== null;
+      } catch (error) {
+        results.drizzle.connected = false;
+        results.drizzle.error = error instanceof Error ? error.message : 'Unknown error';
+      }
+
+      // Test Supabase client
+      try {
+        const client = getSupabaseClient();
+        results.supabase.configured = client !== null;
+
+        if (client) {
+          results.supabase.connected = await testSupabaseConnection();
+        }
+      } catch (error) {
+        results.supabase.connected = false;
+        results.supabase.error = error instanceof Error ? error.message : 'Unknown error';
+      }
+
+      results.healthy = results.drizzle.connected || results.supabase.connected;
+
+      return results;
+    } catch (error) {
+      return {
+        healthy: false,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+        drizzle: { connected: false },
+        supabase: { connected: false, configured: false },
+      };
+    }
+  }),
 });

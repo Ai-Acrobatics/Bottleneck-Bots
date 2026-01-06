@@ -151,9 +151,9 @@ cp .env.example .env
 # 2. Add your database URL
 echo "DATABASE_URL=postgresql://user:password@localhost:5432/ghl_agency_ai" >> .env
 
-# 3. For Neon (recommended):
-# Get URL from: https://console.neon.tech
-echo "DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require" >> .env
+# 3. For Supabase (recommended):
+# Get URL from: https://supabase.com/dashboard
+echo "DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres" >> .env
 
 # 4. Test connection
 pnpm tsx scripts/test-db.ts
@@ -176,7 +176,7 @@ Error: The server does not support SSL connections
 
 **Cause:**
 - PostgreSQL server requires SSL but client not configured
-- Common with Neon, Supabase, Railway databases
+- Common with Supabase, Railway, and other managed databases
 
 **Solution:**
 Update connection config in `/root/github-repos/active/ghl-agency-ai/server/db.ts`:

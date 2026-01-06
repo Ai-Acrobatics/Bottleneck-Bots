@@ -10,6 +10,7 @@ import { createEmailWorker } from "./emailWorker";
 import { createVoiceWorker } from "./voiceWorker";
 import { createEnrichmentWorker } from "./enrichmentWorker";
 import { createWorkflowWorker } from "./workflowWorker";
+import { createMemoryCleanupWorker } from "./memoryCleanup.worker";
 import { shutdownQueues, shutdownQueueEvents } from "../_core/queue";
 import { Worker } from "bullmq";
 
@@ -27,12 +28,13 @@ async function startWorkers() {
         const voiceWorker = createVoiceWorker();
         const enrichmentWorker = createEnrichmentWorker();
         const workflowWorker = createWorkflowWorker();
+        const memoryCleanupWorker = createMemoryCleanupWorker();
 
-        workers.push(emailWorker, voiceWorker, enrichmentWorker, workflowWorker);
+        workers.push(emailWorker, voiceWorker, enrichmentWorker, workflowWorker, memoryCleanupWorker);
 
         // Add global error handlers
         workers.forEach((worker, index) => {
-            const workerNames = ["email", "voice", "enrichment", "workflow"];
+            const workerNames = ["email", "voice", "enrichment", "workflow", "memory_cleanup"];
             const workerName = workerNames[index];
 
             worker.on("completed", (job) => {
@@ -58,6 +60,7 @@ async function startWorkers() {
         console.log("  - Voice Worker (voice_call)");
         console.log("  - Enrichment Worker (lead_enrichment)");
         console.log("  - Workflow Worker (workflow_execution)");
+        console.log("  - Memory Cleanup Worker (memory_cleanup, memory_consolidation)");
         console.log("\nPress Ctrl+C to stop workers");
     } catch (error) {
         console.error("Failed to start workers:", error);
