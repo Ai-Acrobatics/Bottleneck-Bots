@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure } from "../../_core/trpc";
+import { router, publicProcedure, protectedProcedure } from "../../_core/trpc";
 import { getDb } from "../../db";
 import { automationTemplates } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -11,7 +11,7 @@ export const templatesRouter = router({
         return await db.select().from(automationTemplates);
     }),
 
-    execute: publicProcedure
+    execute: protectedProcedure
         .input(z.object({ id: z.number() }))
         .mutation(async ({ input }) => {
             const db = await getDb();

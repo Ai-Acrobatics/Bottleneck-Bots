@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../../_core/trpc";
+import { router, publicProcedure, adminProcedure } from "../../_core/trpc";
 import { circuitBreakerRegistry } from "../../lib/circuitBreaker";
 import { browserbaseSDK } from "../../_core/browserbaseSDK";
 
@@ -125,7 +125,7 @@ export const healthRouter = router({
    * await trpc.health.resetCircuit.mutate({ serviceName: 'vapi' });
    * ```
    */
-  resetCircuit: publicProcedure
+  resetCircuit: adminProcedure
     .input(
       z.object({
         serviceName: z.enum([
@@ -164,7 +164,7 @@ export const healthRouter = router({
    * await trpc.health.resetAllCircuits.mutate();
    * ```
    */
-  resetAllCircuits: publicProcedure.mutation(async () => {
+  resetAllCircuits: adminProcedure.mutation(async () => {
     circuitBreakerRegistry.resetAll();
 
     return {

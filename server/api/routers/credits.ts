@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, protectedProcedure, router } from "../../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "../../_core/trpc";
 import { getDb } from "../../db";
 import { user_credits, credit_packages, credit_transactions } from "../../../drizzle/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -178,10 +178,9 @@ export const creditsRouter = router({
   /**
    * Create a new credit package (Admin only)
    */
-  createPackage: publicProcedure
+  createPackage: adminProcedure
     .input(createPackageSchema)
     .mutation(async ({ input }) => {
-      // PLACEHOLDER: Add admin role check when auth is implemented
 
       const db = await getDb();
       if (!db) {
@@ -213,10 +212,9 @@ export const creditsRouter = router({
   /**
    * Update a credit package (Admin only)
    */
-  updatePackage: publicProcedure
+  updatePackage: adminProcedure
     .input(updatePackageSchema)
     .mutation(async ({ input }) => {
-      // PLACEHOLDER: Add admin role check when auth is implemented
 
       const db = await getDb();
       if (!db) {
@@ -530,10 +528,9 @@ export const creditsRouter = router({
   /**
    * Adjust credits manually (Admin only)
    */
-  adjustCredits: publicProcedure
+  adjustCredits: adminProcedure
     .input(adjustCreditsSchema)
     .mutation(async ({ input }) => {
-      // PLACEHOLDER: Add admin role check when auth is implemented
 
       const creditService = new CreditService();
 
