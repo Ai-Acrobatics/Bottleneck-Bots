@@ -54,13 +54,13 @@ function App() {
   useEffect(() => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    
+
     // Handle OAuth popup callback (for integration OAuth flows)
     if (path === '/api/oauth/callback') {
       setCurrentView('OAUTH_CALLBACK');
       return;
     }
-    
+
     // Handle OAuth errors redirected from server
     const error = params.get('error');
     if (error) {
@@ -70,7 +70,35 @@ function App() {
       window.history.replaceState({}, '', path);
       return;
     }
-    
+
+    // Handle protected routes - redirect to login if not authenticated
+    const protectedPaths = ['/dashboard', '/agent', '/settings', '/lead-lists', '/ai-campaigns', '/browser-sessions'];
+    const isProtectedPath = protectedPaths.some(p => path.startsWith(p));
+
+    if (isProtectedPath && !isAuthLoading && !user) {
+      // Not logged in, redirect to login
+      setCurrentView('LOGIN');
+      return;
+    }
+
+    // Handle public page routes
+    if (path === '/features') {
+      setCurrentView('FEATURES');
+      return;
+    }
+    if (path === '/privacy') {
+      setCurrentView('PRIVACY');
+      return;
+    }
+    if (path === '/terms') {
+      setCurrentView('TERMS');
+      return;
+    }
+    if (path === '/login') {
+      setCurrentView('LOGIN');
+      return;
+    }
+
     // Legacy support: Handle /auth/callback route (if still used)
     // The server now sets cookies directly, but this handles any edge cases
     if (path === '/auth/callback') {
@@ -86,7 +114,7 @@ function App() {
         refetchUser();
       }
     }
-  }, [refetchUser]);
+  }, [refetchUser, isAuthLoading, user]);
 
   useEffect(() => {
     if (user) {
