@@ -112,3 +112,9 @@ stagehand-nextjs-quickstart/
 .env.backup
 .env.production
 .env.secrets
+
+# Agent workspace artifacts
+.codex/
+.hermes/
+.planning/e2e/results/
+agentic-os.config.json
